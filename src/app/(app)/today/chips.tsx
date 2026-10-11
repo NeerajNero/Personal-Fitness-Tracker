@@ -1,4 +1,5 @@
-import { ROUTINE_LABEL, type DayState } from "@/lib/rules/dayState";
+import { ROUTINE_LABEL } from "@/lib/routine";
+import type { DayState } from "@/lib/rules/dayState";
 
 type Tone = "neutral" | "good" | "bad";
 

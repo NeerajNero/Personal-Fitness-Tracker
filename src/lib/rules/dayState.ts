@@ -12,7 +12,9 @@ import { daysBetween, isoWeekday } from "@/lib/dates";
 import { getTargets, type Targets } from "@/lib/metrics/phase";
 import { getSettings } from "@/lib/settings";
 
-export type RoutineDayName = "UpperA" | "LowerA" | "UpperB" | "LowerB";
+import type { RoutineDayName } from "@/lib/routine";
+
+export type { RoutineDayName };
 
 export type DayState = {
   /** IST calendar date "YYYY-MM-DD". */
@@ -28,7 +30,9 @@ export type DayState = {
     isTrainingDay: boolean;
     routineDayName: RoutineDayName | null;
     routineDayId: number | null;
+    /** True once the session has at least one set or the incline walk is ticked. */
     workoutLogged: boolean;
+    /** Set whenever a session row exists for the date, even if nothing is logged in it yet. */
     sessionId: number | null;
     /** "HH:MM:SS" IST of the latest food entry, or null. */
     lastFoodAt: string | null;
@@ -66,7 +70,12 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
       .where(eq(routineDays.weekday, weekday))
       .then((r) => r[0] ?? null),
     db
-      .select({ id: sessions.id })
+      .select({
+        id: sessions.id,
+        inclineWalk: sessions.inclineWalk,
+        // Fully qualified on purpose: drizzle would render the outer id unqualified and the subquery would bind it to sets.id.
+        setCount: sql<number>`(select count(*) from "sets" st where st."session_id" = "sessions"."id")::int`,
+      })
       .from(sessions)
       .where(eq(sessions.date, date))
       .orderBy(desc(sessions.id))
@@ -93,7 +102,7 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
       isTrainingDay: routineDay !== null,
       routineDayName: routineDay?.name ?? null,
       routineDayId: routineDay?.id ?? null,
-      workoutLogged: session !== null,
+      workoutLogged: session !== null && (session.inclineWalk || session.setCount > 0),
       sessionId: session?.id ?? null,
       lastFoodAt,
       foodLoggedSince: (time) => lastFoodAt !== null && lastFoodAt >= time,
@@ -101,10 +110,3 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
     smokeFreeDays: s.smokeFreeSince ? Math.max(0, daysBetween(s.smokeFreeSince, date)) : null,
   };
 }
-
-export const ROUTINE_LABEL: Record<RoutineDayName, string> = {
-  UpperA: "Upper A",
-  LowerA: "Lower A",
-  UpperB: "Upper B",
-  LowerB: "Lower B",
-};

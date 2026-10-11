@@ -5,20 +5,14 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { dailyMetrics, foodLog, foods } from "@/db/schema";
+import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE, nowTimeIST } from "@/lib/dates";
 import { requireSession } from "@/lib/session";
-
-export type ActionResult<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const qtySchema = z.coerce.number().positive("Qty must be > 0").max(50, "Qty too large");
 
 const round = (n: number, dp: number) => Math.round(n * 10 ** dp) / 10 ** dp;
-
-function fail(err: unknown): { ok: false; error: string } {
-  if (err instanceof z.ZodError) return { ok: false, error: err.issues[0]?.message ?? "Invalid input" };
-  return { ok: false, error: err instanceof Error ? err.message : "Something went wrong" };
-}
 
 /* ------------------------------ daily metrics ------------------------------ */
 

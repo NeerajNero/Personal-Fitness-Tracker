@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-type Props = { date: string; isToday: boolean; label: string; prev: string; next: string | null };
+type Props = { basePath: string; date: string; isToday: boolean; label: string; prev: string; next: string | null };
 
 const arrow = "flex size-11 items-center justify-center rounded-full text-2xl text-muted active:bg-surface";
 
-export function DateHeader({ date, isToday, label, prev, next }: Props) {
+export function DateHeader({ basePath, date, isToday, label, prev, next }: Props) {
   return (
     <header className="flex items-center justify-between">
-      <Link href={`/today?d=${prev}`} aria-label="Previous day" className={arrow}>
+      <Link href={`${basePath}?d=${prev}`} aria-label="Previous day" className={arrow}>
         ‹
       </Link>
       <div className="text-center">
@@ -15,7 +15,7 @@ export function DateHeader({ date, isToday, label, prev, next }: Props) {
         <p className="text-xs text-muted">{isToday ? label : date}</p>
       </div>
       {next ? (
-        <Link href={isToday ? "/today" : `/today?d=${next}`} aria-label="Next day" className={arrow}>
+        <Link href={isToday ? basePath : `${basePath}?d=${next}`} aria-label="Next day" className={arrow}>
           ›
         </Link>
       ) : (

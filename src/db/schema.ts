@@ -244,6 +244,23 @@ export const sessions = pgTable(
   (t) => [index("sessions_date_idx").on(t.date)],
 );
 
+/** Exercises attached to a session (routine copy at start, plus ad-hoc additions). */
+export const sessionExercises = pgTable(
+  "session_exercises",
+  {
+    sessionId: integer("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    exerciseId: integer("exercise_id")
+      .notNull()
+      .references(() => exercises.id, { onDelete: "cascade" }),
+    sortOrder: smallint("sort_order").notNull(),
+    targetSets: smallint("target_sets").notNull().default(3),
+    targetReps: smallint("target_reps").notNull().default(8),
+  },
+  (t) => [primaryKey({ columns: [t.sessionId, t.exerciseId] })],
+);
+
 export const sets = pgTable(
   "sets",
   {
@@ -307,6 +324,7 @@ export type Exercise = typeof exercises.$inferSelect;
 export type RoutineDay = typeof routineDays.$inferSelect;
 export type RoutineExercise = typeof routineExercises.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
+export type SessionExercise = typeof sessionExercises.$inferSelect;
 export type WorkoutSet = typeof sets.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type NudgeLog = typeof nudgeLog.$inferSelect;

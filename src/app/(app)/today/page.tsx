@@ -3,7 +3,7 @@ import { addDays, formatDayLabel, isValidIsoDate, todayIST } from "@/lib/dates";
 import { listFoodLog, listFoods } from "@/lib/food";
 import { getDayState } from "@/lib/rules/dayState";
 import { Chips } from "./chips";
-import { DateHeader } from "./date-header";
+import { DateHeader } from "@/components/date-header";
 import { FoodSection } from "./food-section";
 import { MetricInputs } from "./metric-inputs";
 import { Totals } from "./totals";
@@ -20,6 +20,7 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-5">
       <DateHeader
+        basePath="/today"
         date={date}
         isToday={date === today}
         label={formatDayLabel(date)}

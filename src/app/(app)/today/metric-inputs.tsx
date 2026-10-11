@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { saveSteps, saveWeight, type ActionResult } from "./actions";
+import type { ActionResult } from "@/lib/action-result";
+import { saveSteps, saveWeight } from "./actions";
 
 type Status = "idle" | "saving" | "saved" | "error";
 

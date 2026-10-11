@@ -58,6 +58,7 @@ covers it.
 - `routine_days`: id, name (UpperA|LowerA|UpperB|LowerB), weekday, sort_order
 - `routine_exercises`: routine_day_id, exercise_id, sort_order, target_sets, target_reps
 - `sessions`: id, date, routine_day_id (nullable for ad-hoc), incline_walk (bool), notes
+- `session_exercises`: session_id, exercise_id, sort_order, target_sets, target_reps — exercises in a session (routine copied at start + ad-hoc additions); PK (session_id, exercise_id)
 - `sets`: id, session_id, exercise_id, set_no, weight_kg, reps, rpe (nullable), is_working
 - `activities`: id, date, name, minutes, notes — quick-add sport/cardio
 - `nudge_log`: id, sent_at, rule_key, date, payload — prevents duplicate sends, enforces daily cap
@@ -142,7 +143,7 @@ DayState {
   remaining: { kcal, protein }            // negative = over; protein vs proteinMin
   metrics:   { weightKg, steps, waterGlasses }   // null when not logged
   flags: { weightLogged, stepsLogged, isTrainingDay, routineDayName, routineDayId,
-           workoutLogged, sessionId, lastFoodAt ("HH:MM:SS"|null), foodLoggedSince(time) }
+           workoutLogged (≥1 set or incline walk), sessionId (any session row), lastFoodAt ("HH:MM:SS"|null), foodLoggedSince(time) }
   smokeFreeDays: number | null
 }
 ```
