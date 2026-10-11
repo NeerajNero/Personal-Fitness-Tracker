@@ -134,7 +134,7 @@ Each rule = `{ key, window, condition(state), message(state) }`. Idempotent via 
 
 ## Env (`.env.example`)
 `DATABASE_URL` `AUTH_SECRET` `AUTH_GOOGLE_ID` `AUTH_GOOGLE_SECRET` `ALLOWED_EMAIL`
-`TELEGRAM_BOT_TOKEN` `TELEGRAM_WEBHOOK_SECRET` `TICK_SECRET` `GEMINI_API_KEY` `NEXT_PUBLIC_APP_URL`
+`TELEGRAM_BOT_TOKEN` `TELEGRAM_BOT_USERNAME` `TELEGRAM_WEBHOOK_SECRET` `TICK_SECRET` `GEMINI_API_KEY` `NEXT_PUBLIC_APP_URL`
 
 ## Build order
 1 scaffold → 2 schema + seed → 3 auth + app shell + PWA → 4 Today → 5 Train → 6 Trends + export
@@ -149,6 +149,9 @@ Food-database search, calorie-burn estimates, sleep tracking, mood, multi-user, 
 - Turbopack is always on in Next 16 (dev and build); there is no webpack fallback.
 - `AGENTS.md` is auto-generated and rewritten by `next dev` on every run — never edit it. CLAUDE.md is the source of truth.
 - Run `pnpm exec next typegen` before `tsc --noEmit`; the generated `LayoutProps` / `PageProps` globals live in `.next/types` and `tsc` fails without them.
+- `cacheComponents` is OFF in next.config.ts: every screen is per-request (auth + db), and the flag would require a Suspense boundary around each dynamic read. Keep it off.
+- Request-level guards use `proxy.ts` in Next 16 (`middleware.ts` is deprecated). The auth gate lives in `src/app/(app)/layout.tsx`; there is no proxy.ts.
+- Root `auth.ts` is importable as `@/auth` via an explicit tsconfig path alias.
 
 ## Secrets
 - Secrets live in `.env` (not `.env.local`). All scripts, `drizzle.config.ts`, and Next.js read from `.env`.

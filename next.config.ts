@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Every screen is per-request and single-user; cacheComponents would force a
+  // Suspense boundary around each auth()/db call for no benefit. See CLAUDE.md.
+  cacheComponents: false,
   turbopack: {
     rules: {
       "*.css": {
