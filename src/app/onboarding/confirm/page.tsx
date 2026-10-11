@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { todayIST } from "@/lib/dates";
-import { currentPhase, proteinRange } from "@/lib/rules/phase";
+import { getTargets } from "@/lib/metrics/phase";
 import { getSettings, isOnboarded } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Your targets" };
@@ -14,8 +14,9 @@ export default async function ConfirmPage() {
   const s = await getSettings();
   if (!isOnboarded(s)) redirect("/onboarding");
 
-  const phase = currentPhase(s, todayIST());
-  const protein = proteinRange(s, phase);
+  const t = getTargets(todayIST(), s);
+  const phase = t.phase;
+  const protein = { min: t.proteinMin, max: t.proteinMax };
   const phaseNote =
     s.phaseOverride ? "set manually in settings"
     : phase === "veg" ? `until ${s.phaseSwitchDate}`

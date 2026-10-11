@@ -132,6 +132,23 @@ Each rule = `{ key, window, condition(state), message(state) }`. Idempotent via 
 - `phase_switch` 2026-12-01 · `checkpoint_card` 2026-12-10 · `smokefree_milestone` weekly
 - Instant (on the logging path, not the tick): a log that pushes kcal over target → immediate reply with the overage
 
+## Rules API (`src/lib/rules/dayState.ts`)
+`getDayState(date, { settings? })` is the ONE place that computes "state of today". UI chips, the bot `today` command and every nudge rule read it.
+```
+DayState {
+  date: "YYYY-MM-DD"                      // IST
+  targets: { phase, kcal, kcalRange, proteinMin, proteinMax, steps, stepsRange, budget }  // from src/lib/metrics/phase.ts getTargets()
+  totals:    { kcal, protein, cost, entries }
+  remaining: { kcal, protein }            // negative = over; protein vs proteinMin
+  metrics:   { weightKg, steps, waterGlasses }   // null when not logged
+  flags: { weightLogged, stepsLogged, isTrainingDay, routineDayName, routineDayId,
+           workoutLogged, sessionId, lastFoodAt ("HH:MM:SS"|null), foodLoggedSince(time) }
+  smokeFreeDays: number | null
+}
+```
+`foodLoggedSince` is a function — pick plain fields before passing DayState to a client component.
+Five queries run in parallel (settings, food totals, daily_metrics, routine day by weekday, session). Pass `settings` when the caller already has it.
+
 ## Env (`.env.example`)
 `DATABASE_URL` `AUTH_SECRET` `AUTH_GOOGLE_ID` `AUTH_GOOGLE_SECRET` `ALLOWED_EMAIL`
 `TELEGRAM_BOT_TOKEN` `TELEGRAM_BOT_USERNAME` `TELEGRAM_WEBHOOK_SECRET` `TICK_SECRET` `GEMINI_API_KEY` `NEXT_PUBLIC_APP_URL`
