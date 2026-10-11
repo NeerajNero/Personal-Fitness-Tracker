@@ -6,15 +6,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/db";
+import { bodyStatsSchema } from "@/lib/body-stats";
 import { settings } from "@/db/schema";
 import { getSettings } from "@/lib/settings";
 
-const schema = z.object({
-  weightKg: z.coerce.number().min(30, "30–300 kg").max(300, "30–300 kg"),
-  heightCm: z.coerce.number().min(120, "120–250 cm").max(250, "120–250 cm"),
-  age: z.coerce.number().int("Whole number").min(13, "13–100").max(100, "13–100"),
-  sex: z.enum(["male", "female"], { message: "Pick one" }),
-});
+const schema = bodyStatsSchema;
 
 type Field = keyof z.infer<typeof schema>;
 export type OnboardingState = { error: string; fieldErrors: Partial<Record<Field, string>> } | null;

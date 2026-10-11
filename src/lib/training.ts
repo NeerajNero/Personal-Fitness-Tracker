@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activities, exercises, routineDays, routineExercises, sessionExercises, sessions, sets, type Activity } from "@/db/schema";
 import { hintFromSets, loadHistory, loadLastSessionSets, stallFromHistory, type Hint, type SetLite, type Stall } from "@/lib/metrics/strength";
@@ -158,4 +158,12 @@ export async function createSession(date: string, routineDayId: number | null): 
     }
   }
   return { sessionId: sess.id };
+}
+
+/** Reuse an exercise by name (case-insensitive) or create a custom one. */
+export async function findOrCreateExercise(name: string, muscleGroup: string): Promise<number> {
+  const [existing] = await db.select({ id: exercises.id }).from(exercises).where(sql`lower(${exercises.name}) = lower(${name})`).limit(1);
+  if (existing) return existing.id;
+  const [created] = await db.insert(exercises).values({ name, muscleGroup, isCustom: true }).returning({ id: exercises.id });
+  return created.id;
 }

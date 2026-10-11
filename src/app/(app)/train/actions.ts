@@ -9,7 +9,7 @@ import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
 import { MUSCLE_GROUPS } from "@/lib/routine";
 import { requireSession } from "@/lib/session";
-import { createSession } from "@/lib/training";
+import { createSession, findOrCreateExercise } from "@/lib/training";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const id = z.number().int().positive();
@@ -138,19 +138,7 @@ export async function addExerciseToSession(
       if (!ex) return { ok: false, error: "Exercise not found" };
       exerciseId = ex.id;
     } else {
-      const [existing] = await db
-        .select({ id: exercises.id })
-        .from(exercises)
-        .where(sql`lower(${exercises.name}) = lower(${v.name})`)
-        .limit(1);
-      if (existing) exerciseId = existing.id;
-      else {
-        const [created] = await db
-          .insert(exercises)
-          .values({ name: v.name, muscleGroup: v.muscleGroup, isCustom: true })
-          .returning({ id: exercises.id });
-        exerciseId = created.id;
-      }
+      exerciseId = await findOrCreateExercise(v.name, v.muscleGroup);
     }
 
     const [{ max }] = await db
