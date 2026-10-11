@@ -2,7 +2,7 @@
 
 import { useMemo, useOptimistic, useRef, useState, useTransition, type FormEvent } from "react";
 import type { Food, FoodLog } from "@/lib/food";
-import { foodInPhase } from "@/lib/food";
+import { foodInPhase } from "@/lib/metrics/phase";
 import type { Phase } from "@/lib/metrics/phase";
 import { addFoodLog, deleteFoodLog, quickAddFoodLog, updateFoodLogQty } from "./actions";
 

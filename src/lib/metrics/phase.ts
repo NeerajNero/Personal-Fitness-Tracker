@@ -35,3 +35,8 @@ export function getTargets(date: string, s: Settings): Targets {
     budget: veg ? s.budgetVegInr : s.budgetNonvegInr,
   };
 }
+
+/** veg phase shows veg + both; nonveg phase shows everything. Client-safe (no db import). */
+export function foodInPhase(food: { phaseTag: "veg" | "nonveg" | "both" }, phase: Phase): boolean {
+  return phase === "nonveg" || food.phaseTag !== "nonveg";
+}
