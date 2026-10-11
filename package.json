@@ -13,7 +13,9 @@
     "seed": "node --env-file=.env --import=tsx scripts/seed.ts",
     "bot:set-webhook": "node --env-file=.env --import=tsx scripts/bot-webhook.ts set",
     "bot:webhook-info": "node --env-file=.env --import=tsx scripts/bot-webhook.ts info",
-    "bot:delete-webhook": "node --env-file=.env --import=tsx scripts/bot-webhook.ts delete"
+    "bot:delete-webhook": "node --env-file=.env --import=tsx scripts/bot-webhook.ts delete",
+    "tick": "node --env-file=.env --import=tsx scripts/tick.ts",
+    "tick:dry": "node --env-file=.env --import=tsx scripts/tick.ts dry"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

@@ -5,9 +5,9 @@
  * `foodLoggedSince` is a function, so strip it (or pick fields) before passing
  * a DayState to a client component.
  */
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { dailyMetrics, foodLog, routineDays, sessions, type Settings } from "@/db/schema";
+import { dailyMetrics, foodLog, nudgeLog, routineDays, sessions, type Settings } from "@/db/schema";
 import { daysBetween, isoWeekday } from "@/lib/dates";
 import { getTargets, type Targets } from "@/lib/metrics/phase";
 import { getSettings } from "@/lib/settings";
@@ -15,6 +15,9 @@ import { getSettings } from "@/lib/settings";
 import type { RoutineDayName } from "@/lib/routine";
 
 export type { RoutineDayName };
+
+/** nudge_log rule_key used as a per-day marker (not a send; excluded from the daily cap). */
+export const NO_TRAINING_MARK = "mark:no_training";
 
 export type DayState = {
   /** IST calendar date "YYYY-MM-DD". */
@@ -34,6 +37,8 @@ export type DayState = {
     workoutLogged: boolean;
     /** Set whenever a session row exists for the date, even if nothing is logged in it yet. */
     sessionId: number | null;
+    /** Owner tapped "No training today" (nudge_log marker `mark:no_training`) — stop asking for a workout. */
+    trainingSkipped: boolean;
     /** "HH:MM:SS" IST of the latest food entry, or null. */
     lastFoodAt: string | null;
     /** True if any food was logged at or after `time` ("HH:MM" or "HH:MM:SS"). */
@@ -46,7 +51,7 @@ export type DayState = {
 export async function getDayState(date: string, opts: { settings?: Settings } = {}): Promise<DayState> {
   const weekday = isoWeekday(date);
 
-  const [s, totals, metrics, routineDay, session] = await Promise.all([
+  const [s, totals, metrics, routineDay, session, skipMark] = await Promise.all([
     opts.settings ? Promise.resolve(opts.settings) : getSettings(),
     db
       .select({
@@ -81,6 +86,12 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
       .orderBy(desc(sessions.id))
       .limit(1)
       .then((r) => r[0] ?? null),
+    db
+      .select({ id: nudgeLog.id })
+      .from(nudgeLog)
+      .where(and(eq(nudgeLog.date, date), eq(nudgeLog.ruleKey, NO_TRAINING_MARK)))
+      .limit(1)
+      .then((r) => r.length > 0),
   ]);
 
   const targets = getTargets(date, s);
@@ -104,6 +115,7 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
       routineDayId: routineDay?.id ?? null,
       workoutLogged: session !== null && (session.inclineWalk || session.setCount > 0),
       sessionId: session?.id ?? null,
+      trainingSkipped: skipMark,
       lastFoodAt,
       foodLoggedSince: (time) => lastFoodAt !== null && lastFoodAt >= time,
     },

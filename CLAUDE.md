@@ -113,7 +113,7 @@ Note shown with cues: upper-trap or forearm pain during pulls = shrugging + bice
 Exact-match commands (no AI):
 - `w 74.2` weight · `s 8500` steps · `<food> <qty>` e.g. `paneer 150`, `roti 3`, `scoop` (qty defaults to 1 serving)
 - `water` (+1 glass; optional feature) · `done` (mark today's workout done; reply with app link to enter sets)
-- `today` (state summary from rules module) · `undo` (remove last log entry)
+- `today` (state summary from rules module) · `undo` (remove last log entry) · `navel 88.5` / `waist 85` (weekly measurement, upsert by date)
 Free text (AI): anything else → Gemini parses against the foods list → returns matched items, estimated unknowns, totals.
 Bot replies with the summary + inline ✓ / Edit buttons. Write to DB only on ✓.
 If Gemini fails or is rate-limited → reply: "couldn't parse that — try `paneer 150` style".
@@ -129,7 +129,7 @@ Each rule = `{ key, window, condition(state), message(state) }`. Idempotent via 
 - `day_close` 22:00–22:30: summary + anything missing (weight, steps, workout on a training day) with inline buttons to log
 - `water` 10:00–20:00 every 2 h: reminder only; OFF by default, toggle in settings
 - `weekly_measure` Sun 19:00: prompt navel/waist; once logged send the weekly report
-  (7-day avg Δ, navel Δ, lifts progressed, adherence %, verdict)
+  (7-day avg Δ, navel Δ, lifts progressed, adherence %, verdict). Fallback: Monday 08:00 with "no measurement this week"
 - `budget_80`: month-to-date protein spend ≥ 80 % of budget before the 24th
 - `phase_switch` 2026-12-01 · `checkpoint_card` 2026-12-10 · `smokefree_milestone` weekly
 - Instant (on the logging path, not the tick): a log that pushes kcal over target → immediate reply with the overage
@@ -144,12 +144,14 @@ DayState {
   remaining: { kcal, protein }            // negative = over; protein vs proteinMin
   metrics:   { weightKg, steps, waterGlasses }   // null when not logged
   flags: { weightLogged, stepsLogged, isTrainingDay, routineDayName, routineDayId,
-           workoutLogged (≥1 set or incline walk), sessionId (any session row), lastFoodAt ("HH:MM:SS"|null), foodLoggedSince(time) }
+           workoutLogged (≥1 set or incline walk), sessionId (any session row), trainingSkipped (nudge_log marker `mark:no_training`), lastFoodAt ("HH:MM:SS"|null), foodLoggedSince(time) }
   smokeFreeDays: number | null
 }
 ```
 `foodLoggedSince` is a function — pick plain fields before passing DayState to a client component.
-Five queries run in parallel (settings, food totals, daily_metrics, routine day by weekday, session). Pass `settings` when the caller already has it.
+Six queries run in parallel (settings, food totals, daily_metrics, routine day by weekday, session, no-training marker). Pass `settings` when the caller already has it.
+
+Engine (`src/lib/rules/engine.ts` + `rules.ts`): `evaluate(now)` → due + skipped (reasons: disabled, quiet_hours, outside_window, already_sent, daily_cap, condition_false); `send(due)` delivers via `src/lib/telegram/send.ts` and writes `nudge_log`. Idempotency = one row per rule_key per IST date; water logs `water_HH`, the weekly report logs `weekly_report_<monday>`, budget_80 is once per month, phase_switch / checkpoint_card once ever. Rows with rule_key prefix `mark:` are per-day markers, not sends, and don't count toward the cap. `/api/tick?dry=1` evaluates without sending or logging; `?force=<key>` sends one rule now regardless of window, condition or cap (still logged).
 
 ## Env (`.env.example`)
 `DATABASE_URL` `AUTH_SECRET` `AUTH_GOOGLE_ID` `AUTH_GOOGLE_SECRET` `ALLOWED_EMAIL`

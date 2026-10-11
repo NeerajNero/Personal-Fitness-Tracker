@@ -10,10 +10,13 @@ export type Command =
   | { type: "today" }
   | { type: "undo" }
   | { type: "help" }
+  | { type: "navel"; cm: number }
+  | { type: "waist"; cm: number }
   | { type: "food"; query: string; n: number | null };
 
 const kg = z.coerce.number().min(30).max(300);
 const steps = z.coerce.number().int().min(0).max(100_000);
+const cm = z.coerce.number().min(40).max(200);
 const KEYWORDS: Record<string, Command["type"]> = { water: "water", done: "done", today: "today", undo: "undo", help: "help", start: "help" };
 
 export function parseCommand(raw: string): Command | null {
@@ -33,6 +36,11 @@ export function parseCommand(raw: string): Command | null {
   if (s) {
     const v = steps.safeParse(s[1]);
     return v.success ? { type: "steps", n: v.data } : null;
+  }
+  const mm = /^(navel|waist)\s+(\d+(?:\.\d+)?)$/i.exec(text);
+  if (mm) {
+    const v = cm.safeParse(mm[2]);
+    return v.success ? { type: mm[1].toLowerCase() as "navel" | "waist", cm: Math.round(v.data * 10) / 10 } : null;
   }
 
   // `<food words> [n]` — letters first, optional trailing number.

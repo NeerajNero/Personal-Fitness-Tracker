@@ -64,3 +64,34 @@ export function daysBetween(fromIso: string, toIso: string): number {
 export function formatDayLabel(iso: string): string {
   return dayLabel.format(utcMidnight(iso));
 }
+
+/* ------------------------------- IST clock -------------------------------- */
+
+export type IstNow = {
+  date: string; // "YYYY-MM-DD"
+  time: string; // "HH:MM"
+  minutes: number; // minutes since IST midnight
+  weekday: number; // ISO 1 = Mon … 7 = Sun
+  dayOfMonth: number;
+};
+
+export function istNow(now: Date = new Date()): IstNow {
+  const date = todayIST(now);
+  const hms = nowTimeIST(now);
+  const [h, m] = hms.split(":").map(Number);
+  return { date, time: hms.slice(0, 5), minutes: h * 60 + m, weekday: isoWeekday(date), dayOfMonth: Number(date.slice(8, 10)) };
+}
+
+/** "HH:MM" or "HH:MM:SS" → minutes since midnight. */
+export function minutesOf(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + (m || 0);
+}
+
+/** Quiet window may wrap midnight (22:30–07:00). End is exclusive. */
+export function inQuietHours(minutes: number, start: string, end: string): boolean {
+  const s = minutesOf(start);
+  const e = minutesOf(end);
+  if (s === e) return false;
+  return s < e ? minutes >= s && minutes < e : minutes >= s || minutes < e;
+}

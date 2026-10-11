@@ -5,6 +5,7 @@ import { deleteLatestFoodEntry, entryFromFood, insertFoodEntries, listFoods } fr
 import { esc, n0, n1, qtyStr } from "@/lib/format";
 import { ROUTINE_LABEL } from "@/lib/routine";
 import { getDayState } from "@/lib/rules/dayState";
+import { upsertMeasurementByDate } from "@/lib/measurements";
 import { createSession } from "@/lib/training";
 import { appUrl } from "./env";
 import { entryLine, runningLine, todaySummary, withOverage } from "./messages";
@@ -58,4 +59,9 @@ export async function opUndo(date: string, settings: Settings): Promise<string> 
   if (!row) return "Nothing to undo today.";
   const state = await getDayState(date, { settings });
   return `↩️ Removed <b>${esc(row.label)}</b>${row.qty !== 1 ? ` ×${qtyStr(row.qty)}` : ""} (${n0(row.kcal)} kcal).\n${runningLine(state)}`;
+}
+
+export async function opMeasure(date: string, kind: "navel" | "waist", cm: number): Promise<string> {
+  await upsertMeasurementByDate(date, kind === "navel" ? { navelCm: cm } : { waistCm: cm });
+  return `📏 ${kind} ${n1(cm)} cm saved for today.`;
 }

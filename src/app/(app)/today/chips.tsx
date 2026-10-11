@@ -27,7 +27,9 @@ export function Chips({ state }: { state: DayState }) {
       : { text: `protein ✓ ${fmt(totals.protein)} g`, tone: "good" },
   );
 
-  if (flags.isTrainingDay && flags.routineDayName) {
+  if (flags.isTrainingDay && flags.routineDayName && flags.trainingSkipped && !flags.workoutLogged) {
+    chips.push({ text: `${ROUTINE_LABEL[flags.routineDayName]} skipped`, tone: "neutral" });
+  } else if (flags.isTrainingDay && flags.routineDayName) {
     chips.push({
       text: `${ROUTINE_LABEL[flags.routineDayName]} today${flags.workoutLogged ? " ✓" : ""}`,
       tone: flags.workoutLogged ? "good" : "neutral",

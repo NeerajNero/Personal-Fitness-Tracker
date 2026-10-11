@@ -15,7 +15,8 @@ import { getSettings } from "@/lib/settings";
 import { createPending, expirePending, parseFreeText, takePending, type ParsedItem } from "./ai";
 import { botToken } from "./env";
 import { entryLine, HELP, runningLine, withOverage } from "./messages";
-import { opDone, opFood, opSteps, opToday, opUndo, opWater, opWeight } from "./ops";
+import { opDone, opFood, opMeasure, opSteps, opToday, opUndo, opWater, opWeight } from "./ops";
+import { markNoTraining } from "@/lib/rules/marks";
 import { parseCommand } from "./parse";
 
 export type BotContext = Context & { settings: Settings };
@@ -77,6 +78,20 @@ export function getBot(): Bot<BotContext> {
     await ctx.editMessageText(withOverage(`✓ Logged\n${lines.join("\n")}\n${runningLine(state)}`, state), { parse_mode: "HTML" }).catch(() => {});
   });
 
+  // Buttons on the day_close nudge.
+  bot.callbackQuery("nudge:done", async (ctx) => {
+    const text = await opDone(todayIST(), ctx.settings);
+    await ctx.answerCallbackQuery({ text: "Starting…" });
+    await ctx.editMessageReplyMarkup().catch(() => {});
+    await ctx.reply(text, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+  });
+  bot.callbackQuery("nudge:skip", async (ctx) => {
+    await markNoTraining(todayIST());
+    await ctx.answerCallbackQuery({ text: "Rest day noted" });
+    await ctx.editMessageReplyMarkup().catch(() => {});
+    await ctx.reply("Okay — no training today. I'll stop asking.", { parse_mode: "HTML" });
+  });
+
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
     const date = todayIST();
@@ -93,6 +108,8 @@ export function getBot(): Bot<BotContext> {
         case "today": return void (await reply(await opToday(date, s)));
         case "undo": return void (await reply(await opUndo(date, s)));
         case "help": return void (await reply(HELP));
+        case "navel":
+        case "waist": return void (await reply(await opMeasure(date, cmd.type, cmd.cm)));
         case "food": {
           const out = await opFood(date, cmd.query, cmd.n, s);
           if (out !== null) return void (await reply(out));

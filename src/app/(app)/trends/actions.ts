@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { measurements, settings } from "@/db/schema";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE, todayIST } from "@/lib/dates";
+import { upsertMeasurementByDate } from "@/lib/measurements";
 import { requireSession } from "@/lib/session";
 
 const cm = z.union([z.literal("").transform(() => null), z.coerce.number().min(40, "40–200 cm").max(200, "40–200 cm")]);
@@ -25,15 +26,7 @@ export async function upsertMeasurement(input: { date: string; navelCm: string; 
   await requireSession();
   try {
     const v = measurementSchema.parse(input);
-    const [existing] = await db.select({ id: measurements.id }).from(measurements).where(eq(measurements.date, v.date)).limit(1);
-    let id: number;
-    if (existing) {
-      await db.update(measurements).set({ navelCm: v.navelCm, waistCm: v.waistCm, notes: v.notes }).where(eq(measurements.id, existing.id));
-      id = existing.id;
-    } else {
-      const [row] = await db.insert(measurements).values(v).returning({ id: measurements.id });
-      id = row.id;
-    }
+    const id = await upsertMeasurementByDate(v.date, { navelCm: v.navelCm, waistCm: v.waistCm, notes: v.notes });
     revalidatePath("/trends");
     return { ok: true, id };
   } catch (e) {

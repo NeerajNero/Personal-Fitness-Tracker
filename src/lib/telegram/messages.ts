@@ -10,6 +10,7 @@ export const HELP = [
   "<code>w 74.2</code> — weight",
   "<code>s 8500</code> — steps",
   "<code>paneer 150</code> · <code>roti 3</code> · <code>scoop</code> — log food (no number = 1 serving, under 10 = servings, 10+ = grams)",
+  "<code>navel 88.5</code> · <code>waist 85</code> — weekly measurement",
   "<code>water</code> — +1 glass",
   "<code>done</code> — start today's workout",
   "<code>today</code> — where you stand",
@@ -40,7 +41,7 @@ export function todaySummary(state: DayState): string {
   lines.push(`🍽 ${n0(totals.kcal)} / ${n0(targets.kcal)} kcal · ${remaining.kcal >= 0 ? `${n0(remaining.kcal)} left` : `<b>${n0(-remaining.kcal)} over</b>`}`);
   lines.push(`🥚 ${n0(totals.protein)} / ${targets.proteinMin}–${targets.proteinMax} g protein · ${remaining.protein > 0 ? `${n0(remaining.protein)} g to go` : "done ✓"}`);
   if (flags.isTrainingDay && flags.routineDayName) {
-    lines.push(`🏋️ ${ROUTINE_LABEL[flags.routineDayName]} — ${flags.workoutLogged ? "logged ✓" : flags.sessionId ? "started, no sets yet" : "not started"}`);
+    lines.push(`🏋️ ${ROUTINE_LABEL[flags.routineDayName]} — ${flags.workoutLogged ? "logged ✓" : flags.trainingSkipped ? "skipped today" : flags.sessionId ? "started, no sets yet" : "not started"}`);
   } else {
     lines.push(`👟 ${metrics.steps === null ? "no steps yet" : `${n0(metrics.steps)} steps`} · target ${n0(targets.steps)}`);
   }
