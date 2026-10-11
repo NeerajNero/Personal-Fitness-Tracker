@@ -22,11 +22,11 @@ covers it.
 
 ## Conventions
 - pnpm; strict TypeScript; zod for all input validation (forms, bot messages, API bodies)
-- Server Actions for app mutations; route handlers only for `/api/telegram` and `/api/tick`
+- Server Actions for app mutations; route handlers only for `/api/telegram`, `/api/tick` and `/api/export/[table]` (session-gated CSV download; `settings` excluded)
 - ONE shared module `src/lib/rules/` computes "state of today" (remaining kcal/protein, missing logs, verdicts).
   Both the UI chips and the bot read from it. Never duplicate that logic.
 - Derived metrics live in `src/lib/metrics/`: `rolling7dAvg`, `weeklyRate`, `e1rm` (Epley), `adherence`,
-  `stallDetector`, `weeklyVerdict`, `estimateMaintenance`
+  `stallDetector`, `weeklyVerdict`, `estimateMaintenance`, `monthSpend` (spend.ts), `checkpointSummary` (checkpoint.ts)
 - Mobile-first, large tap targets; the Today screen must be usable one-handed
 - Minimal dependencies. No UI kits — Tailwind only. No charting library; write a small SVG line-chart component.
 - Commit after each build step with a clear message.

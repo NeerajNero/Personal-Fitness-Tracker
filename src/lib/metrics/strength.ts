@@ -133,3 +133,37 @@ export async function progressionHint(exerciseId: number, targetSets: number, ta
   const last = (await loadLastSessionSets([exerciseId])).get(exerciseId);
   return hintFromSets(last?.sets ?? null, ex?.muscleGroup ?? "", targetSets, targetReps);
 }
+
+export type ExerciseHistory = { exerciseId: number; name: string; muscleGroup: string; points: HistoryPoint[] };
+
+/** Every exercise's best-set-per-session history (oldest first), for the Lifts section and checkpoints. */
+export async function loadAllHistory(): Promise<ExerciseHistory[]> {
+  const res = await db.execute<{ exercise_id: number; name: string; muscle_group: string; session_id: number; date: string; weight_kg: number; reps: number; e1rm: number }>(sql`
+    select v.exercise_id, e.name, e.muscle_group, v.session_id, v.date::text as date, v.weight_kg::float as weight_kg, v.reps, v.e1rm::float as e1rm
+    from v_e1rm_by_exercise v join exercises e on e.id = v.exercise_id
+    order by e.name, v.date, v.session_id`);
+  const map = new Map<number, ExerciseHistory>();
+  for (const r of res.rows) {
+    const h = map.get(r.exercise_id) ?? { exerciseId: r.exercise_id, name: r.name, muscleGroup: r.muscle_group, points: [] };
+    h.points.push({ sessionId: r.session_id, date: r.date, weightKg: r.weight_kg, reps: r.reps, e1rm: r.e1rm });
+    map.set(r.exercise_id, h);
+  }
+  return [...map.values()];
+}
+
+/** Indices of sessions inside a stall run (≥3 consecutive sessions without a new best). */
+export function stallIndices(history: HistoryPoint[]): Set<number> {
+  const out = new Set<number>();
+  let best = -Infinity;
+  let run: number[] = [];
+  history.forEach((p, i) => {
+    if (p.e1rm > best) {
+      best = p.e1rm;
+      run = [];
+    } else {
+      run.push(i);
+      if (run.length >= 3) run.forEach((j) => out.add(j));
+    }
+  });
+  return out;
+}

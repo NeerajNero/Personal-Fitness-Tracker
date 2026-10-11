@@ -101,6 +101,35 @@ export type WeekAdherence = {
 
 export const SESSIONS_PER_WEEK = 4;
 
+export type Adherence = {
+  daysLogged: number;
+  avgKcal: number | null;
+  avgProtein: number | null;
+  kcalAdherencePct: number | null;
+  proteinHitPct: number | null;
+};
+
+/** Adherence over an inclusive date window using the phase targets that applied on each day. */
+export function adherenceFrom(totals: DailyTotal[], settings: Settings, from: string, to: string): Adherence {
+  let logged = 0, kcalSum = 0, protSum = 0, kcalIn = 0, protHit = 0;
+  for (const t of totals) {
+    if (t.date < from || t.date > to || t.entries === 0) continue;
+    const tg = getTargets(t.date, settings);
+    logged++;
+    kcalSum += t.kcal;
+    protSum += t.protein;
+    if (t.kcal >= tg.kcalRange[0] && t.kcal <= tg.kcalRange[1]) kcalIn++;
+    if (t.protein >= tg.proteinMin) protHit++;
+  }
+  return {
+    daysLogged: logged,
+    avgKcal: logged ? Math.round(kcalSum / logged) : null,
+    avgProtein: logged ? round(protSum / logged, 1) : null,
+    kcalAdherencePct: logged ? Math.round((kcalIn / logged) * 100) : null,
+    proteinHitPct: logged ? Math.round((protHit / logged) * 100) : null,
+  };
+}
+
 /** ISO-week Monday for a date. */
 export function mondayOf(iso: string): string {
   return addDays(iso, -(isoWeekday(iso) - 1));
@@ -114,36 +143,19 @@ export function adherenceByWeekFrom(input: {
   today?: string;
 }): WeekAdherence[] {
   const { settings, totals, sessionDates, weeks = 12, today = todayIST() } = input;
-  const totalsByDate = new Map(totals.map((t) => [t.date, t]));
   const currentMonday = mondayOf(today);
   const out: WeekAdherence[] = [];
 
   for (let w = 0; w < weeks; w++) {
     const weekStart = addDays(currentMonday, -7 * w);
     const weekEnd = addDays(weekStart, 6);
-    let logged = 0, kcalSum = 0, protSum = 0, kcalIn = 0, protHit = 0;
-    for (let i = 0; i < 7; i++) {
-      const date = addDays(weekStart, i);
-      if (date > today) break;
-      const t = totalsByDate.get(date);
-      if (!t || t.entries === 0) continue;
-      const tg = getTargets(date, settings);
-      logged++;
-      kcalSum += t.kcal;
-      protSum += t.protein;
-      if (t.kcal >= tg.kcalRange[0] && t.kcal <= tg.kcalRange[1]) kcalIn++;
-      if (t.protein >= tg.proteinMin) protHit++;
-    }
+    const a = adherenceFrom(totals, settings, weekStart, weekEnd < today ? weekEnd : today);
     const sessionsDone = sessionDates.filter((d) => d >= weekStart && d <= weekEnd).length;
     out.push({
       weekStart,
       weekEnd,
       isCurrent: w === 0,
-      daysLogged: logged,
-      avgKcal: logged ? Math.round(kcalSum / logged) : null,
-      avgProtein: logged ? round(protSum / logged, 1) : null,
-      kcalAdherencePct: logged ? Math.round((kcalIn / logged) * 100) : null,
-      proteinHitPct: logged ? Math.round((protHit / logged) * 100) : null,
+      ...a,
       sessionsDone,
       sessionsPlanned: SESSIONS_PER_WEEK,
     });
