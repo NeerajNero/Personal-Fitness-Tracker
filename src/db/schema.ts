@@ -313,6 +313,15 @@ export const nudgeLog = pgTable(
   ],
 );
 
+/* ------------------------------ telegram ------------------------- */
+
+/** Gemini parses awaiting ✓/✗ in Telegram. Only the id travels in callback data; rows expire after 24 h. */
+export const pendingParses = pgTable("pending_parses", {
+  id: serial("id").primaryKey(),
+  payload: jsonb("payload").notNull(),
+  createdAt: createdAt(),
+});
+
 /* ------------------------------ types ---------------------------- */
 
 export type Settings = typeof settings.$inferSelect;
@@ -328,3 +337,4 @@ export type SessionExercise = typeof sessionExercises.$inferSelect;
 export type WorkoutSet = typeof sets.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type NudgeLog = typeof nudgeLog.$inferSelect;
+export type PendingParse = typeof pendingParses.$inferSelect;

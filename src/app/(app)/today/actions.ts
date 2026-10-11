@@ -4,9 +4,11 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { dailyMetrics, foodLog, foods } from "@/db/schema";
+import { foodLog, foods } from "@/db/schema";
 import { fail, type ActionResult } from "@/lib/action-result";
+import { upsertDailyMetrics } from "@/lib/daily";
 import { ISO_DATE, nowTimeIST } from "@/lib/dates";
+import { entryFromFood, insertFoodEntries } from "@/lib/food";
 import { requireSession } from "@/lib/session";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
@@ -30,10 +32,7 @@ export async function saveWeight(date: string, raw: string): Promise<ActionResul
   try {
     const d = dateSchema.parse(date);
     const weightKg = weightSchema.parse(raw.trim());
-    await db
-      .insert(dailyMetrics)
-      .values({ date: d, weightKg })
-      .onConflictDoUpdate({ target: dailyMetrics.date, set: { weightKg, updatedAt: new Date() } });
+    await upsertDailyMetrics(d, { weightKg });
     revalidatePath("/today");
     return { ok: true };
   } catch (e) {
@@ -46,10 +45,7 @@ export async function saveSteps(date: string, raw: string): Promise<ActionResult
   try {
     const d = dateSchema.parse(date);
     const steps = stepsSchema.parse(raw.trim());
-    await db
-      .insert(dailyMetrics)
-      .values({ date: d, steps })
-      .onConflictDoUpdate({ target: dailyMetrics.date, set: { steps, updatedAt: new Date() } });
+    await upsertDailyMetrics(d, { steps });
     revalidatePath("/today");
     return { ok: true };
   } catch (e) {
@@ -67,22 +63,9 @@ export async function addFoodLog(date: string, foodId: number, qty: number): Pro
     const q = qtySchema.parse(qty);
     const [food] = await db.select().from(foods).where(eq(foods.id, z.number().int().parse(foodId))).limit(1);
     if (!food) return { ok: false, error: "Food not found" };
-    const [row] = await db
-      .insert(foodLog)
-      .values({
-        date: d,
-        time: nowTimeIST(),
-        foodId: food.id,
-        label: food.name,
-        qty: q,
-        kcal: round(food.kcal * q, 1),
-        proteinG: round(food.proteinG * q, 1),
-        costInr: round(food.costInr * q, 2),
-        source: "app",
-      })
-      .returning({ id: foodLog.id });
+    const [id] = await insertFoodEntries([entryFromFood(food, q, d, "app")]);
     revalidatePath("/today");
-    return { ok: true, id: row.id };
+    return { ok: true, id };
   } catch (e) {
     return fail(e);
   }

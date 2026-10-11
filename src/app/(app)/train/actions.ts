@@ -1,15 +1,15 @@
 "use server";
 
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { activities, exercises, routineDays, routineExercises, sessionExercises, sessions, sets } from "@/db/schema";
+import { activities, exercises, sessionExercises, sessions, sets } from "@/db/schema";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
-import { loadLastSessionSets } from "@/lib/metrics/strength";
 import { MUSCLE_GROUPS } from "@/lib/routine";
 import { requireSession } from "@/lib/session";
+import { createSession } from "@/lib/training";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const id = z.number().int().positive();
@@ -21,44 +21,14 @@ function revalidate() {
 
 /* --------------------------------- session --------------------------------- */
 
-/**
- * Create a session. With a routine day: copy its exercises into session_exercises and
- * materialise each exercise's last working sets as real rows (edit only what changed).
- */
 export async function startSession(date: string, routineDayId: number | null): Promise<ActionResult<{ sessionId: number }>> {
   await requireSession();
   try {
     const d = dateSchema.parse(date);
     const rd = routineDayId === null ? null : id.parse(routineDayId);
-    if (rd !== null) {
-      const [day] = await db.select({ id: routineDays.id }).from(routineDays).where(eq(routineDays.id, rd)).limit(1);
-      if (!day) return { ok: false, error: "Routine day not found" };
-    }
-
-    const [sess] = await db.insert(sessions).values({ date: d, routineDayId: rd }).returning({ id: sessions.id });
-
-    if (rd !== null) {
-      const re = await db
-        .select({
-          exerciseId: routineExercises.exerciseId,
-          sortOrder: routineExercises.sortOrder,
-          targetSets: routineExercises.targetSets,
-          targetReps: routineExercises.targetReps,
-        })
-        .from(routineExercises)
-        .where(eq(routineExercises.routineDayId, rd))
-        .orderBy(asc(routineExercises.sortOrder));
-      if (re.length) {
-        await db.insert(sessionExercises).values(re.map((r) => ({ sessionId: sess.id, ...r })));
-        const last = await loadLastSessionSets(re.map((r) => r.exerciseId), sess.id);
-        const copies = [...last.entries()].flatMap(([exerciseId, l]) =>
-          l.sets.map((s) => ({ sessionId: sess.id, exerciseId, setNo: s.setNo, weightKg: s.weightKg, reps: s.reps, isWorking: true })),
-        );
-        if (copies.length) await db.insert(sets).values(copies);
-      }
-    }
+    const { sessionId } = await createSession(d, rd);
     revalidate();
-    return { ok: true, sessionId: sess.id };
+    return { ok: true, sessionId };
   } catch (e) {
     return fail(e);
   }

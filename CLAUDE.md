@@ -62,6 +62,7 @@ covers it.
 - `sets`: id, session_id, exercise_id, set_no, weight_kg, reps, rpe (nullable), is_working
 - `activities`: id, date, name, minutes, notes — quick-add sport/cardio
 - `nudge_log`: id, sent_at, rule_key, date, payload — prevents duplicate sends, enforces daily cap
+- `pending_parses`: id, payload jsonb, created_at — Gemini parses awaiting ✓/✗ in Telegram; only the id goes in callback data; expired after 24 h
 - Views: `v_daily_totals`, `v_weight_7d`, `v_e1rm_by_exercise`, `v_weekly_summary`
 
 ## Seed data
@@ -152,7 +153,7 @@ Five queries run in parallel (settings, food totals, daily_metrics, routine day 
 
 ## Env (`.env.example`)
 `DATABASE_URL` `AUTH_SECRET` `AUTH_GOOGLE_ID` `AUTH_GOOGLE_SECRET` `ALLOWED_EMAIL`
-`TELEGRAM_BOT_TOKEN` `TELEGRAM_BOT_USERNAME` `TELEGRAM_WEBHOOK_SECRET` `TICK_SECRET` `GEMINI_API_KEY` `NEXT_PUBLIC_APP_URL`
+`TELEGRAM_BOT_TOKEN` `TELEGRAM_BOT_USERNAME` `TELEGRAM_WEBHOOK_SECRET` `TICK_SECRET` `GEMINI_API_KEY` `GEMINI_MODEL` (optional, default gemini-3.5-flash-lite; 2.5-flash-lite is retired for new accounts) `NEXT_PUBLIC_APP_URL`
 
 ## Build order
 1 scaffold → 2 schema + seed → 3 auth + app shell + PWA → 4 Today → 5 Train → 6 Trends + export

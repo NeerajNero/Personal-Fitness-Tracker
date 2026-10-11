@@ -122,3 +122,40 @@ export async function getTrainData(date: string): Promise<TrainData> {
   ]);
   return { state, routineDays: days, activities: acts, session, preview, allExercises };
 }
+
+/* ------------------------------ shared writes ------------------------------ */
+
+/**
+ * Create a session. With a routine day: copy its exercises into session_exercises and
+ * materialise each exercise's last working sets as real rows (edit only what changed).
+ * Used by the Train screen's Start and the bot's `done`.
+ */
+export async function createSession(date: string, routineDayId: number | null): Promise<{ sessionId: number }> {
+  if (routineDayId !== null) {
+    const [day] = await db.select({ id: routineDays.id }).from(routineDays).where(eq(routineDays.id, routineDayId)).limit(1);
+    if (!day) throw new Error("Routine day not found");
+  }
+  const [sess] = await db.insert(sessions).values({ date, routineDayId }).returning({ id: sessions.id });
+
+  if (routineDayId !== null) {
+    const re = await db
+      .select({
+        exerciseId: routineExercises.exerciseId,
+        sortOrder: routineExercises.sortOrder,
+        targetSets: routineExercises.targetSets,
+        targetReps: routineExercises.targetReps,
+      })
+      .from(routineExercises)
+      .where(eq(routineExercises.routineDayId, routineDayId))
+      .orderBy(asc(routineExercises.sortOrder));
+    if (re.length) {
+      await db.insert(sessionExercises).values(re.map((x) => ({ sessionId: sess.id, ...x })));
+      const last = await loadLastSessionSets(re.map((x) => x.exerciseId), sess.id);
+      const copies = [...last.entries()].flatMap(([exerciseId, l]) =>
+        l.sets.map((s) => ({ sessionId: sess.id, exerciseId, setNo: s.setNo, weightKg: s.weightKg, reps: s.reps, isWorking: true })),
+      );
+      if (copies.length) await db.insert(sets).values(copies);
+    }
+  }
+  return { sessionId: sess.id };
+}
