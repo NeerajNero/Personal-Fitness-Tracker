@@ -149,3 +149,10 @@ Food-database search, calorie-burn estimates, sleep tracking, mood, multi-user, 
 - Turbopack is always on in Next 16 (dev and build); there is no webpack fallback.
 - `AGENTS.md` is auto-generated and rewritten by `next dev` on every run — never edit it. CLAUDE.md is the source of truth.
 - Run `pnpm exec next typegen` before `tsc --noEmit`; the generated `LayoutProps` / `PageProps` globals live in `.next/types` and `tsc` fails without them.
+
+## Secrets
+- Secrets live in `.env` (not `.env.local`). All scripts, `drizzle.config.ts`, and Next.js read from `.env`.
+  Next.js and drizzle-kit both load `.env` automatically; standalone scripts must load it explicitly (e.g. `node --env-file=.env`).
+- Never print, cat, echo, log, or quote the contents of `.env` or any environment variable value — not in terminal
+  output, commit messages, code comments, error messages, or summaries. To confirm a variable exists, report only
+  its name and whether it is set (e.g. `DATABASE_URL: set`), never the value.
