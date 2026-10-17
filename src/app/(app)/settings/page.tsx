@@ -8,12 +8,12 @@ import { EXPORT_TABLES } from "@/lib/export-tables";
 import { getPhase } from "@/lib/metrics/phase";
 import { NUDGE_TOGGLES } from "@/lib/nudges";
 import { getSettings } from "@/lib/settings";
-import { listExercises, listRoutineDays } from "@/lib/training";
+import { listExercises, listWorkoutTypes } from "@/lib/training";
 import { BodyStatsForm } from "./body-stats-form";
 import { FoodsEditor } from "./foods-editor";
 import { NudgeSettings } from "./nudge-settings";
 import { PhaseSection } from "./phase-section";
-import { RoutineEditor, type RoutineDayView } from "./routine-editor";
+import { WorkoutTypesEditor, type WorkoutTypeView } from "./workout-types-editor";
 import { TargetsForm } from "./targets-form";
 import { TelegramCard } from "./telegram-card";
 
@@ -25,7 +25,7 @@ export default async function SettingsPage() {
     getSettings(),
     db.select().from(foods).orderBy(asc(foods.archived), asc(foods.name)),
     listExercises(),
-    listRoutineDays(),
+    listWorkoutTypes({ includeArchived: true }),
     db
       .select({
         routineDayId: routineExercises.routineDayId,
@@ -42,10 +42,10 @@ export default async function SettingsPage() {
       .orderBy(asc(routineExercises.routineDayId), asc(routineExercises.sortOrder)),
   ]);
 
-  const routine: RoutineDayView[] = days.map((d) => ({
+  const types: WorkoutTypeView[] = days.map((d) => ({
     id: d.id,
-    name: d.name,
-    weekday: d.weekday,
+    label: d.label,
+    archived: d.archived,
     exercises: re.filter((x) => x.routineDayId === d.id).map(({ exerciseId, name, muscleGroup, cues, targetSets, targetReps }) => ({ exerciseId, name, muscleGroup, cues, targetSets, targetReps })),
   }));
   const toggles = Object.fromEntries(NUDGE_TOGGLES.map((k) => [k, s[k]])) as Record<(typeof NUDGE_TOGGLES)[number], boolean>;
@@ -62,7 +62,7 @@ export default async function SettingsPage() {
 
       <h2 className="mt-3 text-sm font-medium text-muted">Setup — rarely changed</h2>
       <FoodsEditor foods={allFoods} />
-      <RoutineEditor days={routine} allExercises={allExercises} />
+      <WorkoutTypesEditor types={types} allExercises={allExercises} weeklyTarget={s.weeklySessionTarget} />
       <BodyStatsForm s={s} today={today} />
 
       <details id="export" className="group rounded-2xl border border-border bg-surface">

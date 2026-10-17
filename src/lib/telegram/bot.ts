@@ -15,9 +15,9 @@ import { getSettings } from "@/lib/settings";
 import { createPending, expirePending, parseFreeText, takePending, type ParsedItem } from "./ai";
 import { botToken } from "./env";
 import { entryLine, HELP, runningLine, withOverage } from "./messages";
-import { opCopy, opDone, opFood, opManual, opMeasure, opSteps, opToday, opUndo, opWater, opWeight } from "./ops";
-import { markNoTraining } from "@/lib/rules/marks";
-import { parseCommand } from "./parse";
+import { opCopy, opDid, opDone, opFood, opManual, opMeasure, opPlan, opSteps, opToday, opUndo, opWater, opWeight, type Reply } from "./ops";
+import { listWorkoutTypes } from "@/lib/training";
+import { matchPlanWord, parseCommand } from "./parse";
 
 export type BotContext = Context & { settings: Settings };
 
@@ -78,18 +78,35 @@ export function getBot(): Bot<BotContext> {
     await ctx.editMessageText(withOverage(`✓ Logged\n${lines.join("\n")}\n${runningLine(state)}`, state), { parse_mode: "HTML" }).catch(() => {});
   });
 
-  // Buttons on the day_close nudge.
+  const send = (ctx: BotContext, r: Reply) =>
+    ctx.reply(r.text, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: r.keyboard ? { inline_keyboard: r.keyboard } : undefined });
+
+  // Morning buttons set the day; evening buttons log it. The date travels in the data so late taps hit the right day.
+  bot.callbackQuery(/^plan:(\d{4}-\d{2}-\d{2}):(\d+|rest)$/, async (ctx) => {
+    const [, date, v] = ctx.match;
+    const r = await opPlan(date, v === "rest" ? { kind: "rest" } : { kind: "workout", typeId: Number(v) }, ctx.settings);
+    await ctx.answerCallbackQuery({ text: v === "rest" ? "Rest day" : "Set" });
+    await ctx.editMessageReplyMarkup().catch(() => {});
+    await send(ctx, r);
+  });
+  bot.callbackQuery(/^did:(\d{4}-\d{2}-\d{2}):(\d+|rest|same)$/, async (ctx) => {
+    const [, date, v] = ctx.match;
+    const r = await opDid(date, v, ctx.settings);
+    await ctx.answerCallbackQuery({ text: v === "rest" ? "Rest day" : "Logging…" });
+    await ctx.editMessageReplyMarkup().catch(() => {});
+    await send(ctx, r);
+  });
+
+  // Legacy day_close buttons still sitting in the chat from before "choose your day".
   bot.callbackQuery("nudge:done", async (ctx) => {
-    const text = await opDone(todayIST(), ctx.settings);
     await ctx.answerCallbackQuery({ text: "Logging…" });
     await ctx.editMessageReplyMarkup().catch(() => {});
-    await ctx.reply(text, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+    await send(ctx, await opDone(todayIST(), ctx.settings));
   });
   bot.callbackQuery("nudge:skip", async (ctx) => {
-    await markNoTraining(todayIST());
-    await ctx.answerCallbackQuery({ text: "Rest day noted" });
+    await ctx.answerCallbackQuery({ text: "Rest day" });
     await ctx.editMessageReplyMarkup().catch(() => {});
-    await ctx.reply("Okay — no training today. I'll stop asking.", { parse_mode: "HTML" });
+    await send(ctx, await opPlan(todayIST(), { kind: "rest" }, ctx.settings));
   });
 
   bot.on("message:text", async (ctx) => {
@@ -99,12 +116,18 @@ export function getBot(): Bot<BotContext> {
     const cmd = parseCommand(text);
     const reply = (html: string) => ctx.reply(html, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
 
+    // Workout type names and `rest` set the day; checked before food matching.
+    if (!cmd || (cmd.type === "food" && cmd.n === null)) {
+      const plan = matchPlanWord(text, await listWorkoutTypes());
+      if (plan) return void (await send(ctx, await opPlan(date, plan, s)));
+    }
+
     if (cmd) {
       switch (cmd.type) {
         case "weight": return void (await reply(await opWeight(date, cmd.kg)));
         case "steps": return void (await reply(await opSteps(date, cmd.n, s)));
         case "water": return void (await reply(await opWater(date, s)));
-        case "done": return void (await reply(await opDone(date, s)));
+        case "done": return void (await send(ctx, await opDone(date, s)));
         case "today": return void (await reply(await opToday(date, s)));
         case "undo": return void (await reply(await opUndo(date, s)));
         case "help": return void (await reply(HELP));

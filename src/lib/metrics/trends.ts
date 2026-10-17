@@ -99,8 +99,6 @@ export type WeekAdherence = {
   sessionsPlanned: number;
 };
 
-export const SESSIONS_PER_WEEK = 4;
-
 export type Adherence = {
   daysLogged: number;
   avgKcal: number | null;
@@ -157,7 +155,7 @@ export function adherenceByWeekFrom(input: {
       isCurrent: w === 0,
       ...a,
       sessionsDone,
-      sessionsPlanned: SESSIONS_PER_WEEK,
+      sessionsPlanned: settings.weeklySessionTarget,
     });
   }
   return out; // newest first

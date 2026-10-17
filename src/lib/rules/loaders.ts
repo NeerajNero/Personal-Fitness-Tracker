@@ -23,9 +23,9 @@ export type Loaders = {
   measurements: () => Promise<Measurement[]>;
   /** Measurements dated within the ISO week containing `date` (default today). */
   measurementsInWeek: (date?: string) => Promise<Measurement[]>;
-  /** Today's routine exercises with the top set from their last session. */
-  routineTopSets: () => Promise<TopSet[]>;
-  routineNames: () => Promise<string[]>;
+  /** A workout type's exercises with the top set from their last session (exercises never done are omitted). */
+  typeTopSets: (typeId: number) => Promise<TopSet[]>;
+  typeExerciseNames: (typeId: number) => Promise<string[]>;
   weeklyReport: (weekStart: string) => Promise<WeeklyReport>;
   checkpoint: (from: string, to: string) => Promise<CheckpointSummary>;
 };
@@ -35,11 +35,19 @@ function memo<T>(fn: () => Promise<T>): () => Promise<T> {
   return () => (p ??= fn());
 }
 
+function memoBy<K, T>(cache: Map<K, Promise<T>>, key: K, fn: () => Promise<T>): Promise<T> {
+  let p = cache.get(key);
+  if (!p) cache.set(key, (p = fn()));
+  return p;
+}
+
 export function makeLoaders(now: IstNow, settings: Settings, state: DayState): Loaders {
   const foods = memo(() => listFoods());
   const measurements = memo(() => loadMeasurements());
   const weeklyReports = new Map<string, Promise<WeeklyReport>>();
   const checkpoints = new Map<string, Promise<CheckpointSummary>>();
+  const names = new Map<number, Promise<string[]>>();
+  const tops = new Map<number, Promise<TopSet[]>>();
 
   return {
     foods,
@@ -52,23 +60,23 @@ export function makeLoaders(now: IstNow, settings: Settings, state: DayState): L
       const end = addDays(start, 6);
       return (await measurements()).filter((m) => m.date >= start && m.date <= end);
     },
-    routineNames: memo(async () => (state.flags.routineDayId ? (await listRoutineExerciseNames(state.flags.routineDayId)).map((r) => r.name) : [])),
-    routineTopSets: memo(async () => {
-      if (!state.flags.routineDayId) return [];
-      const rows = await db
-        .select({ id: exercises.id, name: exercises.name })
-        .from(routineExercises)
-        .innerJoin(exercises, eq(exercises.id, routineExercises.exerciseId))
-        .where(eq(routineExercises.routineDayId, state.flags.routineDayId))
-        .orderBy(asc(routineExercises.sortOrder));
-      const last = await loadLastSessionSets(rows.map((r) => r.id), state.flags.sessionId ?? undefined);
-      return rows.flatMap((r) => {
-        const l: LastSession | undefined = last.get(r.id);
-        if (!l || l.sets.length === 0) return [];
-        const top = l.sets.reduce((a, b) => (b.weightKg * (1 + b.reps / 30) > a.weightKg * (1 + a.reps / 30) ? b : a));
-        return [{ name: r.name, weightKg: top.weightKg, reps: top.reps }];
-      });
-    }),
+    typeExerciseNames: (typeId) => memoBy(names, typeId, async () => (await listRoutineExerciseNames(typeId)).map((r) => r.name)),
+    typeTopSets: (typeId) =>
+      memoBy(tops, typeId, async () => {
+        const rows = await db
+          .select({ id: exercises.id, name: exercises.name })
+          .from(routineExercises)
+          .innerJoin(exercises, eq(exercises.id, routineExercises.exerciseId))
+          .where(eq(routineExercises.routineDayId, typeId))
+          .orderBy(asc(routineExercises.sortOrder));
+        const last = await loadLastSessionSets(rows.map((r) => r.id), state.flags.sessionId ?? undefined);
+        return rows.flatMap((r) => {
+          const l: LastSession | undefined = last.get(r.id);
+          if (!l || l.sets.length === 0) return [];
+          const top = l.sets.reduce((a, b) => (b.weightKg * (1 + b.reps / 30) > a.weightKg * (1 + a.reps / 30) ? b : a));
+          return [{ name: r.name, weightKg: top.weightKg, reps: top.reps }];
+        });
+      }),
     weeklyReport: (weekStart) => {
       let p = weeklyReports.get(weekStart);
       if (!p) {

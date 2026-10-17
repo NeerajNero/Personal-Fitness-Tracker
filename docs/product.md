@@ -12,10 +12,11 @@ Weight / height / age / sex are collected in onboarding.
 2. **Telegram first.** On most days the owner never opens the app.
 3. **Confirm by exception.** Repeat what happened last time with one tap, and type only what changed
    (My meals, "Same as yesterday", ✓ same as last session).
-4. **Show the answer, hide the detail.** Every screen leads with one thing to act on. Everything else sits under "More".
-5. **Photo calorie estimation stays outside the app.** The owner photographs meals, gets kcal + protein from an
+4. **You choose the day.** No fixed weekday plan: pick a workout type (or Rest) each day. The app suggests the next one in rotation.
+5. **Show the answer, hide the detail.** Every screen leads with one thing to act on. Everything else sits under "More".
+6. **Photo calorie estimation stays outside the app.** The owner photographs meals, gets kcal + protein from an
    outside AI and types the numbers in (`dosa 350 12` in Telegram, or Add a meal on Today). Don't build it in.
-6. **Kcal + protein only.** No fat or carbs. Cost (₹) is still stored, but it isn't asked for or shown on logging
+7. **Kcal + protein only.** No fat or carbs. Cost (₹) is still stored, but it isn't asked for or shown on logging
    screens. The owner will decide on cost later.
 
 ## Targets (seeded into `settings`; editable in Settings)
@@ -25,7 +26,7 @@ Weight / height / age / sex are collected in onboarding.
 | Protein, `veg` phase (until 2026-11-30) | 85–100 g/day, budget ₹4,800/month |
 | Protein, `nonveg` phase (from 2026-12-01) | 115–130 g/day, budget ₹5,000/month |
 | Steps (rest days) | 8,000–10,000 |
-| Training | Upper/Lower 4-day: Mon Upper A, Tue Lower A, Thu Upper B, Fri Lower B. Wed/Sat/Sun rest |
+| Training | **Choose the day**, no weekday schedule. Workout types Push → Pull → Legs (rotation suggests "next up"); target 4 sessions/week (`settings.weekly_session_target`) |
 | Cardio | 15–20 min incline walk after lifting (checkbox per session) |
 | Smoke-free since | 2026-09-27 (editable) |
 | Checkpoints | 2026-12-10 gym-renewal decision (8-week review) · 2027-10-11 end goal |
@@ -62,11 +63,13 @@ Foods (approximate; the owner edits them in the app):
 | Chicken breast | 100 g raw | 120 | 23 | 30 | nonveg |
 | Fish (rohu) | 100 g raw | 100 | 17 | 25 | nonveg |
 
-Routine (working sets only):
-- **Upper A:** Lat pulldown (wide), Barbell row, Flat bench press, Overhead press, Face pull, Biceps curl
-- **Lower A:** Back squat, Romanian deadlift, Leg press, Leg curl, Standing calf raise, Hanging knee raise
-- **Upper B:** Pull-up (or assisted), Chest-supported row, Incline DB press, Lateral raise, Straight-arm pulldown, Triceps pushdown
-- **Lower B:** Trap bar / conventional deadlift, Hack squat (or front squat), Walking lunge, Leg extension, Seated calf raise, Cable crunch
+Workout types (rotation order, 3 × 8 working sets each):
+- **Push:** Flat bench press, Overhead press, Incline DB press, Lateral raise, Triceps pushdown
+- **Pull:** Pull-up (or assisted), Lat pulldown (wide), Barbell row, Chest-supported row, Face pull, Biceps curl
+- **Legs:** Back squat, Romanian deadlift, Leg press, Leg curl, Leg extension, Standing calf raise, Hanging knee raise
+
+The exercise library also keeps Straight-arm pulldown, Hack squat (or front squat), Walking lunge, Trap bar / conventional
+deadlift, Seated calf raise and Cable crunch (searchable in "+ Exercise"). Upper A/B and Lower A/B (Oct 2026) are archived types.
 
 Lat cues, attached to every pull exercise (pulldown, rows, pull-ups, straight-arm pulldown):
 1. Thumbless grip: reduces forearm/biceps takeover

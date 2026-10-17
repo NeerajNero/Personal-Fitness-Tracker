@@ -36,6 +36,7 @@ export const phaseEnum = pgEnum("phase", ["veg", "nonveg"]);
 export const phaseTagEnum = pgEnum("phase_tag", ["veg", "nonveg", "both"]);
 export const logSourceEnum = pgEnum("log_source", ["app", "telegram", "ai"]);
 export const sexEnum = pgEnum("sex", ["male", "female"]);
+/** Legacy: routine_days.name used this until 0005 (now text). Kept so drizzle-kit never drops the type. */
 export const routineDayNameEnum = pgEnum("routine_day_name", [
   "UpperA",
   "LowerA",
@@ -101,6 +102,7 @@ export const settings = pgTable(
 
     // Lifestyle
     smokeFreeSince: date("smoke_free_since").default("2026-09-27"),
+    weeklySessionTarget: smallint("weekly_session_target").notNull().default(4),
 
     // Nudge toggles
     nudgeMorningBrief: boolean("nudge_morning_brief").notNull().default(true),
@@ -171,6 +173,8 @@ export const dailyMetrics = pgTable("daily_metrics", {
   steps: integer("steps"),
   waterGlasses: smallint("water_glasses"),
   notes: text("notes"),
+  /** Owner chose Rest for this date (Today picker, bot `rest`). */
+  restDay: boolean("rest_day").notNull().default(false),
   updatedAt: updatedAt(),
 });
 
@@ -206,9 +210,13 @@ export const routineDays = pgTable(
   "routine_days",
   {
     id: serial("id").primaryKey(),
-    name: routineDayNameEnum("name").notNull(),
-    weekday: smallint("weekday").notNull(), // ISO 1=Mon … 7=Sun
+    /** Workout type name ("Push", or legacy "UpperA"). Text since 0005; the old enum type is kept, unused. */
+    name: text("name").notNull(),
+    /** Legacy: the weekday no longer decides anything. Kept for history, never read. */
+    weekday: smallint("weekday"),
+    /** Rotation order for "next up". */
     sortOrder: smallint("sort_order").notNull(),
+    archived: boolean("archived").notNull().default(false),
   },
   (t) => [uniqueIndex("routine_days_name_uq").on(t.name)],
 );

@@ -1,5 +1,4 @@
 import { n0 } from "@/lib/format";
-import { ROUTINE_LABEL } from "@/lib/routine";
 import type { DayState } from "@/lib/rules/dayState";
 
 function Bar({ label, value, target, unit, over }: { label: string; value: number; target: number; unit: string; over: boolean }) {
@@ -22,17 +21,16 @@ function Bar({ label, value, target, unit, over }: { label: string; value: numbe
   );
 }
 
-/** One line under the bars: what's left, today's training (or steps on a rest day), smoke-free streak. */
-function statusLine({ remaining, totals, targets, flags, metrics, smokeFreeDays }: DayState): string {
+/** One line under the bars: what's left, steps on rest/unset days, smoke-free streak. */
+function statusLine({ remaining, totals, targets, dayPlan, metrics, smokeFreeDays }: DayState): string {
   const parts = [
     remaining.kcal >= 0 ? `${n0(remaining.kcal)} kcal left` : `${n0(-remaining.kcal)} kcal over`,
     remaining.protein > 0 ? `${n0(remaining.protein)} g protein to go` : `protein ✓ ${n0(totals.protein)} g`,
   ];
-  if (flags.isTrainingDay && flags.routineDayName) {
-    const label = ROUTINE_LABEL[flags.routineDayName];
-    parts.push(flags.workoutLogged ? `${label} ✓` : flags.trainingSkipped ? `${label} skipped` : `${label} today`);
-  } else if (metrics.steps !== null) {
-    parts.push(`${n0(metrics.steps)} / ${n0(targets.steps)} steps${metrics.steps >= targets.steps ? " ✓" : ""}`);
+  // The workout itself is on the day picker line; steps matter on rest and unset days.
+  if (dayPlan.kind === "rest" || dayPlan.kind === "unset") {
+    const steps = metrics.steps ?? 0;
+    parts.push(`${n0(steps)} / ${n0(targets.steps)} steps${steps >= targets.steps ? " ✓" : ""}`);
   }
   if (smokeFreeDays !== null) parts.push(`${smokeFreeDays} d smoke-free`);
   return parts.join(" · ");

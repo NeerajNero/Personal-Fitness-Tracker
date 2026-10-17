@@ -3,10 +3,10 @@ import type { Food, Settings } from "@/db/schema";
 import { addDays, todayIST } from "@/lib/dates";
 import { esc, n0, n1 } from "@/lib/format";
 import { foodInPhase } from "@/lib/food";
+import { musclesInOrder } from "@/lib/metrics/strength";
 import { mondayOf, VERDICT_LABEL } from "@/lib/metrics/trends";
-import { ROUTINE_LABEL } from "@/lib/routine";
 import { appUrl } from "@/lib/telegram/env";
-import { todaySummary } from "@/lib/telegram/messages";
+import { didButtons, planButtons, todaySummary } from "@/lib/telegram/messages";
 import type { Rule, RuleCtx, RuleMessage } from "./engine";
 import type { WeeklyReport } from "./weekly";
 
@@ -43,7 +43,9 @@ export function formatWeeklyReport(r: WeeklyReport): string {
   const lines = [`📊 <b>Week ${r.weekStart.slice(5)} → ${r.weekEnd.slice(5)}</b>`];
   lines.push(r.rate ? `⚖️ 7-day avg ${n1(r.rate.latest.avg7)} kg · ${r.rate.kgPerWeek > 0 ? "+" : ""}${r.rate.kgPerWeek.toFixed(2)} kg/wk (${r.rate.pctPerWeek > 0 ? "+" : ""}${r.rate.pctPerWeek.toFixed(2)} %)` : "⚖️ not enough weigh-ins for a trend");
   lines.push(r.navel ? `📏 Navel ${n1(r.navel.latest)} cm${r.navel.delta !== null ? ` (${r.navel.delta > 0 ? "+" : ""}${r.navel.delta} vs last)` : ""}` : "📏 no measurement this week");
-  lines.push(`🏋️ ${r.sessionsDone} sessions · lifts progressed ${r.lifts.progressed}/${r.lifts.tracked}`);
+  lines.push(`🏋️ ${r.sessionsDone}/${r.sessionTarget} sessions · lifts progressed ${r.lifts.progressed}/${r.lifts.tracked}`);
+  const muscles = musclesInOrder(r.setsByMuscle);
+  if (muscles.length) lines.push(`💪 Sets: ${muscles.map(([m, n]) => `${esc(m)} ${n}`).join(" · ")}`);
   const a = r.adherence;
   lines.push(`🍽 kcal in range ${a.kcalAdherencePct ?? "—"}% · protein hit ${a.proteinHitPct ?? "—"}% · ${a.daysLogged}/7 days logged`);
   lines.push(`🧭 <b>${VERDICT_LABEL[r.verdict.verdict]}</b>`);
@@ -62,21 +64,37 @@ export const RULES: Rule[] = [
     condition: () => true,
     message: async ({ state, settings, load }) => {
       const lines: string[] = [];
-      if (state.flags.isTrainingDay && state.flags.routineDayName) {
-        lines.push(`🏋️ <b>${ROUTINE_LABEL[state.flags.routineDayName]} today</b>`);
-        const tops = await load.routineTopSets();
+      const { dayPlan: plan, nextUp } = state;
+      let inlineKeyboard: RuleMessage["inlineKeyboard"];
+      const topSets = async (typeId: number) => {
+        const tops = await load.typeTopSets(typeId);
         if (tops.length) lines.push(tops.map((t) => `${esc(t.name)} ${fmtW(t.weightKg)}×${t.reps}`).join(" · "));
         else {
-          lines.push((await load.routineNames()).map(esc).join(" · "));
+          lines.push((await load.typeExerciseNames(typeId)).map(esc).join(" · "));
           lines.push("First time — pick weights you can do for 8.");
         }
-      } else {
+      };
+      if (plan.kind === "workout" && plan.typeId !== null) {
+        lines.push(`🏋️ <b>${esc(plan.typeName ?? "Workout")} today</b>`);
+        await topSets(plan.typeId);
+      } else if (plan.kind === "custom") {
+        lines.push("🏋️ <b>Custom workout today</b>");
+      } else if (plan.kind === "rest") {
         lines.push(`🛌 <b>Rest day</b> — ${n0(state.targets.stepsRange[0])}–${n0(state.targets.stepsRange[1])} steps`);
+      } else if (nextUp) {
+        const days = state.daysSince.find((d) => d.typeId === nextUp.typeId)?.days ?? null;
+        const ago = days === null ? "first time" : days === 0 ? "last done today" : `last done ${days} ${days === 1 ? "day" : "days"} ago`;
+        lines.push(`🏋️ Next up: <b>${esc(nextUp.typeName)}</b> (${ago})`);
+        await topSets(nextUp.typeId);
+        lines.push("What's today? Tap below, or send a type name / <code>rest</code>.");
+        inlineKeyboard = planButtons(state);
+      } else {
+        lines.push(`👟 ${n0(state.targets.stepsRange[0])}–${n0(state.targets.stepsRange[1])} steps today`);
       }
       if (!state.flags.weightLogged) lines.push("⚖️ Weigh in: <code>w 74.2</code>");
       const d = state.smokeFreeDays;
       if (settings.nudgeMilestones && d !== null && d > 0 && d % 7 === 0) lines.push(`🚭 <b>${d} days smoke-free</b> — ${d / 7} ${d === 7 ? "week" : "weeks"}. Keep going.`);
-      return { text: lines.join("\n") };
+      return { text: lines.join("\n"), inlineKeyboard };
     },
   },
   {
@@ -125,14 +143,15 @@ export const RULES: Rule[] = [
       const missing: string[] = [];
       if (!f.weightLogged) missing.push("weight — reply <code>w 74.2</code>");
       if (!f.stepsLogged) missing.push("steps — reply <code>s 8500</code>");
-      const workoutMissing = f.isTrainingDay && !f.workoutLogged && !f.trainingSkipped;
-      if (workoutMissing) missing.push("workout — tap below");
-      const text = `${todaySummary(state)}\n\n${missing.length ? `<b>Missing:</b>\n• ${missing.join("\n• ")}` : "All logged ✓"}`;
+      const plan = state.dayPlan;
+      const unset = plan.kind === "unset" && state.daysSince.length > 0;
+      const workoutMissing = plan.kind === "workout" && !f.workoutLogged;
+      if (workoutMissing) missing.push(`${esc(plan.typeName ?? "workout")} — tap below`);
+      const parts = [todaySummary(state), missing.length ? `<b>Missing:</b>\n• ${missing.join("\n• ")}` : "All logged ✓"];
+      if (unset) parts.push("<b>What did you do today?</b> Tap a workout to log it as same as last time.");
       return {
-        text,
-        inlineKeyboard: workoutMissing
-          ? [[{ text: "✓ Did it (same as last time)", callback_data: "nudge:done" }, { text: "No training today", callback_data: "nudge:skip" }]]
-          : undefined,
+        text: parts.join("\n\n"),
+        inlineKeyboard: unset || workoutMissing ? didButtons(state) : undefined,
       };
     },
   },

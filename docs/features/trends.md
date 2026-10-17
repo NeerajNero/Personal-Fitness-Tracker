@@ -14,7 +14,8 @@ Answers "am I on track, and do I need to change anything?" before showing any de
 - **Estimated maintenance**: when the suggested target differs from the current one by ≥ 50 kcal. It has an Apply button and is never applied automatically.
 
 **Under "More details"** (a `<details>` element; still rendered on the server)
-Goal progress %, lifts (e1RM per exercise with stall runs), weekly protein / kcal adherence (12 weeks), spend vs budget,
+Goal progress %, lifts (e1RM per exercise with stall runs), **sets per muscle** (working sets per `exercises.muscle_group`, last 4
+ISO weeks, back first), weekly protein / kcal adherence (12 weeks; sessions vs `weekly_session_target`), spend vs budget,
 the checkpoint / maintenance card when not promoted, and the CSV export link.
 
 ## Files
@@ -22,8 +23,8 @@ the checkpoint / maintenance card when not promoted, and the CSV export link.
 |---|---|
 | `src/app/(app)/trends/page.tsx` | Loads every dataset once, derives with the pure `*From` helpers, decides promotion |
 | `trends/verdict-card.tsx`, `weight-section.tsx`, `navel-section.tsx`, `measurements.tsx` | Top cards |
-| `trends/goal-card.tsx`, `lifts-section.tsx`, `adherence-table.tsx`, `maintenance-card.tsx`, `checkpoint-card.tsx`, `spend-section.tsx` | Detail cards |
+| `trends/goal-card.tsx`, `lifts-section.tsx`, `muscle-volume.tsx`, `adherence-table.tsx`, `maintenance-card.tsx`, `checkpoint-card.tsx`, `spend-section.tsx` | Detail cards |
 | `trends/actions.ts` | Measurement upsert/delete, `applyKcalTarget` |
 | `src/lib/metrics/trends.ts` | Weight series, weekly rate, adherence, verdict, maintenance |
-| `src/lib/metrics/checkpoint.ts`, `spend.ts`, `strength.ts` | Checkpoint summary, month spend, e1RM history |
+| `src/lib/metrics/checkpoint.ts`, `spend.ts`, `strength.ts` | Checkpoint summary (planned sessions = days ÷ 7 × weekly target), month spend, e1RM history, `weeklySetsByMuscle` |
 | `src/components/charts/line-chart.tsx` | The SVG chart (series, band, marker). Don't add a chart library |

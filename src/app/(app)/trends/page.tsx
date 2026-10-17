@@ -3,7 +3,7 @@ import Link from "next/link";
 import { addDays, daysBetween, todayIST } from "@/lib/dates";
 import { checkpointSummary } from "@/lib/metrics/checkpoint";
 import { monthSpend } from "@/lib/metrics/spend";
-import { loadAllHistory, stallFromHistory, stallIndices } from "@/lib/metrics/strength";
+import { loadAllHistory, stallFromHistory, stallIndices, weeklySetsByMuscle } from "@/lib/metrics/strength";
 import {
   adherenceByWeekFrom,
   estimateMaintenanceFrom,
@@ -22,6 +22,7 @@ import { GoalCard } from "./goal-card";
 import { LiftsSection, type Lift } from "./lifts-section";
 import { MaintenanceCard } from "./maintenance-card";
 import { Measurements } from "./measurements";
+import { MuscleVolume } from "./muscle-volume";
 import { NavelSection } from "./navel-section";
 import { SpendSection } from "./spend-section";
 import { VerdictCard } from "./verdict-card";
@@ -35,13 +36,14 @@ export default async function TrendsPage() {
   const today = todayIST();
   const from = addDays(mondayOf(today), -7 * (WEEKS - 1));
 
-  const [settings, series, measurements, totals, sessionDates, history] = await Promise.all([
+  const [settings, series, measurements, totals, sessionDates, history, volume] = await Promise.all([
     getSettings(),
     loadWeightSeries(),
     loadMeasurements(),
     loadDailyTotals(from, today),
     loadLoggedSessionDates(from, today),
     loadAllHistory(),
+    weeklySetsByMuscle(4, today),
   ]);
 
   const onboardingDate = settings.onboardedAt ? todayIST(settings.onboardedAt) : settings.smokeFreeSince ?? today;
@@ -100,6 +102,7 @@ export default async function TrendsPage() {
         <div className="mt-4 flex flex-col gap-4">
           <GoalCard settings={settings} measurements={measurements} today={today} />
           <LiftsSection lifts={lifts} />
+          <MuscleVolume weeks={volume} />
           <AdherenceTable weeks={weeks} />
           {!maintenanceActionable ? maintenanceCard : null}
           {!checkpointSoon ? checkpointCard : null}

@@ -4,12 +4,12 @@ import { incrementWater, upsertDailyMetrics } from "@/lib/daily";
 import { addDays, nowTimeIST } from "@/lib/dates";
 import { copyFoodLog, deleteLatestFoodEntry, entryFromFood, insertFoodEntries, listFoodLog, listFoods } from "@/lib/food";
 import { esc, n0, n1, qtyStr } from "@/lib/format";
-import { ROUTINE_LABEL } from "@/lib/routine";
 import { getDayState } from "@/lib/rules/dayState";
 import { upsertMeasurementByDate } from "@/lib/measurements";
-import { copyLastSets, createSession } from "@/lib/training";
+import { copyLastSets, getSessionDetail, setDayPlan, type DayChoice } from "@/lib/training";
 import { appUrl } from "./env";
-import { entryLine, runningLine, todaySummary, withOverage } from "./messages";
+import { didButtons, entryLine, runningLine, todaySummary, withOverage } from "./messages";
+import type { InlineKeyboardButton } from "grammy/types";
 import { matchFood, servingsFor } from "./parse";
 
 export async function opWeight(date: string, kg: number): Promise<string> {
@@ -20,7 +20,8 @@ export async function opWeight(date: string, kg: number): Promise<string> {
 export async function opSteps(date: string, n: number, settings: Settings): Promise<string> {
   await upsertDailyMetrics(date, { steps: n });
   const state = await getDayState(date, { settings });
-  return `👟 ${n0(n)} steps saved${!state.flags.isTrainingDay && n >= state.targets.steps ? " — target hit ✓" : ""}.`;
+  const restish = state.dayPlan.kind === "rest" || state.dayPlan.kind === "unset";
+  return `👟 ${n0(n)} steps saved${restish && n >= state.targets.steps ? " — target hit ✓" : ""}.`;
 }
 
 export async function opWater(date: string, settings: Settings): Promise<string> {
@@ -58,17 +59,62 @@ export async function opCopy(date: string, settings: Settings): Promise<string> 
   return withOverage(`↺ Copied ${n} ${n === 1 ? "entry" : "entries"} from yesterday.\n${runningLine(state)}`, state);
 }
 
-/** `done` — log today's workout as the same as last time; edit any lift that changed in the app. */
-export async function opDone(date: string, settings: Settings): Promise<string> {
-  const state = await getDayState(date, { settings });
-  const sessionId = state.flags.sessionId ?? (await createSession(date, state.flags.routineDayId)).sessionId;
-  const filled = await copyLastSets(sessionId);
-  const label = state.flags.routineDayName ? ROUTINE_LABEL[state.flags.routineDayName] : "Workout";
-  const link = `<a href="${appUrl()}/train">open Train</a>`;
-  if (filled === 0) {
-    return state.flags.workoutLogged ? `${label} already logged ✓ — ${link} to change anything.` : `🏋️ ${label} started — no previous sets to copy, ${link} to enter them.`;
+/** A reply with optional inline buttons. */
+export type Reply = { text: string; keyboard?: InlineKeyboardButton[][] };
+
+const trainLink = (date: string, label = "open Train") => `<a href="${appUrl()}/train?d=${date}">${label}</a>`;
+const confirmInApp = (date: string, setCount: number) =>
+  `That day already has ${setCount} ${setCount === 1 ? "set" : "sets"} logged — ${trainLink(date, "change it in the app")} so nothing is lost.`;
+
+/** `push` / `rest` (or a morning button) — set what the day is. A type replies with its list and a ✓ All same button. */
+export async function opPlan(date: string, choice: DayChoice, settings: Settings): Promise<Reply> {
+  const r = await setDayPlan(date, choice);
+  if (!r.ok) return { text: confirmInApp(date, r.setCount) };
+  if (choice.kind === "rest") {
+    const state = await getDayState(date, { settings });
+    return { text: `🛌 Rest day set. Steps target ${n0(state.targets.stepsRange[0])}–${n0(state.targets.stepsRange[1])}.` };
   }
-  return `🏋️ ${label} logged — same as last time (${filled} ${filled === 1 ? "exercise" : "exercises"}). Progressed on a lift? ${link} and edit it.`;
+  const detail = r.sessionId ? await getSessionDetail(r.sessionId) : null;
+  const title = detail?.typeName ?? "Custom workout";
+  const lines = detail?.exercises.map((e) => `• ${esc(e.name)} — ${esc(e.sets.length ? "logged ✓" : e.hint.text)}`) ?? [];
+  return {
+    text: [`🏋️ <b>${esc(title)}</b>`, ...lines, `Edit a lift that progressed: ${trainLink(date)}`].join("\n"),
+    keyboard: lines.length ? [[{ text: "✓ All same as last time", callback_data: `did:${date}:same` }]] : undefined,
+  };
+}
+
+async function logSame(date: string, sessionId: number, title: string, wasLogged: boolean): Promise<Reply> {
+  const filled = await copyLastSets(sessionId);
+  const link = trainLink(date);
+  if (filled === 0) {
+    return { text: wasLogged ? `${esc(title)} already logged ✓ — ${link} to change anything.` : `🏋️ ${esc(title)} — no previous sets to copy, ${link} to enter them.` };
+  }
+  return { text: `🏋️ ${esc(title)} logged — same as last time (${filled} ${filled === 1 ? "exercise" : "exercises"}). Progressed on a lift? ${link} and edit it.` };
+}
+
+/** `done` — log the chosen type as same as last time; when the day isn't set (or is rest), ask which. */
+export async function opDone(date: string, settings: Settings): Promise<Reply> {
+  const state = await getDayState(date, { settings });
+  const plan = state.dayPlan;
+  if ((plan.kind === "workout" || plan.kind === "custom") && state.flags.sessionId) {
+    return logSame(date, state.flags.sessionId, plan.typeName ?? "Custom workout", state.flags.workoutLogged);
+  }
+  if (state.daysSince.length === 0) return { text: `No workout types yet — add them in Settings, or ${trainLink(date)}.` };
+  return { text: plan.kind === "rest" ? "Today is set as rest. Did you train after all?" : "What did you do today?", keyboard: didButtons({ ...state, dayPlan: { kind: "unset", typeId: null, typeName: null } }) };
+}
+
+/** Evening buttons: `did:<date>:<typeId|rest|same>` — set the day and log it as same as last time. */
+export async function opDid(date: string, value: string, settings: Settings): Promise<Reply> {
+  if (value === "rest") return opPlan(date, { kind: "rest" }, settings);
+  if (value === "same") {
+    const state = await getDayState(date, { settings });
+    if (!state.flags.sessionId) return opDone(date, settings);
+    return logSame(date, state.flags.sessionId, state.dayPlan.typeName ?? "Custom workout", state.flags.workoutLogged);
+  }
+  const r = await setDayPlan(date, { kind: "workout", typeId: Number(value) });
+  if (!r.ok) return { text: confirmInApp(date, r.setCount) };
+  const detail = r.sessionId ? await getSessionDetail(r.sessionId) : null;
+  return logSame(date, r.sessionId!, detail?.typeName ?? "Workout", false);
 }
 
 export async function opToday(date: string, settings: Settings): Promise<string> {

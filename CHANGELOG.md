@@ -7,14 +7,26 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 ## Unreleased
 
 ### Added
+- **Choose your day:** a "What's today?" picker on Today and Train (a button per workout type with days since it was last done,
+  next up highlighted, plus Rest; Custom and archived types under ⋯). Replaces the fixed weekday schedule.
+- Workout types **Push / Pull / Legs** in a rotation that suggests "next up" (data script `pnpm choose-day` archives Upper/Lower
+  and turns past "No training today" taps into rest days).
+- Bot: send a workout type name (`push`, `pull`, `legs`) or `rest` to set the day. Morning brief shows "Next up: Pull (last
+  done 4 days ago)" with buttons; day close asks "What did you do today?" with one-tap log buttons.
+- Settings → **Workout types**: add, rename, reorder (= rotation), archive/restore, exercises per type, sessions-per-week target.
+- Train "+ Add an exercise" searches the full library, with "Also add to <type>".
+- **Sets per muscle** (working sets per muscle group, last 4 weeks, back first) in Trends → More details and the weekly report.
 - Project documentation in `docs/` (product, architecture, data model, one doc per feature, rules engine, operations) and this changelog.
 - `/sync-docs` project skill (`.claude/skills/sync-docs`): maps a diff to the docs it affects, updates them and the changelog.
 
 ### Changed
+- Session adherence, the weekly report and the Dec 10 checkpoint measure sessions against the weekly target (default 4)
+  instead of the fixed weekday plan.
+- `done` logs the chosen workout type; with no day chosen it asks which.
 - `CLAUDE.md` slimmed to rules + a docs map; the detailed spec moved to `docs/`.
 
 ### Fixed
-- The Milestones reminder no longer claims to send smoke-free weekly milestones (that rule was never built).
+- `pnpm seed` crashed since 2026-10-11 (`server-only` in the db module throws under plain Node); db scripts now run with `--conditions=react-server`.
 
 ## 2026-10-17: Simplification
 

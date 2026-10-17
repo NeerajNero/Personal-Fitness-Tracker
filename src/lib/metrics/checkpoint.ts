@@ -1,10 +1,8 @@
 /** Window summary for the Dec 10 checkpoint card and the Telegram checkpoint rule. */
 import type { Measurement, Settings } from "@/db/schema";
-import { addDays, isoWeekday } from "@/lib/dates";
 import { loadAllHistory, type ExerciseHistory } from "@/lib/metrics/strength";
 import { adherenceFrom, loadDailyTotals, loadLoggedSessionDates, loadMeasurements, loadWeightSeries, type Adherence, type DailyTotal, type WeightPoint } from "@/lib/metrics/trends";
 import { getSettings } from "@/lib/settings";
-import { listRoutineDays } from "@/lib/training";
 
 export type LiftProgress = {
   exerciseId: number;
@@ -49,11 +47,9 @@ export function liftProgressFrom(history: ExerciseHistory[], from: string, to: s
     .filter((x): x is LiftProgress => x !== null);
 }
 
-export function plannedSessions(from: string, to: string, routineWeekdays: number[]): number {
-  const set = new Set(routineWeekdays);
-  let n = 0;
-  for (let d = from; d <= to; d = addDays(d, 1)) if (set.has(isoWeekday(d))) n++;
-  return n;
+/** Sessions expected in an inclusive window at `weeklyTarget` per week (pro-rated, rounded). */
+export function plannedSessions(days: number, weeklyTarget: number): number {
+  return Math.round((days / 7) * weeklyTarget);
 }
 
 export function checkpointSummaryFrom(input: {
@@ -65,22 +61,22 @@ export function checkpointSummaryFrom(input: {
   history: ExerciseHistory[];
   totals: DailyTotal[];
   sessionDates: string[];
-  routineWeekdays: number[];
 }): CheckpointSummary {
-  const { from, to, settings, series, measurements, history, totals, sessionDates, routineWeekdays } = input;
+  const { from, to, settings, series, measurements, history, totals, sessionDates } = input;
   const navels = measurements.filter((m) => m.navelCm !== null && m.date >= from && m.date <= to);
   const w = series.filter((p) => p.date >= from && p.date <= to);
   const details = liftProgressFrom(history, from, to);
   const r1 = (n: number) => Math.round(n * 10) / 10;
+  const days = Math.max(0, (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
   return {
     from,
     to,
-    days: Math.max(0, (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1,
+    days,
     navel: navels.length ? { first: navels[0].navelCm!, latest: navels[navels.length - 1].navelCm!, delta: r1(navels[navels.length - 1].navelCm! - navels[0].navelCm!) } : null,
     weight: w.length ? { first: r1(w[0].avg7), latest: r1(w[w.length - 1].avg7), delta: r1(w[w.length - 1].avg7 - w[0].avg7) } : null,
     lifts: { progressed: details.filter((d) => d.progressed).length, tracked: details.length, details },
     sessionsDone: sessionDates.filter((d) => d >= from && d <= to).length,
-    sessionsPlanned: plannedSessions(from, to, routineWeekdays),
+    sessionsPlanned: plannedSessions(days, settings.weeklySessionTarget),
     ...adherenceFrom(totals, settings, from, to),
   };
 }
@@ -89,16 +85,15 @@ export function checkpointSummaryFrom(input: {
 export async function checkpointSummary(
   from: string,
   to: string,
-  pre: Partial<{ settings: Settings; series: WeightPoint[]; measurements: Measurement[]; history: ExerciseHistory[]; routineWeekdays: number[] }> = {},
+  pre: Partial<{ settings: Settings; series: WeightPoint[]; measurements: Measurement[]; history: ExerciseHistory[] }> = {},
 ): Promise<CheckpointSummary> {
-  const [settings, series, measurements, history, routineWeekdays, totals, sessionDates] = await Promise.all([
+  const [settings, series, measurements, history, totals, sessionDates] = await Promise.all([
     pre.settings ?? getSettings(),
     pre.series ?? loadWeightSeries(),
     pre.measurements ?? loadMeasurements(),
     pre.history ?? loadAllHistory(),
-    pre.routineWeekdays ?? listRoutineDays().then((d) => d.map((x) => x.weekday)),
     loadDailyTotals(from, to),
     loadLoggedSessionDates(from, to),
   ]);
-  return checkpointSummaryFrom({ from, to, settings, series, measurements, history, totals, sessionDates, routineWeekdays });
+  return checkpointSummaryFrom({ from, to, settings, series, measurements, history, totals, sessionDates });
 }

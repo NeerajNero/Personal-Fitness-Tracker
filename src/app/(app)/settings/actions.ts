@@ -8,8 +8,10 @@ import { db } from "@/db";
 import { exercises, foods, routineDays, routineExercises, settings } from "@/db/schema";
 import { bodyStatsSchema } from "@/lib/body-stats";
 import { todayIST } from "@/lib/dates";
-import { MUSCLE_GROUPS } from "@/lib/routine";
-import { findOrCreateExercise } from "@/lib/training";
+import { listFoods } from "@/lib/food";
+import { BOT_COMMAND_WORDS, MUSCLE_GROUPS } from "@/lib/routine";
+import { matchFood } from "@/lib/telegram/parse";
+import { findOrCreateExercise, listWorkoutTypes } from "@/lib/training";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { requireSession } from "@/lib/session";
 
@@ -267,7 +269,7 @@ export async function addRoutineExercise(dayId: number, input: { exerciseId: num
     const v = addSchema.parse(input);
     const exerciseId = "exerciseId" in v ? v.exerciseId : await findOrCreateExercise(v.name, v.muscleGroup);
     const rows = await dayRows(d);
-    if (rows.some((r) => r.exerciseId === exerciseId)) return { ok: false, error: "Already in this day." };
+    if (rows.some((r) => r.exerciseId === exerciseId)) return { ok: false, error: "Already in this workout type." };
     await db.insert(routineExercises).values({ routineDayId: d, exerciseId, sortOrder: (rows.at(-1)?.sortOrder ?? 0) + 1 });
     revalidateAll();
     return { ok: true };
@@ -276,10 +278,99 @@ export async function addRoutineExercise(dayId: number, input: { exerciseId: num
   }
 }
 
-export async function setRoutineWeekday(dayId: number, weekday: number): Promise<ActionResult> {
+/* =============================== workout types =============================== */
+
+const typeName = z.string().trim().min(1, "Name required").max(30, "30 characters max");
+
+/** Reserved bot words block the name; a food with the same name only warns (the type wins in the bot). */
+async function checkTypeName(name: string, exceptId?: number): Promise<{ error: string } | { warning: string | null }> {
+  const lower = name.toLowerCase();
+  if ((BOT_COMMAND_WORDS as readonly string[]).includes(lower)) return { error: `"${name}" is a bot command — pick another name.` };
+  const types = await listWorkoutTypes({ includeArchived: true });
+  if (types.some((t) => t.id !== exceptId && (t.name.toLowerCase() === lower || t.label.toLowerCase() === lower))) return { error: "A workout type with that name exists." };
+  const food = matchFood(name, await listFoods());
+  const warning =
+    food && food.name.toLowerCase() === lower
+      ? `"${food.name}" is also a food. In Telegram, "${name}" will now set the day instead of logging the food.`
+      : null;
+  return { warning };
+}
+
+/** Renumber: active types in the given order 1..n, archived after them. */
+async function renumberTypes(activeOrder: number[]) {
+  const archived = (await listWorkoutTypes({ includeArchived: true })).filter((t) => t.archived).map((t) => t.id);
+  for (const [k, typeId] of [...activeOrder, ...archived].entries()) {
+    await db.update(routineDays).set({ sortOrder: k + 1 }).where(eq(routineDays.id, typeId));
+  }
+}
+
+export async function addWorkoutType(name: string): Promise<ActionResult<{ warning: string | null }>> {
   await requireSession();
   try {
-    await db.update(routineDays).set({ weekday: int(1, 7, "1–7").parse(weekday) }).where(eq(routineDays.id, id.parse(dayId)));
+    const n = typeName.parse(name);
+    const check = await checkTypeName(n);
+    if ("error" in check) return { ok: false, error: check.error };
+    const active = await listWorkoutTypes();
+    const [row] = await db.insert(routineDays).values({ name: n, sortOrder: active.length + 1 }).returning({ id: routineDays.id });
+    await renumberTypes([...active.map((t) => t.id), row.id]);
+    revalidateAll();
+    return { ok: true, warning: check.warning };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function renameWorkoutType(typeId: number, name: string): Promise<ActionResult<{ warning: string | null }>> {
+  await requireSession();
+  try {
+    const t = id.parse(typeId);
+    const n = typeName.parse(name);
+    const check = await checkTypeName(n, t);
+    if ("error" in check) return { ok: false, error: check.error };
+    await db.update(routineDays).set({ name: n }).where(eq(routineDays.id, t));
+    revalidateAll();
+    return { ok: true, warning: check.warning };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Move within the rotation (active types only). */
+export async function moveWorkoutType(typeId: number, dir: "up" | "down"): Promise<ActionResult> {
+  await requireSession();
+  try {
+    const order = (await listWorkoutTypes()).map((t) => t.id);
+    const i = order.indexOf(id.parse(typeId));
+    const j = dir === "up" ? i - 1 : i + 1;
+    if (i < 0 || j < 0 || j >= order.length) return { ok: true };
+    [order[i], order[j]] = [order[j], order[i]];
+    await renumberTypes(order);
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Archive hides a type from the picker and rotation (history stays); restore puts it at the end of the rotation. */
+export async function setWorkoutTypeArchived(typeId: number, archived: boolean): Promise<ActionResult> {
+  await requireSession();
+  try {
+    const t = id.parse(typeId);
+    await db.update(routineDays).set({ archived: z.boolean().parse(archived) }).where(eq(routineDays.id, t));
+    const active = (await listWorkoutTypes()).map((x) => x.id).filter((x) => x !== t);
+    await renumberTypes(archived ? active : [...active, t]);
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveWeeklySessionTarget(n: number): Promise<ActionResult> {
+  await requireSession();
+  try {
+    await db.update(settings).set({ weeklySessionTarget: int(1, 14, "1–14").parse(n), updatedAt: new Date() }).where(eq(settings.id, 1));
     revalidateAll();
     return { ok: true };
   } catch (e) {

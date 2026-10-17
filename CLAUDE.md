@@ -51,7 +51,9 @@ degrade gracefully) · Vercel Hobby · all rules in `Asia/Kolkata` (store UTC, c
 - Tailwind v4 is CSS-first (`src/app/globals.css`). Don't create a tailwind.config.
 - `cacheComponents` stays OFF. There is no proxy.ts: the auth gate is `src/app/(app)/layout.tsx`. Root `auth.ts` is imported as `@/auth`.
 - Migrations that change defaults must also `UPDATE` the existing `settings` row (id = 1) when the owner's current value should change.
-- Don't run `pnpm db:migrate` against the database or set the webhook without the owner's go-ahead.
+- Production data is real: schema changes are additive only (new tables, nullable/defaulted columns, type relaxations; no drops
+  or renames). Generate migrations and data scripts (with a `:dry` mode), but never run them or set the webhook; the owner does.
+- Standalone scripts that import `src/db` need `node --conditions=react-server` (the db module imports `server-only`).
 
 ## Checks
 ```bash

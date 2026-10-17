@@ -4,7 +4,8 @@
  * - settings: insert id=1 only if missing (never overwrites owner edits)
  * - foods: insert by name; existing rows are left untouched (owner edits in-app)
  * - exercises: upsert by name; muscle_group and cues are refreshed from this file
- * - routine_days / routine_exercises: upserted so the routine always matches the spec
+ * - routine_days (workout types Push/Pull/Legs) + their exercises: inserted only when the type is missing;
+ *   afterwards the owner manages types in Settings, so a re-run never undoes edits
  */
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
@@ -53,49 +54,40 @@ const FOODS: FoodSeed[] = [
 
 type ExerciseSeed = { name: string; muscleGroup: string; pull?: boolean };
 
-// `pull` = lat-dominant pull; gets LAT_CUES attached.
-const ROUTINE: Record<"UpperA" | "LowerA" | "UpperB" | "LowerB", ExerciseSeed[]> = {
-  UpperA: [
-    { name: "Lat pulldown (wide)", muscleGroup: "back", pull: true },
-    { name: "Barbell row", muscleGroup: "back", pull: true },
-    { name: "Flat bench press", muscleGroup: "chest" },
-    { name: "Overhead press", muscleGroup: "shoulders" },
-    { name: "Face pull", muscleGroup: "rear delts" },
-    { name: "Biceps curl", muscleGroup: "biceps" },
-  ],
-  LowerA: [
-    { name: "Back squat", muscleGroup: "quads" },
-    { name: "Romanian deadlift", muscleGroup: "hamstrings" },
-    { name: "Leg press", muscleGroup: "quads" },
-    { name: "Leg curl", muscleGroup: "hamstrings" },
-    { name: "Standing calf raise", muscleGroup: "calves" },
-    { name: "Hanging knee raise", muscleGroup: "core" },
-  ],
-  UpperB: [
-    { name: "Pull-up (or assisted)", muscleGroup: "back", pull: true },
-    { name: "Chest-supported row", muscleGroup: "back", pull: true },
-    { name: "Incline DB press", muscleGroup: "chest" },
-    { name: "Lateral raise", muscleGroup: "shoulders" },
-    { name: "Straight-arm pulldown", muscleGroup: "back", pull: true },
-    { name: "Triceps pushdown", muscleGroup: "triceps" },
-  ],
-  LowerB: [
-    { name: "Trap bar / conventional deadlift", muscleGroup: "posterior chain" },
-    { name: "Hack squat (or front squat)", muscleGroup: "quads" },
-    { name: "Walking lunge", muscleGroup: "quads" },
-    { name: "Leg extension", muscleGroup: "quads" },
-    { name: "Seated calf raise", muscleGroup: "calves" },
-    { name: "Cable crunch", muscleGroup: "core" },
-  ],
-};
+// The exercise library. `pull` = lat-dominant pull; gets LAT_CUES attached.
+const EXERCISES: ExerciseSeed[] = [
+  { name: "Lat pulldown (wide)", muscleGroup: "back", pull: true },
+  { name: "Barbell row", muscleGroup: "back", pull: true },
+  { name: "Pull-up (or assisted)", muscleGroup: "back", pull: true },
+  { name: "Chest-supported row", muscleGroup: "back", pull: true },
+  { name: "Straight-arm pulldown", muscleGroup: "back", pull: true },
+  { name: "Flat bench press", muscleGroup: "chest" },
+  { name: "Incline DB press", muscleGroup: "chest" },
+  { name: "Overhead press", muscleGroup: "shoulders" },
+  { name: "Lateral raise", muscleGroup: "shoulders" },
+  { name: "Face pull", muscleGroup: "rear delts" },
+  { name: "Biceps curl", muscleGroup: "biceps" },
+  { name: "Triceps pushdown", muscleGroup: "triceps" },
+  { name: "Back squat", muscleGroup: "quads" },
+  { name: "Hack squat (or front squat)", muscleGroup: "quads" },
+  { name: "Leg press", muscleGroup: "quads" },
+  { name: "Walking lunge", muscleGroup: "quads" },
+  { name: "Leg extension", muscleGroup: "quads" },
+  { name: "Romanian deadlift", muscleGroup: "hamstrings" },
+  { name: "Leg curl", muscleGroup: "hamstrings" },
+  { name: "Trap bar / conventional deadlift", muscleGroup: "posterior chain" },
+  { name: "Standing calf raise", muscleGroup: "calves" },
+  { name: "Seated calf raise", muscleGroup: "calves" },
+  { name: "Hanging knee raise", muscleGroup: "core" },
+  { name: "Cable crunch", muscleGroup: "core" },
+];
 
-// ISO weekday: 1=Mon … 7=Sun
-const ROUTINE_DAYS = [
-  { name: "UpperA", weekday: 1, sortOrder: 1 },
-  { name: "LowerA", weekday: 2, sortOrder: 2 },
-  { name: "UpperB", weekday: 4, sortOrder: 3 },
-  { name: "LowerB", weekday: 5, sortOrder: 4 },
-] as const;
+// Workout types in rotation order (3 × 8 each). Same as scripts/choose-your-day.ts.
+const WORKOUT_TYPES: { name: string; exercises: string[] }[] = [
+  { name: "Push", exercises: ["Flat bench press", "Overhead press", "Incline DB press", "Lateral raise", "Triceps pushdown"] },
+  { name: "Pull", exercises: ["Pull-up (or assisted)", "Lat pulldown (wide)", "Barbell row", "Chest-supported row", "Face pull", "Biceps curl"] },
+  { name: "Legs", exercises: ["Back squat", "Romanian deadlift", "Leg press", "Leg curl", "Leg extension", "Standing calf raise", "Hanging knee raise"] },
+];
 
 async function main() {
   // settings (id=1) — insert only if missing
@@ -111,17 +103,9 @@ async function main() {
   console.log(`foods: ${f.length} inserted, ${FOODS.length - f.length} existing`);
 
   // exercises — upsert by name, refresh muscle_group + cues
-  const allExercises = Object.values(ROUTINE).flat();
   const exRows = await db
     .insert(exercises)
-    .values(
-      allExercises.map((e) => ({
-        name: e.name,
-        muscleGroup: e.muscleGroup,
-        cues: e.pull ? LAT_CUES : null,
-        isCustom: false,
-      })),
-    )
+    .values(EXERCISES.map((e) => ({ name: e.name, muscleGroup: e.muscleGroup, cues: e.pull ? LAT_CUES : null, isCustom: false })))
     .onConflictDoUpdate({
       target: exercises.name,
       set: {
@@ -131,39 +115,28 @@ async function main() {
     })
     .returning({ id: exercises.id, name: exercises.name });
   const exerciseIdByName = new Map(exRows.map((r) => [r.name, r.id]));
-  console.log(`exercises: ${exRows.length} upserted (${allExercises.filter((e) => e.pull).length} with lat cues)`);
+  console.log(`exercises: ${exRows.length} upserted (${EXERCISES.filter((e) => e.pull).length} with lat cues)`);
 
-  // routine_days — upsert by name
-  const dayRows = await db
+  // workout types — insert if missing; the owner manages them in Settings afterwards
+  const created = await db
     .insert(routineDays)
-    .values(ROUTINE_DAYS.map((d) => ({ ...d })))
-    .onConflictDoUpdate({
-      target: routineDays.name,
-      set: { weekday: sql`excluded.weekday`, sortOrder: sql`excluded.sort_order` },
-    })
+    .values(WORKOUT_TYPES.map((t, i) => ({ name: t.name, sortOrder: i + 1 })))
+    .onConflictDoNothing({ target: routineDays.name })
     .returning({ id: routineDays.id, name: routineDays.name });
-  const dayIdByName = new Map(dayRows.map((r) => [r.name, r.id]));
-  console.log(`routine_days: ${dayRows.length} upserted`);
+  console.log(`workout types: ${created.length} inserted, ${WORKOUT_TYPES.length - created.length} existing`);
 
-  // routine_exercises — upsert by (day, exercise); defaults 3 × 8
-  const reValues = (Object.keys(ROUTINE) as (keyof typeof ROUTINE)[]).flatMap((day) =>
-    ROUTINE[day].map((e, i) => ({
-      routineDayId: dayIdByName.get(day)!,
-      exerciseId: exerciseIdByName.get(e.name)!,
+  // exercises per type — only for types created just now (never re-adds what the owner removed)
+  const reValues = created.flatMap((t) =>
+    WORKOUT_TYPES.find((w) => w.name === t.name)!.exercises.map((name, i) => ({
+      routineDayId: t.id,
+      exerciseId: exerciseIdByName.get(name)!,
       sortOrder: i + 1,
       targetSets: 3,
       targetReps: 8,
     })),
   );
-  const re = await db
-    .insert(routineExercises)
-    .values(reValues)
-    .onConflictDoUpdate({
-      target: [routineExercises.routineDayId, routineExercises.exerciseId],
-      set: { sortOrder: sql`excluded.sort_order` },
-    })
-    .returning({ exerciseId: routineExercises.exerciseId });
-  console.log(`routine_exercises: ${re.length} upserted`);
+  if (reValues.length) await db.insert(routineExercises).values(reValues).onConflictDoNothing();
+  console.log(`routine_exercises: ${reValues.length} inserted`);
 }
 
 main()

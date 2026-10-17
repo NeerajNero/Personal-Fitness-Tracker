@@ -18,7 +18,9 @@ Weight, height, age, sex → saved to `settings` → confirm targets → link Te
 
 **Setup: rarely changed** (all collapsed)
 - **Foods & My meals**: edit, favourite ★, archive (`foods-editor.tsx`). Saved meals show here with the serving "1 meal".
-- **Routine**: exercises per day, order, targets, weekday (`routine-editor.tsx`)
+- **Workout types** (`workout-types-editor.tsx`): sessions-per-week target · each active type (▲▼ = rotation order, Rename,
+  Archive; expand for its exercises: order, sets × reps, cues, + Exercise) · Add type · Archived list with Restore.
+  Names are bot commands: a reserved bot word (`BOT_COMMAND_WORDS`) or a duplicate is refused; a food with the same name only warns.
 - **Body & habits**: onboarding stats + smoke-free date (`body-stats-form.tsx`)
 - **Export data**: one CSV per table (`/api/export/<table>`). `settings` is never exported because it holds the chat id.
 

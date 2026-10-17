@@ -93,3 +93,14 @@ export function servingsFor(food: Pick<Food, "name" | "servingGrams" | "servingL
   if (!food.servingGrams) return { error: `${food.name} is counted per ${food.servingLabel} — send a number under 10.` };
   return { qty: Math.round((n / food.servingGrams) * 100) / 100 };
 }
+
+/**
+ * Day-plan words: `rest`, or an active workout type's name/label (case-insensitive, whole message).
+ * Checked before food matching, so a type called "Pull" wins over a food starting with "pull".
+ */
+export function matchPlanWord(raw: string, types: { id: number; name: string; label: string }[]): { kind: "rest" } | { kind: "workout"; typeId: number } | null {
+  const t = raw.trim().replace(/\s+/g, " ").replace(/^\//, "").toLowerCase();
+  if (t === "rest") return { kind: "rest" };
+  const hit = types.find((x) => x.name.toLowerCase() === t || x.label.toLowerCase() === t);
+  return hit ? { kind: "workout", typeId: hit.id } : null;
+}

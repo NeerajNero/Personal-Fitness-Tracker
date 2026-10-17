@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { addDays, formatDayLabel, isValidIsoDate, todayIST } from "@/lib/dates";
+import Link from "next/link";
+import { DayPicker } from "@/components/day-picker";
 import { listFoodLog, listFoods } from "@/lib/food";
+import { pickerTypes } from "@/lib/routine";
+import { listWorkoutTypes, sessionProgress } from "@/lib/training";
 import { getDayState } from "@/lib/rules/dayState";
 import { DateHeader } from "@/components/date-header";
 import { FoodSection } from "./food-section";
@@ -14,7 +18,10 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
   const today = todayIST();
   const date = typeof d === "string" && isValidIsoDate(d) && d <= today ? d : today;
 
-  const [state, entries, foodList] = await Promise.all([getDayState(date), listFoodLog(date), listFoods()]);
+  const [state, entries, foodList, types] = await Promise.all([getDayState(date), listFoodLog(date), listFoods(), listWorkoutTypes({ includeArchived: true })]);
+  const progress = state.flags.sessionId ? await sessionProgress(state.flags.sessionId) : null;
+  const plan = state.dayPlan;
+  const trainHref = date === today ? "/train" : `/train?d=${date}`;
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-5">
@@ -25,6 +32,27 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
         label={formatDayLabel(date)}
         prev={addDays(date, -1)}
         next={date < today ? addDays(date, 1) : null}
+      />
+
+      <DayPicker
+        key={`plan-${date}`}
+        date={date}
+        plan={plan}
+        nextUpId={state.nextUp?.typeId ?? null}
+        types={pickerTypes(types, state.daysSince)}
+        summary={
+          plan.kind === "rest" ? (
+            <span className="font-medium">🛌 Rest day</span>
+          ) : (
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-semibold">{plan.typeName ?? "Custom"}</span>
+              {progress ? <span className="text-sm text-muted">{progress.logged}/{progress.total} logged</span> : null}
+              <Link href={trainHref} className="text-sm font-medium text-accent">
+                Open Train
+              </Link>
+            </span>
+          )
+        }
       />
 
       <Totals state={state} />

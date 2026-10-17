@@ -1,8 +1,9 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activities, exercises, routineDays, routineExercises, sessionExercises, sessions, sets, type Activity } from "@/db/schema";
+import { activities, dailyMetrics, exercises, routineDays, routineExercises, sessionExercises, sessions, sets, type Activity } from "@/db/schema";
 import { hintFromSets, loadHistory, loadLastSessionSets, stallFromHistory, type Hint, type SetLite, type Stall } from "@/lib/metrics/strength";
-import { getDayState, type DayState, type RoutineDayName } from "@/lib/rules/dayState";
+import { getDayState, type DayState } from "@/lib/rules/dayState";
+import { typeLabel } from "@/lib/routine";
 
 export type { Activity };
 
@@ -21,8 +22,9 @@ export type ExerciseCard = {
 export type SessionDetail = {
   id: number;
   date: string;
-  routineDayId: number | null;
-  routineDayName: RoutineDayName | null;
+  /** Workout type; null = custom session. `typeName` is the display label. */
+  typeId: number | null;
+  typeName: string | null;
   inclineWalk: boolean;
   notes: string | null;
   exercises: ExerciseCard[];
@@ -30,8 +32,16 @@ export type SessionDetail = {
 
 export type ExerciseLite = { id: number; name: string; muscleGroup: string };
 
-export function listRoutineDays() {
-  return db.select({ id: routineDays.id, name: routineDays.name, weekday: routineDays.weekday }).from(routineDays).orderBy(asc(routineDays.sortOrder));
+export type WorkoutType = { id: number; name: string; label: string; archived: boolean; sortOrder: number };
+
+/** Workout types in rotation order (archived last when included). */
+export async function listWorkoutTypes(opts: { includeArchived?: boolean } = {}): Promise<WorkoutType[]> {
+  const rows = await db
+    .select({ id: routineDays.id, name: routineDays.name, archived: routineDays.archived, sortOrder: routineDays.sortOrder })
+    .from(routineDays)
+    .where(opts.includeArchived ? undefined : eq(routineDays.archived, false))
+    .orderBy(asc(routineDays.archived), asc(routineDays.sortOrder), asc(routineDays.id));
+  return rows.map((r) => ({ ...r, label: typeLabel(r.name) }));
 }
 
 export function listExercises(): Promise<ExerciseLite[]> {
@@ -56,8 +66,8 @@ export async function getSessionDetail(sessionId: number): Promise<SessionDetail
     .select({
       id: sessions.id,
       date: sessions.date,
-      routineDayId: sessions.routineDayId,
-      routineDayName: routineDays.name,
+      typeId: sessions.routineDayId,
+      rawTypeName: routineDays.name,
       inclineWalk: sessions.inclineWalk,
       notes: sessions.notes,
     })
@@ -91,8 +101,10 @@ export async function getSessionDetail(sessionId: number): Promise<SessionDetail
   const ids = exRows.map((e) => e.exerciseId);
   const [history, lastSets] = await Promise.all([loadHistory(ids, sessionId), loadLastSessionSets(ids, sessionId)]);
 
+  const { rawTypeName, ...rest } = row;
   return {
-    ...row,
+    ...rest,
+    typeName: rawTypeName ? typeLabel(rawTypeName) : null,
     exercises: exRows.map((e) => ({
       ...e,
       sets: setRows.filter((s) => s.exerciseId === e.exerciseId).map(({ setNo, weightKg, reps }) => ({ setNo, weightKg, reps })),
@@ -104,36 +116,39 @@ export async function getSessionDetail(sessionId: number): Promise<SessionDetail
 
 export type TrainData = {
   state: DayState;
-  routineDays: { id: number; name: RoutineDayName; weekday: number }[];
+  /** Every workout type, active first (rotation order), then archived — for the day picker. */
+  types: WorkoutType[];
   activities: Activity[];
   session: SessionDetail | null;
-  /** Exercise names of the day's routine, for the pre-start preview. */
-  preview: string[];
   allExercises: ExerciseLite[];
 };
 
 export async function getTrainData(date: string): Promise<TrainData> {
-  const [state, days, acts, allExercises] = await Promise.all([getDayState(date), listRoutineDays(), listActivities(date), listExercises()]);
-  const [session, preview] = await Promise.all([
-    state.flags.sessionId ? getSessionDetail(state.flags.sessionId) : Promise.resolve(null),
-    state.flags.routineDayId && !state.flags.sessionId
-      ? listRoutineExerciseNames(state.flags.routineDayId).then((r) => r.map((x) => x.name))
-      : Promise.resolve([] as string[]),
-  ]);
-  return { state, routineDays: days, activities: acts, session, preview, allExercises };
+  const [state, types, acts, allExercises] = await Promise.all([getDayState(date), listWorkoutTypes({ includeArchived: true }), listActivities(date), listExercises()]);
+  const session = state.flags.sessionId ? await getSessionDetail(state.flags.sessionId) : null;
+  return { state, types, activities: acts, session, allExercises };
+}
+
+/** Exercises with ≥1 set / exercises in the session — the "2/5 logged" on Today. */
+export async function sessionProgress(sessionId: number): Promise<{ logged: number; total: number }> {
+  const res = await db.execute<{ logged: number; total: number }>(sql`
+    select count(*)::int as total,
+      count(*) filter (where exists (select 1 from sets st where st.session_id = se.session_id and st.exercise_id = se.exercise_id))::int as logged
+    from session_exercises se where se.session_id = ${sessionId}`);
+  return res.rows[0] ?? { logged: 0, total: 0 };
 }
 
 /* ------------------------------ shared writes ------------------------------ */
 
 /**
- * Create a session. With a routine day, copy its exercises into session_exercises.
+ * Create a session. With a workout type, copy its exercises into session_exercises.
  * No sets are written — each exercise is logged with ✓ (same as last time, `copyLastSets`) or edited.
- * Used by the Train screen's Start and the bot's `done`.
+ * Called through `setDayPlan`.
  */
 export async function createSession(date: string, routineDayId: number | null): Promise<{ sessionId: number }> {
   if (routineDayId !== null) {
     const [day] = await db.select({ id: routineDays.id }).from(routineDays).where(eq(routineDays.id, routineDayId)).limit(1);
-    if (!day) throw new Error("Routine day not found");
+    if (!day) throw new Error("Workout type not found");
   }
   const [sess] = await db.insert(sessions).values({ date, routineDayId }).returning({ id: sessions.id });
 
@@ -174,6 +189,69 @@ export async function copyLastSets(sessionId: number, exerciseIds?: number[]): P
   );
   if (copies.length) await db.insert(sets).values(copies).onConflictDoNothing();
   return last.size;
+}
+
+export type DayChoice = { kind: "rest" } | { kind: "custom" } | { kind: "workout"; typeId: number };
+export type DayPlanResult =
+  | { ok: true; sessionId: number | null }
+  /** The day's current session already has sets; nothing changed. Repeat with `confirm` to switch and keep them. */
+  | { ok: false; needsConfirm: true; setCount: number };
+
+/**
+ * Set what a date is: a workout type, a custom session, or rest. Used by the Today/Train picker and the bot.
+ * - A type/custom creates the session as Start used to (routine exercises copied, no sets). An empty session of
+ *   another kind is replaced; one with sets is retyped only with `confirm` (sets kept, the new type's exercises added).
+ * - Rest removes an empty session; with sets it needs `confirm`, then marks rest and keeps the session and its sets.
+ */
+export async function setDayPlan(date: string, choice: DayChoice, opts: { confirm?: boolean } = {}): Promise<DayPlanResult> {
+  const [current] = await db
+    .select({
+      id: sessions.id,
+      typeId: sessions.routineDayId,
+      setCount: sql<number>`(select count(*) from "sets" st where st."session_id" = "sessions"."id")::int`,
+    })
+    .from(sessions)
+    .where(eq(sessions.date, date))
+    .orderBy(desc(sessions.id))
+    .limit(1);
+  const typeId = choice.kind === "workout" ? choice.typeId : null;
+  const same = current && choice.kind !== "rest" && current.typeId === typeId;
+  if (current && current.setCount > 0 && !same && !opts.confirm) return { ok: false, needsConfirm: true, setCount: current.setCount };
+
+  if (choice.kind === "rest") {
+    if (current && current.setCount === 0) await db.delete(sessions).where(eq(sessions.id, current.id));
+    await db.insert(dailyMetrics).values({ date, restDay: true }).onConflictDoUpdate({ target: dailyMetrics.date, set: { restDay: true, updatedAt: new Date() } });
+    return { ok: true, sessionId: null };
+  }
+
+  await db.update(dailyMetrics).set({ restDay: false, updatedAt: new Date() }).where(and(eq(dailyMetrics.date, date), eq(dailyMetrics.restDay, true)));
+  if (same) return { ok: true, sessionId: current.id };
+  if (!current || current.setCount === 0) {
+    if (current) await db.delete(sessions).where(eq(sessions.id, current.id));
+    return { ok: true, sessionId: (await createSession(date, typeId)).sessionId };
+  }
+
+  // Retype a session that has sets: keep logged exercises, drop the untouched ones, add the new type's.
+  await db.update(sessions).set({ routineDayId: typeId }).where(eq(sessions.id, current.id));
+  const logged = db.selectDistinct({ id: sets.exerciseId }).from(sets).where(eq(sets.sessionId, current.id));
+  await db.delete(sessionExercises).where(and(eq(sessionExercises.sessionId, current.id), notInArray(sessionExercises.exerciseId, logged)));
+  if (typeId !== null) {
+    const re = await db
+      .select({ exerciseId: routineExercises.exerciseId, sortOrder: routineExercises.sortOrder, targetSets: routineExercises.targetSets, targetReps: routineExercises.targetReps })
+      .from(routineExercises)
+      .where(eq(routineExercises.routineDayId, typeId));
+    if (re.length) await db.insert(sessionExercises).values(re.map((x) => ({ sessionId: current.id, ...x }))).onConflictDoNothing();
+  }
+  return { ok: true, sessionId: current.id };
+}
+
+/** Append an exercise to a workout type's list (end of the order, 3 × 8). No-op if already there. */
+export async function addExerciseToType(typeId: number, exerciseId: number): Promise<void> {
+  const [{ max }] = await db
+    .select({ max: sql<number>`coalesce(max(${routineExercises.sortOrder}), 0)::int` })
+    .from(routineExercises)
+    .where(eq(routineExercises.routineDayId, typeId));
+  await db.insert(routineExercises).values({ routineDayId: typeId, exerciseId, sortOrder: max + 1 }).onConflictDoNothing();
 }
 
 /** Reuse an exercise by name (case-insensitive) or create a custom one. */

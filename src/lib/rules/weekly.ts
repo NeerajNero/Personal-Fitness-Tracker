@@ -1,7 +1,7 @@
 /** Weekly report data (Sunday evening / Monday fallback). */
 import type { Settings } from "@/db/schema";
 import { addDays } from "@/lib/dates";
-import { loadAllHistory } from "@/lib/metrics/strength";
+import { loadAllHistory, weeklySetsByMuscle } from "@/lib/metrics/strength";
 import {
   adherenceFrom, loadDailyTotals, loadLoggedSessionDates, loadMeasurements, loadWeightSeries, weeklyRateFrom, weeklyVerdictFrom,
   type Adherence, type WeeklyRate, type WeeklyVerdict,
@@ -14,18 +14,22 @@ export type WeeklyReport = {
   navel: { prev: number | null; latest: number; delta: number | null } | null;
   lifts: { progressed: number; tracked: number };
   sessionsDone: number;
+  sessionTarget: number;
+  /** Working sets per muscle group this week. */
+  setsByMuscle: Record<string, number>;
   adherence: Adherence;
   verdict: WeeklyVerdict;
 };
 
 export async function buildWeeklyReport(weekStart: string, settings: Settings): Promise<WeeklyReport> {
   const weekEnd = addDays(weekStart, 6);
-  const [series, measurements, totals, sessionDates, history] = await Promise.all([
+  const [series, measurements, totals, sessionDates, history, volume] = await Promise.all([
     loadWeightSeries(),
     loadMeasurements(),
     loadDailyTotals(addDays(weekStart, -1), weekEnd),
     loadLoggedSessionDates(weekStart, weekEnd),
     loadAllHistory(),
+    weeklySetsByMuscle(1, weekEnd),
   ]);
 
   const navels = measurements.filter((m) => m.navelCm !== null);
@@ -52,6 +56,8 @@ export async function buildWeeklyReport(weekStart: string, settings: Settings): 
     navel,
     lifts: { progressed, tracked },
     sessionsDone: sessionDates.length,
+    sessionTarget: settings.weeklySessionTarget,
+    setsByMuscle: volume[0]?.sets ?? {},
     adherence: adherenceFrom(totals, settings, weekStart, weekEnd),
     verdict: weeklyVerdictFrom({ series: seriesToWeekEnd, measurements, totals, today: weekEnd }),
   };

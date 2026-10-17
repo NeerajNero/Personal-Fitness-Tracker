@@ -12,16 +12,22 @@ DayState {
   totals:    { kcal, protein, cost, entries }
   remaining: { kcal, protein }            // negative = over; protein measured against proteinMin
   metrics:   { weightKg, steps, waterGlasses }   // null when not logged
-  flags: { weightLogged, stepsLogged, isTrainingDay, routineDayName, routineDayId,
-           workoutLogged,       // ≥1 set or incline walk. Starting a session alone does NOT count
+  dayPlan: { kind: "unset" | "rest" | "workout" | "custom", typeId, typeName }
+           // precedence: daily_metrics.rest_day → session with a type → session without one (custom) → unset
+  nextUp: { typeId, typeName } | null     // active type after the most recently trained active type (rotation = sort_order);
+                                          // rest/custom days don't advance it; no history → first active type
+  daysSince: [{ typeId, typeName, days | null }]   // every active type, rotation order; days since last session with sets
+  flags: { weightLogged, stepsLogged,
+           workoutLogged,       // ≥1 set or incline walk. Choosing a type alone does NOT count
            sessionId,           // any session row today
-           trainingSkipped,     // nudge_log marker `mark:no_training`
            lastFoodAt, foodLoggedSince(time) }
   smokeFreeDays: number | null
 }
 ```
+- "Trained" = a session with ≥ 1 set, dated before `date` (`loadTypeHistory`). `typeName` is the display label (`typeLabel`).
 - `foodLoggedSince` is a function. Pick the plain fields before passing DayState to a client component.
-- Six queries run in parallel. Pass `settings` when the caller already has it.
+- Five queries run in parallel (settings, food totals, daily_metrics, type history, session). Pass `settings` when the caller already has it.
+- The weekday no longer decides anything (`routine_days.weekday` is never read).
 
 ## Engine (`engine.ts` + `rules.ts`)
 - `GET /api/tick` (cron-job.org every 15 min, header `x-tick-secret`) → `evaluate(now)` → `send(due)`.
@@ -36,8 +42,8 @@ DayState {
 ## Rules (all times IST)
 | key | when | default | condition / content |
 |---|---|---|---|
-| `morning_brief` | 07:30–08:30 | **on** | today's routine day + last top sets; "weigh in" if no weight yet |
-| `day_close` | 22:00–22:30 | **on** | summary + what's missing; buttons "✓ Did it (same as last time)" (→ `copyLastSets`) / "No training today" (→ `mark:no_training`) |
+| `morning_brief` | 07:30–08:30 | **on** | day unset → "Next up: Pull (last done 4 days ago)" + its last top sets + `plan:` buttons (each active type, ▶ on next up, Rest). Day chosen → that type / rest. Weigh-in line if no weight; smoke-free milestone line every 7 days (milestones toggle) |
+| `day_close` | 22:00–22:30 | **on** | summary + what's missing. Day unset → "What did you do today?" + `did:` buttons (each type = log as same as last time, Rest). Type chosen, nothing logged → "✓ Did <type>" + Rest |
 | `weekly_measure` | Sun 19:00–22:30 | **on** | prompt navel/waist if none logged this week |
 | `weekly_report` | Sun 19:00–22:30 | **on** | once a measurement exists: 7-day avg Δ, navel Δ, lifts progressed, adherence, verdict |
 | `weekly_report_mon` | Mon 08:00–09:00 | **on** | fallback report with "no measurement this week" |
@@ -49,7 +55,14 @@ DayState {
 | `water` | 10:00–20:30, every 2 h | off | reminder only |
 | `budget_80` | 09:00–21:00, before the 24th | off | month-to-date protein spend ≥ 80 % of budget |
 
-Not built: a weekly smoke-free milestone (it's in the original spec, but no rule exists).
+The weekly smoke-free milestone isn't a separate rule: it's a line inside `morning_brief` on every 7th smoke-free day.
+
+## Day buttons (callback data)
+- `plan:<date>:<typeId|rest>`: morning, **sets** the day (`setDayPlan`).
+- `did:<date>:<typeId|rest|same>`: evening, **sets and logs** it (`copyLastSets`); `same` logs the chosen type.
+- Legacy `nudge:done` / `nudge:skip` (old messages still in the chat) map to `done` / rest.
+- Built by `planButtons` / `didButtons` in `telegram/messages.ts` and handled in `telegram/bot.ts`. A choice that would
+  replace a session that has sets replies with an app link instead (the app asks for confirmation).
 
 ## Instant rule (logging path, not the tick)
 `overageLine(state)` in `instant.ts`: any bot log that pushes kcal over target gets the overage appended to the reply

@@ -18,7 +18,7 @@ const MAIN: Row[] = [
   { key: "nudgeMorningBrief", label: "Morning brief", when: "07:30 · today's workout + weigh-in" },
   { key: "nudgeDayClose", label: "Day close", when: "22:00 · summary + what's missing" },
   { key: "nudgeWeeklyMeasure", label: "Weekly measure + report", when: "Sunday 19:00 (Monday 08:00 fallback)" },
-  { key: "nudgeMilestones", label: "Milestones", when: "Dec 1 protein phase switch, Dec 10 checkpoint" },
+  { key: "nudgeMilestones", label: "Milestones", when: "Dec 1 protein phase switch, Dec 10 checkpoint, smoke-free weeks (in the morning brief)" },
 ];
 
 const EXTRA: Row[] = [

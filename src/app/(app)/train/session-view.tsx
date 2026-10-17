@@ -2,7 +2,7 @@
 
 import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import type { ExerciseCard, ExerciseLite, SessionDetail } from "@/lib/training";
-import { MUSCLE_GROUPS, ROUTINE_LABEL, type MuscleGroup } from "@/lib/routine";
+import { MUSCLE_GROUPS, type MuscleGroup } from "@/lib/routine";
 import { addExerciseToSession, deleteSet, discardSession, sameAsLast, saveSessionNotes, setInclineWalk, upsertSet } from "./actions";
 
 const btn = "flex items-center justify-center rounded-xl border border-border bg-bg active:opacity-70 disabled:opacity-50";
@@ -25,7 +25,6 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
   const [notesStatus, setNotesStatus] = useState<"idle" | "saved" | "error">("idle");
   const savedNotes = useRef(session.notes ?? "");
 
-  const title = session.routineDayName ? ROUTINE_LABEL[session.routineDayName] : "Workout";
   const inSession = useMemo(() => new Set(cards.map((c) => c.exerciseId)), [cards]);
   const logged = cards.filter((c) => c.sets.length > 0).length;
   const sameable = cards.filter((c) => c.sets.length === 0 && c.hint.last !== null).length;
@@ -66,7 +65,7 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
     });
   }
 
-  function addExercise(input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }, display: ExerciseLite) {
+  function addExercise(input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }, display: ExerciseLite, alsoAddToType: boolean) {
     setError(null);
     setOpenId(display.id);
     startTransition(async () => {
@@ -81,7 +80,7 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
         hint: { text: "…", mode: "first", suggestedWeight: null, last: null },
         stall: { stalled: false, count: 0 },
       });
-      const r = await addExerciseToSession(session.id, input);
+      const r = await addExerciseToSession(session.id, input, alsoAddToType);
       if (r.ok) setOpenId(r.exerciseId);
       else setError(r.error);
     });
@@ -98,13 +97,10 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
   return (
     <section className="flex flex-col gap-3">
       <header className="rounded-2xl border border-border bg-surface p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-semibold">{title}</h2>
-            <p className="text-sm text-muted">
-              {logged} / {cards.length} logged
-            </p>
-          </div>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted">
+            {logged} / {cards.length} logged
+          </p>
           <button type="button" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore} aria-label="More options" className="h-10 px-3 text-xl text-muted active:opacity-70">
             ⋯
           </button>
@@ -167,7 +163,7 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
         ))}
       </ul>
 
-      <AddExercise allExercises={allExercises} inSession={inSession} onAdd={addExercise} />
+      <AddExercise allExercises={allExercises} inSession={inSession} typeName={session.typeId !== null ? session.typeName : null} onAdd={addExercise} />
     </section>
   );
 }
@@ -406,13 +402,17 @@ function SetRow({
 function AddExercise({
   allExercises,
   inSession,
+  typeName,
   onAdd,
 }: {
   allExercises: ExerciseLite[];
   inSession: Set<number>;
-  onAdd: (input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }, display: ExerciseLite) => void;
+  /** The session's workout type; null for custom sessions (no "also add" toggle). */
+  typeName: string | null;
+  onAdd: (input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }, display: ExerciseLite, alsoAddToType: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [also, setAlso] = useState(false);
   const [q, setQ] = useState("");
   const [mg, setMg] = useState<MuscleGroup>("back");
   const query = q.trim();
@@ -421,13 +421,13 @@ function AddExercise({
   const exact = allExercises.some((e) => e.name.toLowerCase() === lower);
 
   function pick(e: ExerciseLite) {
-    onAdd({ exerciseId: e.id }, e);
+    onAdd({ exerciseId: e.id }, e, also);
     setQ("");
     setOpen(false);
   }
   function create() {
     if (!query) return;
-    onAdd({ name: query, muscleGroup: mg }, { id: tempId--, name: query, muscleGroup: mg });
+    onAdd({ name: query, muscleGroup: mg }, { id: tempId--, name: query, muscleGroup: mg }, also);
     setQ("");
     setOpen(false);
   }
@@ -448,13 +448,19 @@ function AddExercise({
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search or type a new exercise"
+          placeholder="Search all exercises or type a new one"
           className="h-12 min-w-0 flex-1 rounded-xl border border-border bg-bg px-4 outline-none focus:border-accent"
         />
         <button type="button" onClick={() => setOpen(false)} className={`${btn} h-12 px-4 text-sm`}>
           Close
         </button>
       </div>
+      {typeName ? (
+        <label className="mt-2 flex h-10 items-center gap-2 px-1 text-sm text-muted">
+          <input type="checkbox" checked={also} onChange={(e) => setAlso(e.target.checked)} className="size-5 accent-[var(--accent)]" />
+          Also add to {typeName}
+        </label>
+      ) : null}
       <ul className="mt-2 max-h-64 divide-y divide-border overflow-y-auto">
         {matches.map((e) => (
           <li key={e.id}>

@@ -25,17 +25,18 @@ Single user. Everything is computed in IST (`Asia/Kolkata`). Timestamps are stor
 | `src/lib/rules/` | "State of today" (`dayState.ts`) + nudge engine. See [rules-engine.md](rules-engine.md) |
 | `src/lib/metrics/` | Derived numbers: `phase.ts` (targets), `trends.ts`, `strength.ts`, `spend.ts`, `checkpoint.ts` |
 | `src/lib/telegram/` | `bot.ts` (handlers), `parse.ts` (commands, pure), `ops.ts` (command actions), `messages.ts` (templates), `ai.ts` (Gemini), `send.ts` |
-| `src/lib/food.ts`, `training.ts`, `daily.ts`, `measurements.ts` | **Shared writes** used by both the screens and the bot |
+| `src/lib/food.ts`, `training.ts`, `daily.ts`, `measurements.ts` | **Shared writes** used by both the screens and the bot (`setDayPlan` decides what a day is) |
+| `src/components/day-picker.tsx` + `src/app/(app)/day-actions.ts` | "What's today?" picker shared by Today and Train |
 | `src/lib/dates.ts` | IST helpers: `todayIST`, `nowTimeIST`, `addDays`, `istNow`, quiet-hours math |
-| `src/components/` | `tab-bar`, `date-header`, `charts/line-chart.tsx` (hand-written SVG; no chart library) |
-| `scripts/` | `seed.ts`, `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` |
+| `src/components/` | `tab-bar`, `date-header`, `day-picker`, `charts/line-chart.tsx` (hand-written SVG; no chart library) |
+| `scripts/` | `seed.ts`, `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` |
 | `drizzle/` | SQL migrations (0001 = views, hand-written) |
 
 ## Rules that keep it coherent
 - **One source for "today":** `getDayState()` in `src/lib/rules/dayState.ts`. The Today card, the bot's `today`
   command and every nudge read it. Never recompute remaining kcal/protein, training-day status, etc. anywhere else.
 - **One write path:** the screens and the bot call the same functions (`insertFoodEntries`, `entryFromFood`, `saveMeal`,
-  `copyFoodLog`, `createSession`, `copyLastSets`, `upsertDailyMetrics`, `upsertMeasurementByDate`). Add new writes there,
+  `copyFoodLog`, `setDayPlan`, `copyLastSets`, `upsertDailyMetrics`, `upsertMeasurementByDate`). Add new writes there,
   not inside a route or a component.
 - **Metrics:** loaders fetch the data, and the `*From` helpers are pure, so a page can load each dataset once and derive everything from it.
 - **Client/server boundary:** client components must not import anything that imports `@/db`. Client-safe modules:

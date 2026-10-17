@@ -9,7 +9,7 @@ import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
 import { MUSCLE_GROUPS } from "@/lib/routine";
 import { requireSession } from "@/lib/session";
-import { copyLastSets, createSession, findOrCreateExercise } from "@/lib/training";
+import { addExerciseToType, copyLastSets, findOrCreateExercise } from "@/lib/training";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const id = z.number().int().positive();
@@ -20,19 +20,6 @@ function revalidate() {
 }
 
 /* --------------------------------- session --------------------------------- */
-
-export async function startSession(date: string, routineDayId: number | null): Promise<ActionResult<{ sessionId: number }>> {
-  await requireSession();
-  try {
-    const d = dateSchema.parse(date);
-    const rd = routineDayId === null ? null : id.parse(routineDayId);
-    const { sessionId } = await createSession(d, rd);
-    revalidate();
-    return { ok: true, sessionId };
-  } catch (e) {
-    return fail(e);
-  }
-}
 
 /** ✓ Same as last time — one exercise, or every unlogged exercise when `exerciseId` is omitted. */
 export async function sameAsLast(sessionId: number, exerciseId?: number): Promise<ActionResult<{ filled: number }>> {
@@ -134,10 +121,11 @@ const addExerciseSchema = z.union([
   z.object({ name: z.string().trim().min(1, "Name required").max(60, "Name too long"), muscleGroup: z.enum(MUSCLE_GROUPS) }),
 ]);
 
-/** Add an existing exercise, or create a custom one, and attach it to this session only. */
+/** Add an existing exercise (full library) or create a new one, attach it to this session, and optionally to its workout type. */
 export async function addExerciseToSession(
   sessionId: number,
   input: { exerciseId: number } | { name: string; muscleGroup: string },
+  alsoAddToType = false,
 ): Promise<ActionResult<{ exerciseId: number }>> {
   await requireSession();
   try {
@@ -158,6 +146,10 @@ export async function addExerciseToSession(
       .from(sessionExercises)
       .where(eq(sessionExercises.sessionId, sid));
     await db.insert(sessionExercises).values({ sessionId: sid, exerciseId, sortOrder: max + 1 }).onConflictDoNothing();
+    if (z.boolean().parse(alsoAddToType)) {
+      const [sess] = await db.select({ typeId: sessions.routineDayId }).from(sessions).where(eq(sessions.id, sid)).limit(1);
+      if (sess?.typeId) await addExerciseToType(sess.typeId, exerciseId);
+    }
 
     revalidate();
     return { ok: true, exerciseId };

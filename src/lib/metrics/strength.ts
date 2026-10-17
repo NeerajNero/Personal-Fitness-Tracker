@@ -6,6 +6,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { exercises } from "@/db/schema";
+import { addDays, isoWeekday, todayIST } from "@/lib/dates";
 
 /** Epley estimated 1RM, 1 dp. Bodyweight-only sets (0 kg) return 0. */
 export function e1rm(weightKg: number, reps: number): number {
@@ -166,4 +167,34 @@ export function stallIndices(history: HistoryPoint[]): Set<number> {
     }
   });
   return out;
+}
+
+/* ----------------------------- volume by muscle ---------------------------- */
+
+export type MuscleWeek = { weekStart: string; sets: Record<string, number> };
+
+/** Working sets per exercises.muscle_group per ISO week, for the last `weeks` weeks ending with the week of `today`. Newest first; empty weeks included. */
+export async function weeklySetsByMuscle(weeks = 4, today: string = todayIST()): Promise<MuscleWeek[]> {
+  const currentMonday = addDays(today, -(isoWeekday(today) - 1));
+  const from = addDays(currentMonday, -7 * (weeks - 1));
+  const to = addDays(currentMonday, 6);
+  const res = await db.execute<{ week_start: string; muscle_group: string; n: number }>(sql`
+    select date_trunc('week', s.date)::date::text as week_start, e.muscle_group, count(*)::int as n
+    from sets st
+    join sessions s on s.id = st.session_id
+    join exercises e on e.id = st.exercise_id
+    where st.is_working and s.date between ${from} and ${to}
+    group by 1, 2`);
+  const out: MuscleWeek[] = Array.from({ length: weeks }, (_, w) => ({ weekStart: addDays(currentMonday, -7 * w), sets: {} }));
+  const byWeek = new Map(out.map((w) => [w.weekStart, w]));
+  for (const r of res.rows) {
+    const w = byWeek.get(r.week_start);
+    if (w) w.sets[r.muscle_group] = r.n;
+  }
+  return out;
+}
+
+/** Muscle groups for display: back first (the V-taper goal), then by set count, then name. */
+export function musclesInOrder(sets: Record<string, number>): [string, number][] {
+  return Object.entries(sets).sort(([a, x], [b, y]) => (a === "back" ? -1 : b === "back" ? 1 : y - x || a.localeCompare(b)));
 }
