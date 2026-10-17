@@ -17,7 +17,7 @@ export function FoodsEditor({ foods }: { foods: Food[] }) {
   const archived = foods.filter((f) => f.archived);
 
   return (
-    <Card title="Foods" sub={`${active.length} active · tap a food to edit. Archive instead of delete — logs keep their history.`} collapsible defaultOpen={false}>
+    <Card title="Foods & My meals" sub={`${active.length} active · tap a food to edit. Archive instead of delete — logs keep their history.`} collapsible defaultOpen={false}>
       {GROUPS.map((g) => {
         const list = active.filter((f) => f.phaseTag === g.tag);
         if (!list.length) return null;

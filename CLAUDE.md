@@ -116,7 +116,9 @@ Note shown with cues: upper-trap or forearm pain during pulls = shrugging + bice
    2027-10-11 · navel/waist log (latest 4, "show all"). Promoted to the top only when relevant: Dec 10 checkpoint card
    (14 days before → 7 days after) and the maintenance suggestion (when it differs from the target by ≥50 kcal).
    Everything else under "More details": goal progress, e1RM per lift, weekly protein/kcal adherence, spend vs budget, CSV export link.
-5. **Settings**: targets, phase override, foods editor, routine editor, nudge toggles + quiet hours, Telegram link, smoke-free date
+5. **Settings** (simplified 2026-10): Everyday = targets, phase, Telegram link, reminders (4 main toggles; extra reminders,
+   quiet hours and cap under "More reminders"). "Setup — rarely changed" = foods & My meals, routine editor, body & habits
+   (incl. smoke-free date), CSV export — all collapsed.
 
 ## Telegram bot
 Exact-match commands (no AI):
@@ -131,7 +133,9 @@ Only `settings.telegram_chat_id` is accepted; ignore every other chat silently.
 
 ## Rules engine (`src/lib/rules`) — evaluated on every `/api/tick`, in IST
 Each rule = `{ key, window, condition(state), message(state) }`. Idempotent via `nudge_log`
-(one send per key per day). Daily cap 6 messages. Quiet hours 22:30–07:00.
+(one send per key per day). Daily cap 4 messages. Quiet hours 22:30–07:00.
+Default ON (since the 2026-10 simplification): `morning_brief`, `day_close`, `weekly_measure`/report, milestones.
+Default OFF (toggle under "More reminders"): `lunch_check`, `protein_check`, `kcal_check`, `water`, `budget_80`.
 - `morning_brief` 07:30–08:30: today's routine day + last session top sets; add "weigh in" if no weight yet
 - `lunch_check` 13:30–14:30: nothing logged since 11:00
 - `protein_check` 16:30–17:30: protein < 45 % of target → grams remaining + cheapest fix from foods (rank by ₹ per g protein)

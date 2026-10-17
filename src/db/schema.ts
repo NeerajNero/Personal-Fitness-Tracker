@@ -104,15 +104,15 @@ export const settings = pgTable(
 
     // Nudge toggles
     nudgeMorningBrief: boolean("nudge_morning_brief").notNull().default(true),
-    nudgeLunchCheck: boolean("nudge_lunch_check").notNull().default(true),
-    nudgeProteinCheck: boolean("nudge_protein_check").notNull().default(true),
-    nudgeKcalCheck: boolean("nudge_kcal_check").notNull().default(true),
+    nudgeLunchCheck: boolean("nudge_lunch_check").notNull().default(false), // off by default since the 2026-10 simplification
+    nudgeProteinCheck: boolean("nudge_protein_check").notNull().default(false), // off by default since the 2026-10 simplification
+    nudgeKcalCheck: boolean("nudge_kcal_check").notNull().default(false), // off by default since the 2026-10 simplification
     nudgeDayClose: boolean("nudge_day_close").notNull().default(true),
     nudgeWater: boolean("nudge_water").notNull().default(false), // OFF by default per spec
     nudgeWeeklyMeasure: boolean("nudge_weekly_measure").notNull().default(true),
-    nudgeBudget: boolean("nudge_budget").notNull().default(true),
+    nudgeBudget: boolean("nudge_budget").notNull().default(false), // off by default since the 2026-10 simplification
     nudgeMilestones: boolean("nudge_milestones").notNull().default(true), // phase_switch, checkpoint, smokefree
-    nudgeDailyCap: smallint("nudge_daily_cap").notNull().default(6),
+    nudgeDailyCap: smallint("nudge_daily_cap").notNull().default(4), // Sunday: brief + measure + report + close
 
     // Quiet hours (IST wall-clock; range wraps midnight)
     quietHoursStart: time("quiet_hours_start").notNull().default("22:30"),
