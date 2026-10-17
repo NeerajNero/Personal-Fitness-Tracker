@@ -126,8 +126,8 @@ export async function getTrainData(date: string): Promise<TrainData> {
 /* ------------------------------ shared writes ------------------------------ */
 
 /**
- * Create a session. With a routine day: copy its exercises into session_exercises and
- * materialise each exercise's last working sets as real rows (edit only what changed).
+ * Create a session. With a routine day, copy its exercises into session_exercises.
+ * No sets are written — each exercise is logged with ✓ (same as last time, `copyLastSets`) or edited.
  * Used by the Train screen's Start and the bot's `done`.
  */
 export async function createSession(date: string, routineDayId: number | null): Promise<{ sessionId: number }> {
@@ -148,16 +148,32 @@ export async function createSession(date: string, routineDayId: number | null): 
       .from(routineExercises)
       .where(eq(routineExercises.routineDayId, routineDayId))
       .orderBy(asc(routineExercises.sortOrder));
-    if (re.length) {
-      await db.insert(sessionExercises).values(re.map((x) => ({ sessionId: sess.id, ...x })));
-      const last = await loadLastSessionSets(re.map((x) => x.exerciseId), sess.id);
-      const copies = [...last.entries()].flatMap(([exerciseId, l]) =>
-        l.sets.map((s) => ({ sessionId: sess.id, exerciseId, setNo: s.setNo, weightKg: s.weightKg, reps: s.reps, isWorking: true })),
-      );
-      if (copies.length) await db.insert(sets).values(copies);
-    }
+    if (re.length) await db.insert(sessionExercises).values(re.map((x) => ({ sessionId: sess.id, ...x })));
   }
   return { sessionId: sess.id };
+}
+
+/**
+ * "Same as last time": copy each exercise's previous working sets into this session.
+ * Exercises that already have sets here are left alone. `exerciseIds` omitted = every exercise in the session.
+ * Returns how many exercises were filled.
+ */
+export async function copyLastSets(sessionId: number, exerciseIds?: number[]): Promise<number> {
+  const [inSession, logged] = await Promise.all([
+    db.select({ id: sessionExercises.exerciseId }).from(sessionExercises).where(eq(sessionExercises.sessionId, sessionId)),
+    db.selectDistinct({ id: sets.exerciseId }).from(sets).where(eq(sets.sessionId, sessionId)),
+  ]);
+  const done = new Set(logged.map((x) => x.id));
+  const wanted = exerciseIds ? new Set(exerciseIds) : null;
+  const ids = inSession.map((x) => x.id).filter((id) => !done.has(id) && (wanted === null || wanted.has(id)));
+  if (ids.length === 0) return 0;
+
+  const last = await loadLastSessionSets(ids, sessionId);
+  const copies = [...last.entries()].flatMap(([exerciseId, l]) =>
+    l.sets.map((s) => ({ sessionId, exerciseId, setNo: s.setNo, weightKg: s.weightKg, reps: s.reps, isWorking: true })),
+  );
+  if (copies.length) await db.insert(sets).values(copies).onConflictDoNothing();
+  return last.size;
 }
 
 /** Reuse an exercise by name (case-insensitive) or create a custom one. */

@@ -7,7 +7,7 @@ import { esc, n0, n1, qtyStr } from "@/lib/format";
 import { ROUTINE_LABEL } from "@/lib/routine";
 import { getDayState } from "@/lib/rules/dayState";
 import { upsertMeasurementByDate } from "@/lib/measurements";
-import { createSession } from "@/lib/training";
+import { copyLastSets, createSession } from "@/lib/training";
 import { appUrl } from "./env";
 import { entryLine, runningLine, todaySummary, withOverage } from "./messages";
 import { matchFood, servingsFor } from "./parse";
@@ -58,13 +58,17 @@ export async function opCopy(date: string, settings: Settings): Promise<string> 
   return withOverage(`↺ Copied ${n} ${n === 1 ? "entry" : "entries"} from yesterday.\n${runningLine(state)}`, state);
 }
 
+/** `done` — log today's workout as the same as last time; edit any lift that changed in the app. */
 export async function opDone(date: string, settings: Settings): Promise<string> {
   const state = await getDayState(date, { settings });
-  const link = `<a href="${appUrl()}/train">enter sets</a>`;
-  if (state.flags.sessionId) return `Already started today — ${link}.`;
-  await createSession(date, state.flags.routineDayId);
-  const label = state.flags.routineDayName ? ROUTINE_LABEL[state.flags.routineDayName] : "an ad-hoc session";
-  return `🏋️ Started ${label} — ${link}.`;
+  const sessionId = state.flags.sessionId ?? (await createSession(date, state.flags.routineDayId)).sessionId;
+  const filled = await copyLastSets(sessionId);
+  const label = state.flags.routineDayName ? ROUTINE_LABEL[state.flags.routineDayName] : "Workout";
+  const link = `<a href="${appUrl()}/train">open Train</a>`;
+  if (filled === 0) {
+    return state.flags.workoutLogged ? `${label} already logged ✓ — ${link} to change anything.` : `🏋️ ${label} started — no previous sets to copy, ${link} to enter them.`;
+  }
+  return `🏋️ ${label} logged — same as last time (${filled} ${filled === 1 ? "exercise" : "exercises"}). Progressed on a lift? ${link} and edit it.`;
 }
 
 export async function opToday(date: string, settings: Settings): Promise<string> {

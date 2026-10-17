@@ -9,7 +9,7 @@ import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
 import { MUSCLE_GROUPS } from "@/lib/routine";
 import { requireSession } from "@/lib/session";
-import { createSession, findOrCreateExercise } from "@/lib/training";
+import { copyLastSets, createSession, findOrCreateExercise } from "@/lib/training";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const id = z.number().int().positive();
@@ -29,6 +29,18 @@ export async function startSession(date: string, routineDayId: number | null): P
     const { sessionId } = await createSession(d, rd);
     revalidate();
     return { ok: true, sessionId };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** ✓ Same as last time — one exercise, or every unlogged exercise when `exerciseId` is omitted. */
+export async function sameAsLast(sessionId: number, exerciseId?: number): Promise<ActionResult<{ filled: number }>> {
+  await requireSession();
+  try {
+    const filled = await copyLastSets(id.parse(sessionId), exerciseId === undefined ? undefined : [id.parse(exerciseId)]);
+    revalidate();
+    return { ok: true, filled };
   } catch (e) {
     return fail(e);
   }

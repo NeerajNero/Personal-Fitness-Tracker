@@ -81,7 +81,7 @@ export function getBot(): Bot<BotContext> {
   // Buttons on the day_close nudge.
   bot.callbackQuery("nudge:done", async (ctx) => {
     const text = await opDone(todayIST(), ctx.settings);
-    await ctx.answerCallbackQuery({ text: "Starting…" });
+    await ctx.answerCallbackQuery({ text: "Logging…" });
     await ctx.editMessageReplyMarkup().catch(() => {});
     await ctx.reply(text, { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
   });

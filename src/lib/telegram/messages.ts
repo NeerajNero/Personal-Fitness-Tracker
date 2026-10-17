@@ -14,7 +14,7 @@ export const HELP = [
   "<code>paneer 150</code> · <code>roti 3</code> · <code>scoop</code> — food or saved meal by name (no number = 1 serving, under 10 = servings, 10+ = grams)",
   "<code>navel 88.5</code> · <code>waist 85</code> — weekly measurement",
   "<code>water</code> — +1 glass",
-  "<code>done</code> — start today's workout",
+  "<code>done</code> — log today's workout, same as last time",
   "<code>today</code> — where you stand",
   "<code>undo</code> — remove the last food entry",
   "Anything else — I'll try to parse it as a meal and ask you to confirm.",

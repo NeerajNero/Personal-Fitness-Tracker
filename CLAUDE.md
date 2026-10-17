@@ -86,7 +86,7 @@ Foods (nonveg; phase_tag = nonveg):
 | Chicken breast | 100 g raw | 120 | 23 | 30 |
 | Fish (rohu) | 100 g raw | 100 | 17 | 25 |
 
-Routine (working sets only; each session pre-fills from the last session of that routine day):
+Routine (working sets only; each exercise shows the last session's sets and ✓ copies them):
 - Upper A: Lat pulldown (wide), Barbell row, Flat bench press, Overhead press, Face pull, Biceps curl
 - Lower A: Back squat, Romanian deadlift, Leg press, Leg curl, Standing calf raise, Hanging knee raise
 - Upper B: Pull-up (or assisted), Chest-supported row, Incline DB press, Lateral raise, Straight-arm pulldown, Triceps pushdown
@@ -106,9 +106,12 @@ Note shown with cues: upper-trap or forearm pain during pulls = shrugging + bice
    (name + kcal + protein, optional "Save to My meals") · logged list (tap a row → qty −/+ and Delete). No ₹ on Today.
    The owner estimates meals from a photo with an outside AI and types the numbers in — don't build photo/AI estimation into the app.
    A saved meal is a `foods` row with `serving_label = "1 meal"` (`MEAL_SERVING`), `is_favourite = true`, `phase_tag = both` — no extra table.
-3. **Train**: today's routine day pre-filled with last session's weight × reps per exercise; edit only what changed ·
-   "+ exercise" quick add (pick existing or type new) · "+ activity" (name + minutes) · incline-walk checkbox ·
-   stall badge when e1RM flat for ≥3 sessions · lat cues visible on pull exercises
+3. **Train** (simplified 2026-10, confirm by exception): Start creates an empty session (no sets copied). Each exercise is one
+   line — last session + progression hint, a ✓ button (= same as last time, copies last working sets) and tap-to-open set grid
+   (placeholders from last session) only when something changed · big "✓ All same as last time" for every unlogged exercise ·
+   incline-walk checkbox · notes + discard behind ⋯ · "Other workout…" for a different day / free workout ·
+   "+ Add an exercise" (pick existing or type new) · "Other activity" (name + minutes) · stall badge when e1RM flat for
+   ≥3 sessions · lat cues (collapsed) on pull exercises. Shared write: `copyLastSets(sessionId, exerciseIds?)` in `src/lib/training.ts`.
 4. **Trends**: weight (daily + 7-day avg) · navel/waist vs straight goal line to 2027-10-11 · weekly protein hit-rate
    and kcal adherence · e1RM per lift · protein spend vs budget (month) · Dec 10 checkpoint card · CSV export of every table
 5. **Settings**: targets, phase override, foods editor, routine editor, nudge toggles + quiet hours, Telegram link, smoke-free date
@@ -117,7 +120,7 @@ Note shown with cues: upper-trap or forearm pain during pulls = shrugging + bice
 Exact-match commands (no AI):
 - `w 74.2` weight · `s 8500` steps · `<food> <qty>` e.g. `paneer 150`, `roti 3`, `scoop` (qty defaults to 1 serving)
 - `dosa 350 12` manual meal (name kcal protein) · `copy` / `same` (copy yesterday's food log onto an empty today)
-- `water` (+1 glass; optional feature) · `done` (mark today's workout done; reply with app link to enter sets)
+- `water` (+1 glass; optional feature) · `done` (log today's workout as same as last time via `copyLastSets`; reply with app link to edit a lift that progressed)
 - `today` (state summary from rules module) · `undo` (remove last log entry) · `navel 88.5` / `waist 85` (weekly measurement, upsert by date)
 Free text (AI): anything else → Gemini parses against the foods list → returns matched items, estimated unknowns, totals.
 Bot replies with the summary + inline ✓ / Edit buttons. Write to DB only on ✓.

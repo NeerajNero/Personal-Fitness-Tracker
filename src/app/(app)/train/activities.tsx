@@ -49,7 +49,7 @@ export function Activities({ date, activities }: { date: string; activities: Act
   return (
     <section>
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted">Activities</h2>
+        <h2 className="text-sm font-medium text-muted">Other activity (sport, cardio)</h2>
         <button type="button" onClick={() => setOpen((v) => !v)} className={`h-9 rounded-lg px-3 text-sm font-medium ${open ? "text-muted" : "text-accent"}`}>
           {open ? "Close" : "+ Activity"}
         </button>
@@ -59,16 +59,13 @@ export function Activities({ date, activities }: { date: string; activities: Act
         <form onSubmit={submit} className="mb-3 grid grid-cols-[1fr_5.5rem] gap-2 rounded-2xl border border-border bg-surface p-3">
           <input name="name" required maxLength={60} placeholder="Badminton, cycling…" className={input} />
           <input name="minutes" type="number" inputMode="numeric" min={1} max={600} required placeholder="min" className={input} />
-          <input name="notes" maxLength={200} placeholder="Note (optional)" className={`${input} col-span-2`} />
           <button type="submit" className="col-span-2 h-12 rounded-xl bg-accent font-medium text-accent-fg active:opacity-80">
             Add
           </button>
         </form>
       ) : null}
 
-      {list.length === 0 ? (
-        !open ? <p className="rounded-2xl border border-dashed border-border p-3 text-center text-sm text-muted">No activities.</p> : null
-      ) : (
+      {list.length === 0 ? null : (
         <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
           {list.map((a) => (
             <li key={a.id} className={`flex min-h-12 items-center gap-3 pl-4 pr-2 ${a.id < 0 ? "opacity-60" : ""}`}>

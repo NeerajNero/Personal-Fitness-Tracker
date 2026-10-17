@@ -131,7 +131,7 @@ export const RULES: Rule[] = [
       return {
         text,
         inlineKeyboard: workoutMissing
-          ? [[{ text: "✓ Done workout", callback_data: "nudge:done" }, { text: "No training today", callback_data: "nudge:skip" }]]
+          ? [[{ text: "✓ Did it (same as last time)", callback_data: "nudge:done" }, { text: "No training today", callback_data: "nudge:skip" }]]
           : undefined,
       };
     },

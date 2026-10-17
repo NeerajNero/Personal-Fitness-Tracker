@@ -3,24 +3,40 @@
 import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import type { ExerciseCard, ExerciseLite, SessionDetail } from "@/lib/training";
 import { MUSCLE_GROUPS, ROUTINE_LABEL, type MuscleGroup } from "@/lib/routine";
-import { addExerciseToSession, deleteSet, discardSession, saveSessionNotes, setInclineWalk, upsertSet } from "./actions";
+import { addExerciseToSession, deleteSet, discardSession, sameAsLast, saveSessionNotes, setInclineWalk, upsertSet } from "./actions";
 
 const btn = "flex items-center justify-center rounded-xl border border-border bg-bg active:opacity-70 disabled:opacity-50";
 const fmtW = (w: number) => (Number.isInteger(w) ? String(w) : w.toFixed(2).replace(/\.?0+$/, ""));
 
 let tempId = -1;
 
+/**
+ * Confirm by exception: each exercise is one line. ✓ logs it the same as last time;
+ * tapping the line opens the set grid only when something changed.
+ */
 export function SessionView({ session, allExercises }: { session: SessionDetail; allExercises: ExerciseLite[] }) {
   const [cards, addCard] = useOptimistic<ExerciseCard[], ExerciseCard>(session.exercises, (list, c) => [...list, c]);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [incline, setIncline] = useState(session.inclineWalk);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [showMore, setShowMore] = useState(false);
   const [armed, setArmed] = useState(false);
   const [notesStatus, setNotesStatus] = useState<"idle" | "saved" | "error">("idle");
   const savedNotes = useRef(session.notes ?? "");
 
-  const title = session.routineDayName ? ROUTINE_LABEL[session.routineDayName] : "Ad-hoc session";
+  const title = session.routineDayName ? ROUTINE_LABEL[session.routineDayName] : "Workout";
   const inSession = useMemo(() => new Set(cards.map((c) => c.exerciseId)), [cards]);
+  const logged = cards.filter((c) => c.sets.length > 0).length;
+  const sameable = cards.filter((c) => c.sets.length === 0 && c.hint.last !== null).length;
+
+  function allSame() {
+    setError(null);
+    startTransition(async () => {
+      const r = await sameAsLast(session.id);
+      if (!r.ok) setError(r.error);
+    });
+  }
 
   function toggleIncline() {
     const v = !incline;
@@ -52,6 +68,7 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
 
   function addExercise(input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }, display: ExerciseLite) {
     setError(null);
+    setOpenId(display.id);
     startTransition(async () => {
       addCard({
         exerciseId: display.id,
@@ -65,7 +82,8 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
         stall: { stalled: false, count: 0 },
       });
       const r = await addExerciseToSession(session.id, input);
-      if (!r.ok) setError(r.error);
+      if (r.ok) setOpenId(r.exerciseId);
+      else setError(r.error);
     });
   }
 
@@ -78,61 +96,83 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
   }
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-3">
       <header className="rounded-2xl border border-border bg-surface p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-medium text-muted">Session</p>
             <h2 className="text-2xl font-semibold">{title}</h2>
+            <p className="text-sm text-muted">
+              {logged} / {cards.length} logged
+            </p>
           </div>
-          {armed ? (
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setArmed(false)} className={`${btn} h-10 px-3 text-sm`}>
-                Keep
-              </button>
-              <button type="button" onClick={discard} className="h-10 rounded-xl bg-danger px-3 text-sm font-medium text-white active:opacity-80">
-                Discard
-              </button>
-            </div>
-          ) : (
-            <button type="button" onClick={() => setArmed(true)} className="h-10 px-2 text-sm text-muted active:opacity-70">
-              Discard
-            </button>
-          )}
+          <button type="button" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore} aria-label="More options" className="h-10 px-3 text-xl text-muted active:opacity-70">
+            ⋯
+          </button>
         </div>
 
-        <label className="mt-4 flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-bg px-4">
+        {sameable > 0 ? (
+          <button type="button" disabled={pending} onClick={allSame} className="mt-3 h-14 w-full rounded-xl bg-accent text-lg font-medium text-accent-fg active:opacity-80 disabled:opacity-60">
+            ✓ All same as last time{sameable < cards.length ? ` (${sameable} left)` : ""}
+          </button>
+        ) : null}
+
+        <label className="mt-3 flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-bg px-4">
           <input type="checkbox" checked={incline} onChange={toggleIncline} className="size-5 accent-[var(--accent)]" />
           <span className="text-sm font-medium">Incline walk 15–20 min</span>
         </label>
 
-        <div className="mt-3">
-          <textarea
-            defaultValue={session.notes ?? ""}
-            onBlur={(e) => commitNotes(e.target.value)}
-            placeholder="Session notes (optional)"
-            rows={2}
-            maxLength={500}
-            className="w-full resize-none rounded-xl border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-accent"
-          />
-          <span className="text-xs text-accent" aria-live="polite">
-            {notesStatus === "saved" ? "Saved ✓" : " "}
-          </span>
-        </div>
+        {showMore ? (
+          <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+            <textarea
+              defaultValue={session.notes ?? ""}
+              onBlur={(e) => commitNotes(e.target.value)}
+              placeholder="Session notes (optional)"
+              rows={2}
+              maxLength={500}
+              className="w-full resize-none rounded-xl border border-border bg-bg px-3 py-2 text-sm outline-none focus:border-accent"
+            />
+            <span className="text-xs text-accent" aria-live="polite">
+              {notesStatus === "saved" ? "Saved ✓" : null}
+            </span>
+            {armed ? (
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setArmed(false)} className={`${btn} h-11 flex-1 text-sm`}>
+                  Keep
+                </button>
+                <button type="button" onClick={discard} className="h-11 flex-1 rounded-xl bg-danger text-sm font-medium text-white active:opacity-80">
+                  Discard workout
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setArmed(true)} className="h-11 text-left text-sm text-danger active:opacity-70">
+                Discard this workout…
+              </button>
+            )}
+          </div>
+        ) : null}
       </header>
 
-      {cards.map((c) => (
-        <ExerciseCardView key={c.exerciseId} sessionId={session.id} card={c} onError={setError} />
-      ))}
+      {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+      <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+        {cards.map((c) => (
+          <ExerciseRow
+            key={c.exerciseId}
+            sessionId={session.id}
+            card={c}
+            open={openId === c.exerciseId}
+            onToggle={() => setOpenId(openId === c.exerciseId ? null : c.exerciseId)}
+            onError={setError}
+          />
+        ))}
+      </ul>
 
       <AddExercise allExercises={allExercises} inSession={inSession} onAdd={addExercise} />
-
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
     </section>
   );
 }
 
-/* ------------------------------ exercise card ------------------------------ */
+/* ------------------------------- exercise row ------------------------------ */
 
 type Row = {
   setNo: number;
@@ -155,22 +195,58 @@ function initialRows(card: ExerciseCard): Row[] {
       status: "idle",
     }));
   }
-  return Array.from({ length: card.targetSets }, (_, i) => ({
-    setNo: i + 1,
-    weight: "",
-    reps: "",
-    savedWeight: null,
-    savedReps: null,
-    status: "idle",
-  }));
+  const n = Math.max(card.targetSets, card.hint.last?.reps.length ?? 0);
+  return Array.from({ length: n }, (_, i) => ({ setNo: i + 1, weight: "", reps: "", savedWeight: null, savedReps: null, status: "idle" }));
 }
 
-function ExerciseCardView({ sessionId, card, onError }: { sessionId: number; card: ExerciseCard; onError: (e: string | null) => void }) {
+/** "45 kg × 10/10/9" when every set used one weight, else "45×10 · 42.5×9". */
+function summary(rows: Row[]): string {
+  const saved = rows.filter((r) => r.savedWeight !== null && r.savedReps !== null);
+  const weights = new Set(saved.map((r) => r.savedWeight));
+  if (weights.size === 1) {
+    const w = saved[0].savedWeight;
+    return `${w === "0" ? "BW" : `${w} kg`} × ${saved.map((r) => r.savedReps).join("/")}`;
+  }
+  return saved.map((r) => `${r.savedWeight}×${r.savedReps}`).join(" · ");
+}
+
+function ExerciseRow({
+  sessionId,
+  card,
+  open,
+  onToggle,
+  onError,
+}: {
+  sessionId: number;
+  card: ExerciseCard;
+  open: boolean;
+  onToggle: () => void;
+  onError: (e: string | null) => void;
+}) {
   const [rows, setRows] = useState<Row[]>(() => initialRows(card));
+  const [sameing, startSame] = useTransition();
   const [, startTransition] = useTransition();
   const pending = card.exerciseId < 0;
 
+  // Sets arrived from the server (✓ / All same) while nothing was saved locally → adopt them.
+  const sig = card.sets.map((x) => `${x.setNo}:${x.weightKg}x${x.reps}`).join(",");
+  const [prevSig, setPrevSig] = useState(sig);
+  if (sig !== prevSig) {
+    setPrevSig(sig);
+    if (card.sets.length > 0 && !rows.some((r) => r.savedWeight !== null)) setRows(initialRows(card));
+  }
+
+  const done = rows.some((r) => r.savedWeight !== null);
+  const last = card.hint.last;
   const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...p } : r)));
+
+  function same() {
+    onError(null);
+    startSame(async () => {
+      const r = await sameAsLast(sessionId, card.exerciseId);
+      if (!r.ok) onError(r.error);
+    });
+  }
 
   function commit(i: number) {
     const r = rows[i];
@@ -190,21 +266,18 @@ function ExerciseCardView({ sessionId, card, onError }: { sessionId: number; car
 
   function addSet() {
     setRows((rs) => {
-      const last = rs[rs.length - 1];
-      return [
-        ...rs,
-        { setNo: (last?.setNo ?? 0) + 1, weight: last?.weight ?? "", reps: last?.reps ?? "", savedWeight: null, savedReps: null, status: "idle" },
-      ];
+      const l = rs[rs.length - 1];
+      return [...rs, { setNo: (l?.setNo ?? 0) + 1, weight: l?.weight ?? "", reps: l?.reps ?? "", savedWeight: null, savedReps: null, status: "idle" }];
     });
   }
 
   function removeSet() {
-    const last = rows[rows.length - 1];
-    if (!last) return;
+    const l = rows[rows.length - 1];
+    if (!l) return;
     setRows((rs) => rs.slice(0, -1));
-    if (last.savedWeight !== null) {
+    if (l.savedWeight !== null) {
       startTransition(async () => {
-        const res = await deleteSet(sessionId, card.exerciseId, last.setNo);
+        const res = await deleteSet(sessionId, card.exerciseId, l.setNo);
         if (!res.ok) onError(res.error);
       });
     }
@@ -213,61 +286,77 @@ function ExerciseCardView({ sessionId, card, onError }: { sessionId: number; car
   const input = "h-12 w-full rounded-xl border border-border bg-bg text-center text-lg tabular-nums outline-none focus:border-accent";
 
   return (
-    <article className={`rounded-2xl border border-border bg-surface p-4 ${pending ? "opacity-60" : ""}`}>
-      <header className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-semibold leading-tight">{card.name}</h3>
-          <p className="text-xs text-muted">
-            {card.muscleGroup} · {card.targetSets} × {card.targetReps}
-          </p>
-        </div>
-        {card.stall.stalled ? (
-          <span className="shrink-0 rounded-full bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">Stalled ×{card.stall.count}</span>
+    <li className={pending ? "opacity-60" : ""}>
+      <div className="flex min-h-16 items-center gap-2 pl-4 pr-2">
+        <button type="button" disabled={pending} onClick={onToggle} aria-expanded={open} className="min-w-0 flex-1 py-2 text-left">
+          <span className="flex items-center gap-2">
+            <span className="truncate font-medium">{card.name}</span>
+            {card.stall.stalled ? <span className="shrink-0 rounded-full bg-warn/15 px-2 text-[11px] font-medium text-warn">stalled</span> : null}
+          </span>
+          <span className={`block truncate text-sm ${done ? "text-accent" : "text-muted"}`}>{done ? `✓ ${summary(rows)}` : card.hint.text}</span>
+        </button>
+        {!done && last ? (
+          <button type="button" disabled={pending || sameing} onClick={same} aria-label={`${card.name}: same as last time`} className={`${btn} h-12 w-14 shrink-0 text-lg font-semibold text-accent`}>
+            {sameing ? "…" : "✓"}
+          </button>
         ) : null}
-      </header>
-      {card.stall.stalled ? <p className="mt-1 text-xs text-warn">Drop ~10% and rebuild, or swap the variation.</p> : null}
-      <p className="mt-1 text-xs text-muted">{card.hint.text}</p>
+      </div>
 
-      {card.cues ? (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs font-medium text-accent">Cues</summary>
-          <pre className="mt-1 whitespace-pre-wrap font-sans text-xs leading-relaxed text-fg">{card.cues}</pre>
-        </details>
+      {open ? (
+        <div className="px-4 pb-4">
+          {card.stall.stalled ? <p className="text-xs text-warn">No new best in {card.stall.count} sessions — drop ~10% and rebuild, or swap the variation.</p> : null}
+          {card.cues ? (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-xs font-medium text-accent">Cues</summary>
+              <pre className="mt-1 whitespace-pre-wrap font-sans text-xs leading-relaxed text-fg">{card.cues}</pre>
+            </details>
+          ) : null}
+
+          <div className="mt-2 grid grid-cols-[1.75rem_1fr_1fr_1.5rem] items-center gap-x-2 gap-y-2">
+            <span className="text-[11px] text-muted">Set</span>
+            <span className="text-center text-[11px] text-muted">kg</span>
+            <span className="text-center text-[11px] text-muted">reps</span>
+            <span />
+            {rows.map((r, i) => (
+              <SetRow
+                key={r.setNo}
+                row={r}
+                inputCls={input}
+                weightHint={last ? fmtW(last.weightKg) : "kg"}
+                repsHint={String(last?.reps[i] ?? card.targetReps)}
+                onChange={(p) => patch(i, p)}
+                onCommit={() => commit(i)}
+              />
+            ))}
+          </div>
+          {rows.some((r) => r.error) ? <p className="mt-1 text-xs text-danger">{rows.find((r) => r.error)?.error}</p> : null}
+
+          <div className="mt-3 flex gap-2">
+            <button type="button" disabled={pending} onClick={addSet} className={`${btn} h-11 flex-1 text-sm font-medium`}>
+              + set
+            </button>
+            <button type="button" disabled={pending || rows.length === 0} onClick={removeSet} className={`${btn} h-11 flex-1 text-sm font-medium`}>
+              − set
+            </button>
+          </div>
+        </div>
       ) : null}
-
-      <div className="mt-3 grid grid-cols-[1.75rem_1fr_1fr_1.5rem] items-center gap-x-2 gap-y-2">
-        <span className="text-[11px] text-muted">Set</span>
-        <span className="text-center text-[11px] text-muted">kg</span>
-        <span className="text-center text-[11px] text-muted">reps</span>
-        <span />
-        {rows.map((r, i) => (
-          <SetRow key={r.setNo} row={r} inputCls={input} targetReps={card.targetReps} onChange={(p) => patch(i, p)} onCommit={() => commit(i)} />
-        ))}
-      </div>
-      {rows.some((r) => r.error) ? <p className="mt-1 text-xs text-danger">{rows.find((r) => r.error)?.error}</p> : null}
-
-      <div className="mt-3 flex gap-2">
-        <button type="button" disabled={pending} onClick={addSet} className={`${btn} h-11 flex-1 text-sm font-medium`}>
-          + set
-        </button>
-        <button type="button" disabled={pending || rows.length === 0} onClick={removeSet} className={`${btn} h-11 flex-1 text-sm font-medium`}>
-          − set
-        </button>
-      </div>
-    </article>
+    </li>
   );
 }
 
 function SetRow({
   row: r,
   inputCls,
-  targetReps,
+  weightHint,
+  repsHint,
   onChange,
   onCommit,
 }: {
   row: Row;
   inputCls: string;
-  targetReps: number;
+  weightHint: string;
+  repsHint: string;
   onChange: (p: Partial<Row>) => void;
   onCommit: () => void;
 }) {
@@ -283,7 +372,7 @@ function SetRow({
         step="0.5"
         min={0}
         value={r.weight}
-        placeholder="kg"
+        placeholder={weightHint}
         onChange={(e) => onChange({ weight: e.target.value })}
         onBlur={onCommit}
         onKeyDown={blurOnEnter}
@@ -296,7 +385,7 @@ function SetRow({
         step="1"
         min={1}
         value={r.reps}
-        placeholder={String(targetReps)}
+        placeholder={repsHint}
         onChange={(e) => onChange({ reps: e.target.value })}
         onBlur={onCommit}
         onKeyDown={blurOnEnter}
@@ -345,8 +434,8 @@ function AddExercise({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className={`${btn} h-12 w-full text-sm font-medium`}>
-        + Exercise
+      <button type="button" onClick={() => setOpen(true)} className="h-11 w-full text-sm font-medium text-accent active:opacity-70">
+        + Add an exercise
       </button>
     );
   }

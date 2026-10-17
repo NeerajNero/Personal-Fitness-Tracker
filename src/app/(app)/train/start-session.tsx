@@ -49,23 +49,12 @@ export function StartSession({ date, isTrainingDay, routineDayId, routineDayName
       ) : (
         <>
           <p className="text-xs font-medium text-muted">Rest day</p>
-          <h2 className="text-2xl font-semibold">
-            {stepsRange[0].toLocaleString("en-IN")}–{stepsRange[1].toLocaleString("en-IN")} steps
-          </h2>
+          <h2 className="text-2xl font-semibold">Walk {stepsRange[0].toLocaleString("en-IN")}–{stepsRange[1].toLocaleString("en-IN")} steps</h2>
         </>
       )}
 
-      <div className="mt-3 flex gap-2">
-        <button type="button" disabled={pending} onClick={() => setPick((v) => !v)} className={small}>
-          Start a different day
-        </button>
-        <button type="button" disabled={pending} onClick={() => go(null)} className={small}>
-          Ad-hoc session
-        </button>
-      </div>
-
       {pick ? (
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           {routineDays
             .filter((d) => d.id !== routineDayId)
             .map((d) => (
@@ -73,8 +62,15 @@ export function StartSession({ date, isTrainingDay, routineDayId, routineDayName
                 {ROUTINE_LABEL[d.name]}
               </button>
             ))}
+          <button type="button" disabled={pending} onClick={() => go(null)} className={small}>
+            Free workout
+          </button>
         </div>
-      ) : null}
+      ) : (
+        <button type="button" disabled={pending} onClick={() => setPick(true)} className="mt-3 h-10 text-sm text-accent active:opacity-70">
+          {isTrainingDay && label ? "Other workout…" : "Train anyway…"}
+        </button>
+      )}
 
       {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
     </section>
