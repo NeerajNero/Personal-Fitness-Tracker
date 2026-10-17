@@ -1,36 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Recomp
 
-## Getting Started
+A personal fitness tracker for a 1-year body recomposition (Oct 2026 → Oct 2027). It's a web app (PWA) plus a Telegram bot.
+Log weight, food (kcal + protein) and lifts in seconds. It tells you each week whether to change anything.
 
-First, run the development server:
+**Daily use is mostly Telegram:** `w 74.2` · `dosa 350 12` · `copy` · `done` · `navel 88.5` · `today`.
+The app is for tapping a saved meal, editing a lift that progressed, and checking Trends.
 
+## Stack
+Next.js 16 (App Router, TypeScript, Tailwind v4) · Neon Postgres + Drizzle · Auth.js (Google, single allowed email) ·
+grammY Telegram bot · Gemini flash-lite for free-text meal parsing · Vercel Hobby + cron-job.org.
+
+## Quick start
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+cp .env.example .env    # fill in values (see comments in the file)
+pnpm install
+pnpm db:migrate && pnpm seed
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Docs
+- [docs/README.md](docs/README.md): index; read the one doc for the area you're changing
+- [CHANGELOG.md](CHANGELOG.md): what changed and when
+- [CLAUDE.md](CLAUDE.md): rules for AI-assisted changes (also a useful summary of the conventions)
