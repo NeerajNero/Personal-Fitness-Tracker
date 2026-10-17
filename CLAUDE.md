@@ -16,7 +16,7 @@ open the files listed in that doc's Files table. Don't explore the whole repo, a
 | goals, targets, verdict rules, seed data, non-goals | `docs/product.md` |
 | layout, shared modules, client/server boundary | `docs/architecture.md` |
 | tables, views, migrations | `docs/data-model.md` |
-| Today / Train / Trends / Settings + onboarding / Telegram bot | `docs/features/<today|train|trends|settings-onboarding|telegram-bot>.md` |
+| Today / Train / Cardio / Trends / Settings + onboarding / Telegram bot | `docs/features/<today|train|cardio|trends|settings-onboarding|telegram-bot>.md` |
 | reminders, `/api/tick`, `getDayState` | `docs/rules-engine.md` |
 | env, checks, deploy, webhook, cron | `docs/operations.md` |
 

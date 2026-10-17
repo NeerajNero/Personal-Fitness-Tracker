@@ -6,7 +6,7 @@ import { foodInPhase } from "@/lib/food";
 import { musclesInOrder } from "@/lib/metrics/strength";
 import { mondayOf, VERDICT_LABEL } from "@/lib/metrics/trends";
 import { appUrl } from "@/lib/telegram/env";
-import { didButtons, planButtons, todaySummary } from "@/lib/telegram/messages";
+import { cardioRepeatRow, didButtons, planButtons, todaySummary } from "@/lib/telegram/messages";
 import type { Rule, RuleCtx, RuleMessage } from "./engine";
 import type { WeeklyReport } from "./weekly";
 
@@ -44,6 +44,12 @@ export function formatWeeklyReport(r: WeeklyReport): string {
   lines.push(r.rate ? `⚖️ 7-day avg ${n1(r.rate.latest.avg7)} kg · ${r.rate.kgPerWeek > 0 ? "+" : ""}${r.rate.kgPerWeek.toFixed(2)} kg/wk (${r.rate.pctPerWeek > 0 ? "+" : ""}${r.rate.pctPerWeek.toFixed(2)} %)` : "⚖️ not enough weigh-ins for a trend");
   lines.push(r.navel ? `📏 Navel ${n1(r.navel.latest)} cm${r.navel.delta !== null ? ` (${r.navel.delta > 0 ? "+" : ""}${r.navel.delta} vs last)` : ""}` : "📏 no measurement this week");
   lines.push(`🏋️ ${r.sessionsDone}/${r.sessionTarget} sessions · lifts progressed ${r.lifts.progressed}/${r.lifts.tracked}`);
+  const types = Object.entries(r.cardio.byType).sort(([, a], [, b]) => b - a);
+  lines.push(
+    r.cardio.minutes || r.cardio.prevMinutes
+      ? `🏃 Cardio ${r.cardio.minutes} min (last week ${r.cardio.prevMinutes})${types.length ? ` · ${types.map(([t, n]) => `${esc(t)} ×${n}`).join(" · ")}` : ""}`
+      : "🏃 No cardio this week",
+  );
   const muscles = musclesInOrder(r.setsByMuscle);
   if (muscles.length) lines.push(`💪 Sets: ${muscles.map(([m, n]) => `${esc(m)} ${n}`).join(" · ")}`);
   const a = r.adherence;
@@ -149,10 +155,8 @@ export const RULES: Rule[] = [
       if (workoutMissing) missing.push(`${esc(plan.typeName ?? "workout")} — tap below`);
       const parts = [todaySummary(state), missing.length ? `<b>Missing:</b>\n• ${missing.join("\n• ")}` : "All logged ✓"];
       if (unset) parts.push("<b>What did you do today?</b> Tap a workout to log it as same as last time.");
-      return {
-        text: parts.join("\n\n"),
-        inlineKeyboard: unset || workoutMissing ? didButtons(state) : undefined,
-      };
+      const keyboard = [...(unset || workoutMissing ? didButtons(state) : []), ...cardioRepeatRow(state)];
+      return { text: parts.join("\n\n"), inlineKeyboard: keyboard.length ? keyboard : undefined };
     },
   },
   {

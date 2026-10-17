@@ -43,6 +43,13 @@
       "when": 1792221910531,
       "tag": "0005_choose_your_day",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792223595027,
+      "tag": "0006_cardio_log",
+      "breakpoints": true
     }
   ]
 }

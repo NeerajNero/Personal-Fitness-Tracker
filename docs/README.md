@@ -10,6 +10,7 @@ can open those directly instead of searching the repo.
 | Tables, columns, views, migrations, seed | [data-model.md](data-model.md) |
 | Food logging, My meals, weight/steps | [features/today.md](features/today.md) |
 | Workout logging, ✓ same as last time, hints, stalls | [features/train.md](features/train.md) |
+| Cardio log (types, fields, repeat, bot syntax, charts) | [features/cardio.md](features/cardio.md) |
 | Charts, verdict, checkpoint, maintenance, export | [features/trends.md](features/trends.md) |
 | Settings screens, onboarding, sign-in | [features/settings-onboarding.md](features/settings-onboarding.md) |
 | Bot commands, Gemini parsing | [features/telegram-bot.md](features/telegram-bot.md) |

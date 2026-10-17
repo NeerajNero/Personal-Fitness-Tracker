@@ -36,6 +36,7 @@ export const phaseEnum = pgEnum("phase", ["veg", "nonveg"]);
 export const phaseTagEnum = pgEnum("phase_tag", ["veg", "nonveg", "both"]);
 export const logSourceEnum = pgEnum("log_source", ["app", "telegram", "ai"]);
 export const sexEnum = pgEnum("sex", ["male", "female"]);
+export const cardioEffortEnum = pgEnum("cardio_effort", ["easy", "moderate", "hard"]);
 /** Legacy: routine_days.name used this until 0005 (now text). Kept so drizzle-kit never drops the type. */
 export const routineDayNameEnum = pgEnum("routine_day_name", [
   "UpperA",
@@ -291,15 +292,23 @@ export const sets = pgTable(
   ],
 );
 
+/** The cardio log (sport included). `type` keys CARDIO_TYPES in src/lib/cardio.ts; null = legacy row, treated as "sport". */
 export const activities = pgTable(
   "activities",
   {
     id: serial("id").primaryKey(),
     date: date("date").notNull(),
+    /** Sport name, or the type's label for other cardio. */
     name: text("name").notNull(),
     minutes: smallint("minutes").notNull(),
     notes: text("notes"),
     createdAt: createdAt(),
+    type: text("type"),
+    distanceKm: num("distance_km", 6, 2),
+    speedKmh: num("speed_kmh", 5, 2),
+    inclinePct: num("incline_pct", 4, 1),
+    effort: cardioEffortEnum("effort"),
+    loggedAt: timestamp("logged_at", { withTimezone: true }).defaultNow(),
   },
   (t) => [index("activities_date_idx").on(t.date)],
 );

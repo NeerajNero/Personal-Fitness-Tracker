@@ -1,11 +1,11 @@
 import { and, asc, desc, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activities, dailyMetrics, exercises, routineDays, routineExercises, sessionExercises, sessions, sets, type Activity } from "@/db/schema";
+import { dailyMetrics, exercises, routineDays, routineExercises, sessionExercises, sessions, sets } from "@/db/schema";
+import { listCardio } from "@/lib/activities";
+import type { CardioEntry } from "@/lib/cardio";
 import { hintFromSets, loadHistory, loadLastSessionSets, stallFromHistory, type Hint, type SetLite, type Stall } from "@/lib/metrics/strength";
 import { getDayState, type DayState } from "@/lib/rules/dayState";
 import { typeLabel } from "@/lib/routine";
-
-export type { Activity };
 
 export type ExerciseCard = {
   exerciseId: number;
@@ -46,10 +46,6 @@ export async function listWorkoutTypes(opts: { includeArchived?: boolean } = {})
 
 export function listExercises(): Promise<ExerciseLite[]> {
   return db.select({ id: exercises.id, name: exercises.name, muscleGroup: exercises.muscleGroup }).from(exercises).orderBy(asc(exercises.name));
-}
-
-export function listActivities(date: string): Promise<Activity[]> {
-  return db.select().from(activities).where(eq(activities.date, date)).orderBy(asc(activities.id));
 }
 
 export function listRoutineExerciseNames(routineDayId: number): Promise<{ name: string }[]> {
@@ -118,15 +114,16 @@ export type TrainData = {
   state: DayState;
   /** Every workout type, active first (rotation order), then archived — for the day picker. */
   types: WorkoutType[];
-  activities: Activity[];
+  /** The date's cardio entries, oldest first. The repeat candidate is `state.cardio.lastEntry`. */
+  cardio: CardioEntry[];
   session: SessionDetail | null;
   allExercises: ExerciseLite[];
 };
 
 export async function getTrainData(date: string): Promise<TrainData> {
-  const [state, types, acts, allExercises] = await Promise.all([getDayState(date), listWorkoutTypes({ includeArchived: true }), listActivities(date), listExercises()]);
+  const [state, types, cardio, allExercises] = await Promise.all([getDayState(date), listWorkoutTypes({ includeArchived: true }), listCardio(date), listExercises()]);
   const session = state.flags.sessionId ? await getSessionDetail(state.flags.sessionId) : null;
-  return { state, types, activities: acts, session, allExercises };
+  return { state, types, cardio, session, allExercises };
 }
 
 /** Exercises with ≥1 set / exercises in the session — the "2/5 logged" on Today. */

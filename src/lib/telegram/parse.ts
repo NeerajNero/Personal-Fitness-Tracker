@@ -1,6 +1,7 @@
 /** Exact-match command parsing. Pure; no DB. Anything that isn't a command falls through to AI. */
 import { z } from "zod";
 import type { Food } from "@/db/schema";
+import { parseCardio, type CardioInput } from "@/lib/cardio";
 
 export type Command =
   | { type: "weight"; kg: number }
@@ -13,6 +14,9 @@ export type Command =
   | { type: "navel"; cm: number }
   | { type: "waist"; cm: number }
   | { type: "copy" }
+  | { type: "cardioRepeat" }
+  | { type: "cardio"; input: CardioInput }
+  | { type: "cardioError"; error: string }
   | { type: "manual"; label: string; kcal: number; proteinG: number }
   | { type: "food"; query: string; n: number | null };
 
@@ -21,7 +25,7 @@ const steps = z.coerce.number().int().min(0).max(100_000);
 const cm = z.coerce.number().min(40).max(200);
 const kcal = z.coerce.number().min(0).max(5000);
 const protein = z.coerce.number().min(0).max(500);
-const KEYWORDS: Record<string, Command["type"]> = { water: "water", done: "done", today: "today", undo: "undo", help: "help", start: "help", copy: "copy", same: "copy" };
+const KEYWORDS: Record<string, Command["type"]> = { water: "water", done: "done", today: "today", undo: "undo", help: "help", start: "help", copy: "copy", same: "copy", cardio: "cardioRepeat" };
 
 export function parseCommand(raw: string): Command | null {
   const text = raw.trim().replace(/\s+/g, " ");
@@ -46,6 +50,10 @@ export function parseCommand(raw: string): Command | null {
     const v = cm.safeParse(mm[2]);
     return v.success ? { type: mm[1].toLowerCase() as "navel" | "waist", cm: Math.round(v.data * 10) / 10 } : null;
   }
+
+  // Cardio before the meal patterns: `walk 30 5` is a walk, not a 30 kcal meal called "walk".
+  const c = parseCardio(text);
+  if (c) return "error" in c ? { type: "cardioError", error: c.error } : { type: "cardio", input: c.input };
 
   // `<meal name> <kcal> <protein>` — manual entry from an outside estimate.
   const m = /^([a-z][a-z .()'/-]*?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/i.exec(text);

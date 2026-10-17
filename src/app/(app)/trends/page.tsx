@@ -21,6 +21,8 @@ import { CheckpointCard } from "./checkpoint-card";
 import { GoalCard } from "./goal-card";
 import { LiftsSection, type Lift } from "./lifts-section";
 import { MaintenanceCard } from "./maintenance-card";
+import { cardioByWeek, loadCardioSince } from "@/lib/activities";
+import { CardioSection } from "./cardio-section";
 import { Measurements } from "./measurements";
 import { MuscleVolume } from "./muscle-volume";
 import { NavelSection } from "./navel-section";
@@ -36,7 +38,7 @@ export default async function TrendsPage() {
   const today = todayIST();
   const from = addDays(mondayOf(today), -7 * (WEEKS - 1));
 
-  const [settings, series, measurements, totals, sessionDates, history, volume] = await Promise.all([
+  const [settings, series, measurements, totals, sessionDates, history, volume, cardioWeeks, cardioEntries] = await Promise.all([
     getSettings(),
     loadWeightSeries(),
     loadMeasurements(),
@@ -44,6 +46,8 @@ export default async function TrendsPage() {
     loadLoggedSessionDates(from, today),
     loadAllHistory(),
     weeklySetsByMuscle(4, today),
+    cardioByWeek(8, today),
+    loadCardioSince(addDays(today, -180)),
   ]);
 
   const onboardingDate = settings.onboardedAt ? todayIST(settings.onboardedAt) : settings.smokeFreeSince ?? today;
@@ -103,6 +107,7 @@ export default async function TrendsPage() {
           <GoalCard settings={settings} measurements={measurements} today={today} />
           <LiftsSection lifts={lifts} />
           <MuscleVolume weeks={volume} />
+          <CardioSection weeks={cardioWeeks.map(({ weekStart, minutes }) => ({ weekStart, minutes }))} entries={cardioEntries} />
           <AdherenceTable weeks={weeks} />
           {!maintenanceActionable ? maintenanceCard : null}
           {!checkpointSoon ? checkpointCard : null}

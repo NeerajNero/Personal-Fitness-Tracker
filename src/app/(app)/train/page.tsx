@@ -5,7 +5,7 @@ import { addDays, formatDayLabel, isValidIsoDate, todayIST } from "@/lib/dates";
 import { n0 } from "@/lib/format";
 import { pickerTypes } from "@/lib/routine";
 import { getTrainData } from "@/lib/training";
-import { Activities } from "./activities";
+import { Cardio } from "./cardio";
 import { SessionView } from "./session-view";
 
 export const metadata: Metadata = { title: "Train" };
@@ -15,7 +15,7 @@ export default async function TrainPage({ searchParams }: PageProps<"/train">) {
   const today = todayIST();
   const date = typeof d === "string" && isValidIsoDate(d) && d <= today ? d : today;
 
-  const { state, types, activities, session, allExercises } = await getTrainData(date);
+  const { state, types, cardio, session, allExercises } = await getTrainData(date);
   const plan = state.dayPlan;
   const [lo, hi] = state.targets.stepsRange;
 
@@ -52,7 +52,7 @@ export default async function TrainPage({ searchParams }: PageProps<"/train">) {
 
       {session ? <SessionView key={session.id} session={session} allExercises={allExercises} /> : null}
 
-      <Activities key={`act-${date}`} date={date} activities={activities} />
+      <Cardio key={`cardio-${date}`} date={date} entries={cardio} last={state.cardio.lastEntry} />
     </div>
   );
 }

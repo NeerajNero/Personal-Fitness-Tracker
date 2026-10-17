@@ -7,6 +7,12 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 ## Unreleased
 
 ### Added
+- **Cardio log:** incline walk, walk, run, cycle, cross-trainer, swim, stairs and sport, each showing only its fields
+  (speed, distance, incline, name), plus effort and a note. Speed ⇄ distance are derived, and pace is shown for walks/runs.
+  Train has a Cardio section with one-tap "Same as last time"; Today has a cardio line. Replaces "+ Activity".
+- Bot cardio: `incline 20 4.5 6%`, `walk 30 5`, `run 25 4.2km hard`, `sport badminton 45`, `cardio` to repeat. `undo` now removes
+  the newest food or cardio entry; `today` shows cardio; day close offers "＋ <last cardio>"; the weekly report shows cardio minutes vs last week.
+- Trends → More details → Cardio: minutes per week (8 weeks) and a conditioning chart (speed per entry, incline labels, effort colours).
 - **Choose your day:** a "What's today?" picker on Today and Train (a button per workout type with days since it was last done,
   next up highlighted, plus Rest; Custom and archived types under ⋯). Replaces the fixed weekday schedule.
 - Workout types **Push / Pull / Legs** in a rotation that suggests "next up" (data script `pnpm choose-day` archives Upper/Lower
@@ -20,6 +26,7 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 - `/sync-docs` project skill (`.claude/skills/sync-docs`): maps a diff to the docs it affects, updates them and the changelog.
 
 ### Changed
+- The incline-walk checkbox is gone from the workout; old ticks still count as a cardio session (no minutes).
 - Session adherence, the weekly report and the Dec 10 checkpoint measure sessions against the weekly target (default 4)
   instead of the fixed weekday plan.
 - `done` logs the chosen workout type; with no day chosen it asks which.
@@ -37,6 +44,7 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 - Train **✓ same as last time** per exercise and **✓ All same as last time** for the whole session.
 
 ### Changed
+- The incline-walk checkbox is gone from the workout; old ticks still count as a cardio session (no minutes).
 - Today: manual entry (name, kcal, protein) is always open; chips merged into the progress card's status line;
   ₹ removed from logging; meal rows use tap → −/+/Delete instead of long-press.
 - Train: one line per exercise with last session + progression hint; the set grid only opens on tap; notes/discard behind ⋯;

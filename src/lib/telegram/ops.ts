@@ -2,7 +2,9 @@
 import type { Food, Settings } from "@/db/schema";
 import { incrementWater, upsertDailyMetrics } from "@/lib/daily";
 import { addDays, nowTimeIST } from "@/lib/dates";
-import { copyFoodLog, deleteLatestFoodEntry, entryFromFood, insertFoodEntries, listFoodLog, listFoods } from "@/lib/food";
+import { deleteCardio, insertCardio, latestCardioOn, repeatLastCardio } from "@/lib/activities";
+import { cardioSummary, type CardioEntry, type CardioInput } from "@/lib/cardio";
+import { copyFoodLog, deleteFoodEntry, entryFromFood, insertFoodEntries, latestFoodEntry, listFoodLog, listFoods } from "@/lib/food";
 import { esc, n0, n1, qtyStr } from "@/lib/format";
 import { getDayState } from "@/lib/rules/dayState";
 import { upsertMeasurementByDate } from "@/lib/measurements";
@@ -121,11 +123,41 @@ export async function opToday(date: string, settings: Settings): Promise<string>
   return todaySummary(await getDayState(date, { settings }));
 }
 
+/** `undo` — remove today's newest entry, food or cardio, whichever was logged last. */
 export async function opUndo(date: string, settings: Settings): Promise<string> {
-  const row = await deleteLatestFoodEntry(date);
-  if (!row) return "Nothing to undo today.";
+  const [food, cardio] = await Promise.all([latestFoodEntry(date), latestCardioOn(date)]);
+  if (!food && !cardio) return "Nothing to undo today.";
+  if (cardio && (!food || Date.parse(cardio.loggedAt) > food.createdAt.getTime())) {
+    await deleteCardio(cardio.id);
+    const state = await getDayState(date, { settings });
+    return `↩️ Removed <b>${esc(cardioSummary(cardio))}</b>.\n${cardioTotalLine(state.cardio.minutes)}`;
+  }
+  await deleteFoodEntry(food!.id);
   const state = await getDayState(date, { settings });
-  return `↩️ Removed <b>${esc(row.label)}</b>${row.qty !== 1 ? ` ×${qtyStr(row.qty)}` : ""} (${n0(row.kcal)} kcal).\n${runningLine(state)}`;
+  return `↩️ Removed <b>${esc(food!.label)}</b>${food!.qty !== 1 ? ` ×${qtyStr(food!.qty)}` : ""} (${n0(food!.kcal)} kcal).\n${runningLine(state)}`;
+}
+
+const cardioTotalLine = (minutes: number) => `Cardio today: <b>${n0(minutes)} min</b>`;
+
+/** Entry line for bot replies: the summary, plus the derived distance an incline walk's summary leaves out. */
+function cardioReplyLine(e: CardioEntry): string {
+  const extra = e.type === "incline_walk" && e.distanceKm !== null ? ` · ≈${e.distanceKm.toFixed(2).replace(/\.?0+$/, "")} km` : "";
+  return `🏃 ${esc(cardioSummary(e))}${extra}`;
+}
+
+/** `walk 30 5.5`, `incline 20 4.5 6%`, `sport badminton 45` … */
+export async function opCardio(date: string, input: CardioInput, settings: Settings): Promise<string> {
+  const e = await insertCardio(date, input);
+  const state = await getDayState(date, { settings });
+  return `${cardioReplyLine(e)}\n${cardioTotalLine(state.cardio.minutes)}`;
+}
+
+/** `cardio` / the day-close button — copy the most recent entry onto `date`. */
+export async function opCardioRepeat(date: string, settings: Settings): Promise<string> {
+  const e = await repeatLastCardio(date);
+  if (!e) return "No cardio logged yet. Try <code>incline 20 4.5 6%</code> or <code>walk 30 5</code>.";
+  const state = await getDayState(date, { settings });
+  return `${cardioReplyLine(e)} (same as last time)\n${cardioTotalLine(state.cardio.minutes)}`;
 }
 
 export async function opMeasure(date: string, kind: "navel" | "waist", cm: number): Promise<string> {

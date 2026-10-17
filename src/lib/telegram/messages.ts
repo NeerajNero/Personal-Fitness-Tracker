@@ -2,6 +2,7 @@
 import { formatDayLabel } from "@/lib/dates";
 import { esc, n0, n1, qtyStr } from "@/lib/format";
 import type { InlineKeyboardButton } from "grammy/types";
+import { cardioDayLine, cardioSummary } from "@/lib/cardio";
 import type { DayState } from "@/lib/rules/dayState";
 import { overageLine } from "@/lib/rules/instant";
 
@@ -11,13 +12,15 @@ export const HELP = [
   "<code>s 8500</code> — steps",
   "<code>dosa 350 12</code> — meal with your own numbers (name kcal protein)",
   "<code>copy</code> — log the same food as yesterday",
+  "<code>incline 20 4.5 6%</code> · <code>walk 30 5</code> · <code>run 25 4.2km hard</code> · <code>cycle 40 15km</code> · <code>stairs 10</code> · <code>swim 30</code> · <code>sport badminton 45</code> — cardio (minutes first; bare number = km/h, <code>km</code>, <code>%</code>, easy/mod/hard)",
+  "<code>cardio</code> — repeat your last cardio",
   "<code>paneer 150</code> · <code>roti 3</code> · <code>scoop</code> — food or saved meal by name (no number = 1 serving, under 10 = servings, 10+ = grams)",
   "<code>navel 88.5</code> · <code>waist 85</code> — weekly measurement",
   "<code>water</code> — +1 glass",
   "<code>push</code> · <code>pull</code> · <code>rest</code> — set today (any workout type name)",
   "<code>done</code> — log today's workout, same as last time",
   "<code>today</code> — where you stand",
-  "<code>undo</code> — remove the last food entry",
+  "<code>undo</code> — remove today's last entry (food or cardio)",
   "Anything else — I'll try to parse it as a meal and ask you to confirm.",
 ].join("\n");
 
@@ -52,6 +55,10 @@ export function todaySummary(state: DayState): string {
   if (plan.kind === "rest" || plan.kind === "unset") {
     lines.push(`👟 ${metrics.steps === null ? "no steps yet" : `${n0(metrics.steps)} steps`} · target ${n0(targets.steps)}`);
   }
+  const c = state.cardio;
+  if (c.entries === 0) lines.push("🏃 no cardio yet — <code>incline 20 4.5 6%</code>");
+  else if (c.entries === 1 && c.lastEntry?.date === state.date) lines.push(`🏃 Cardio: ${esc(cardioDayLine([c.lastEntry]))}`);
+  else lines.push(`🏃 Cardio: ${n0(c.minutes)} min · ${c.entries} entries`);
   lines.push(metrics.weightKg === null ? "⚖️ no weigh-in yet — <code>w 74.2</code>" : `⚖️ ${n1(metrics.weightKg)} kg`);
   if (state.smokeFreeDays !== null) lines.push(`🚭 ${state.smokeFreeDays} days smoke-free`);
   return lines.join("\n");
@@ -83,4 +90,11 @@ export function didButtons(state: DayState): Keyboard {
   if (state.dayPlan.kind === "workout") return [[{ text: `✓ Did ${state.dayPlan.typeName ?? "it"}`, callback_data: `did:${state.date}:same` }, rest]];
   const types = state.daysSince.map((t) => ({ text: t.typeName, callback_data: `did:${state.date}:${t.typeId}` }));
   return [...rows(types), [rest]];
+}
+
+/** Day close: "＋ <last cardio>" when nothing is logged today and an earlier entry exists. */
+export function cardioRepeatRow(state: DayState): Keyboard {
+  const last = state.cardio.lastEntry;
+  if (state.cardio.entries > 0 || !last) return [];
+  return [[{ text: `＋ ${cardioSummary(last)}`, callback_data: `cardio:${state.date}:repeat` }]];
 }

@@ -53,12 +53,14 @@ export async function insertFoodEntries(values: NewFoodEntry[]): Promise<number[
   return rows.map((x) => x.id);
 }
 
-/** Delete the most recent entry of the day and return it (null when the day is empty). */
-export async function deleteLatestFoodEntry(date: string): Promise<FoodLog | null> {
+/** The most recent entry of the day (by logged time), or null. */
+export async function latestFoodEntry(date: string): Promise<FoodLog | null> {
   const [row] = await db.select().from(foodLog).where(eq(foodLog.date, date)).orderBy(desc(foodLog.time), desc(foodLog.id)).limit(1);
-  if (!row) return null;
-  await db.delete(foodLog).where(eq(foodLog.id, row.id));
-  return row;
+  return row ?? null;
+}
+
+export async function deleteFoodEntry(id: number): Promise<void> {
+  await db.delete(foodLog).where(eq(foodLog.id, id));
 }
 
 /* -------------------------------- my meals -------------------------------- */

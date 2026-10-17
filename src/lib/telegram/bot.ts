@@ -15,7 +15,7 @@ import { getSettings } from "@/lib/settings";
 import { createPending, expirePending, parseFreeText, takePending, type ParsedItem } from "./ai";
 import { botToken } from "./env";
 import { entryLine, HELP, runningLine, withOverage } from "./messages";
-import { opCopy, opDid, opDone, opFood, opManual, opMeasure, opPlan, opSteps, opToday, opUndo, opWater, opWeight, type Reply } from "./ops";
+import { opCardio, opCardioRepeat, opCopy, opDid, opDone, opFood, opManual, opMeasure, opPlan, opSteps, opToday, opUndo, opWater, opWeight, type Reply } from "./ops";
 import { listWorkoutTypes } from "@/lib/training";
 import { matchPlanWord, parseCommand } from "./parse";
 
@@ -97,6 +97,13 @@ export function getBot(): Bot<BotContext> {
     await send(ctx, r);
   });
 
+  // Day-close "＋ <last cardio>" button.
+  bot.callbackQuery(/^cardio:(\d{4}-\d{2}-\d{2}):repeat$/, async (ctx) => {
+    await ctx.answerCallbackQuery({ text: "Logging…" });
+    await ctx.editMessageReplyMarkup().catch(() => {});
+    await send(ctx, { text: await opCardioRepeat(ctx.match[1], ctx.settings) });
+  });
+
   // Legacy day_close buttons still sitting in the chat from before "choose your day".
   bot.callbackQuery("nudge:done", async (ctx) => {
     await ctx.answerCallbackQuery({ text: "Logging…" });
@@ -132,6 +139,9 @@ export function getBot(): Bot<BotContext> {
         case "undo": return void (await reply(await opUndo(date, s)));
         case "help": return void (await reply(HELP));
         case "copy": return void (await reply(await opCopy(date, s)));
+        case "cardio": return void (await reply(await opCardio(date, cmd.input, s)));
+        case "cardioRepeat": return void (await reply(await opCardioRepeat(date, s)));
+        case "cardioError": return void (await reply(cmd.error));
         case "manual": return void (await reply(await opManual(date, cmd.label, cmd.kcal, cmd.proteinG, s)));
         case "navel":
         case "waist": return void (await reply(await opMeasure(date, cmd.type, cmd.cm)));

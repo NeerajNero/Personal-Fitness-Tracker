@@ -21,10 +21,10 @@ Views: `drizzle/0001_views.sql`. Read this doc before adding or changing a table
 | `exercises` | name (unique), muscle_group, cues, is_custom | Seed refreshes cues/muscle_group |
 | `routine_days` | name (text, unique), sort_order, archived, weekday (legacy, nullable, never read) | **Workout types.** sort_order = rotation for "next up"; archived = hidden from picker and rotation, history kept. `name` was an enum until 0005 (type `routine_day_name` still exists, unused). Display via `typeLabel()` |
 | `routine_exercises` | (routine_day_id, exercise_id) PK, sort_order, target_sets, target_reps | A workout type's exercise list |
-| `sessions` | date, routine_day_id (null = custom), incline_walk, notes | Choosing a type for a date creates it (`setDayPlan`) |
+| `sessions` | date, routine_day_id (null = custom), incline_walk (legacy, no longer set by the UI), notes | Choosing a type for a date creates it (`setDayPlan`) |
 | `session_exercises` | (session_id, exercise_id) PK, sort_order, targets | The type's list copied when the day is chosen, plus ad-hoc additions. **No sets are copied** |
 | `sets` | session_id, exercise_id, set_no (unique together), weight_kg, reps, rpe, is_working | Written by ✓ (`copyLastSets`) or the set grid |
-| `activities` | date, name, minutes, notes | Sport/cardio quick add |
+| `activities` | date, name, minutes, notes, type, distance_km, speed_kmh, incline_pct, effort (`cardio_effort` enum), logged_at | **The cardio log.** `type` keys `CARDIO_TYPES` (src/lib/cardio.ts); null/unknown = sport. `name` = sport name or the type label. Speed and distance are both stored whenever one can be derived. Legacy rows (before 0006) are `sport` with `logged_at = created_at` |
 | `nudge_log` | sent_at, rule_key, date (IST), payload | Idempotency + daily cap. `mark:*` rows are per-day markers, not sends (legacy `mark:no_training` rows were converted to rest days and are no longer read) |
 | `pending_parses` | id, payload jsonb, created_at | Gemini parses awaiting ✓ in Telegram. Only the id goes in callback data; expire after 24 h |
 

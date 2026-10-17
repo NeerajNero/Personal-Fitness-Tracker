@@ -3,7 +3,7 @@
 import { useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import type { ExerciseCard, ExerciseLite, SessionDetail } from "@/lib/training";
 import { MUSCLE_GROUPS, type MuscleGroup } from "@/lib/routine";
-import { addExerciseToSession, deleteSet, discardSession, sameAsLast, saveSessionNotes, setInclineWalk, upsertSet } from "./actions";
+import { addExerciseToSession, deleteSet, discardSession, sameAsLast, saveSessionNotes, upsertSet } from "./actions";
 
 const btn = "flex items-center justify-center rounded-xl border border-border bg-bg active:opacity-70 disabled:opacity-50";
 const fmtW = (w: number) => (Number.isInteger(w) ? String(w) : w.toFixed(2).replace(/\.?0+$/, ""));
@@ -18,7 +18,6 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
   const [cards, addCard] = useOptimistic<ExerciseCard[], ExerciseCard>(session.exercises, (list, c) => [...list, c]);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [incline, setIncline] = useState(session.inclineWalk);
   const [openId, setOpenId] = useState<number | null>(null);
   const [showMore, setShowMore] = useState(false);
   const [armed, setArmed] = useState(false);
@@ -34,19 +33,6 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
     startTransition(async () => {
       const r = await sameAsLast(session.id);
       if (!r.ok) setError(r.error);
-    });
-  }
-
-  function toggleIncline() {
-    const v = !incline;
-    setIncline(v);
-    setError(null);
-    startTransition(async () => {
-      const r = await setInclineWalk(session.id, v);
-      if (!r.ok) {
-        setIncline(!v);
-        setError(r.error);
-      }
     });
   }
 
@@ -112,10 +98,6 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
           </button>
         ) : null}
 
-        <label className="mt-3 flex h-12 cursor-pointer items-center gap-3 rounded-xl border border-border bg-bg px-4">
-          <input type="checkbox" checked={incline} onChange={toggleIncline} className="size-5 accent-[var(--accent)]" />
-          <span className="text-sm font-medium">Incline walk 15–20 min</span>
-        </label>
 
         {showMore ? (
           <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">

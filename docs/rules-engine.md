@@ -12,6 +12,8 @@ DayState {
   totals:    { kcal, protein, cost, entries }
   remaining: { kcal, protein }            // negative = over; protein measured against proteinMin
   metrics:   { weightKg, steps, waterGlasses }   // null when not logged
+  cardio: { minutes, entries, lastEntry }  // the date's cardio; a legacy incline-walk tick (sessions.incline_walk) = +1 entry, 0 min;
+                                          // lastEntry = most recent entry on or before the date (any type) — what "repeat" copies
   dayPlan: { kind: "unset" | "rest" | "workout" | "custom", typeId, typeName }
            // precedence: daily_metrics.rest_day → session with a type → session without one (custom) → unset
   nextUp: { typeId, typeName } | null     // active type after the most recently trained active type (rotation = sort_order);
@@ -26,7 +28,7 @@ DayState {
 ```
 - "Trained" = a session with ≥ 1 set, dated before `date` (`loadTypeHistory`). `typeName` is the display label (`typeLabel`).
 - `foodLoggedSince` is a function. Pick the plain fields before passing DayState to a client component.
-- Five queries run in parallel (settings, food totals, daily_metrics, type history, session). Pass `settings` when the caller already has it.
+- Seven queries run in parallel (settings, food totals, daily_metrics, type history, session, cardio totals, last cardio). Pass `settings` when the caller already has it.
 - The weekday no longer decides anything (`routine_days.weekday` is never read).
 
 ## Engine (`engine.ts` + `rules.ts`)
@@ -43,9 +45,9 @@ DayState {
 | key | when | default | condition / content |
 |---|---|---|---|
 | `morning_brief` | 07:30–08:30 | **on** | day unset → "Next up: Pull (last done 4 days ago)" + its last top sets + `plan:` buttons (each active type, ▶ on next up, Rest). Day chosen → that type / rest. Weigh-in line if no weight; smoke-free milestone line every 7 days (milestones toggle) |
-| `day_close` | 22:00–22:30 | **on** | summary + what's missing. Day unset → "What did you do today?" + `did:` buttons (each type = log as same as last time, Rest). Type chosen, nothing logged → "✓ Did <type>" + Rest |
+| `day_close` | 22:00–22:30 | **on** | summary + what's missing. Day unset → "What did you do today?" + `did:` buttons (each type = log as same as last time, Rest). Type chosen, nothing logged → "✓ Did <type>" + Rest. No cardio today and an earlier entry exists → extra button "＋ <last entry>" (`cardio:<date>:repeat`) |
 | `weekly_measure` | Sun 19:00–22:30 | **on** | prompt navel/waist if none logged this week |
-| `weekly_report` | Sun 19:00–22:30 | **on** | once a measurement exists: 7-day avg Δ, navel Δ, lifts progressed, adherence, verdict |
+| `weekly_report` | Sun 19:00–22:30 | **on** | once a measurement exists: 7-day avg Δ, navel Δ, sessions vs target, lifts progressed, sets per muscle, cardio minutes vs last week + entries by type, adherence, verdict |
 | `weekly_report_mon` | Mon 08:00–09:00 | **on** | fallback report with "no measurement this week" |
 | `phase_switch` | on `phase_switch_date` | **on** (milestones) | once ever, skipped if a phase override is set |
 | `checkpoint_card` | on `checkpoint_date` | **on** (milestones) | once ever; 8-week summary |
@@ -60,6 +62,7 @@ The weekly smoke-free milestone isn't a separate rule: it's a line inside `morni
 ## Day buttons (callback data)
 - `plan:<date>:<typeId|rest>`: morning, **sets** the day (`setDayPlan`).
 - `did:<date>:<typeId|rest|same>`: evening, **sets and logs** it (`copyLastSets`); `same` logs the chosen type.
+- `cardio:<date>:repeat`: day close, logs the most recent cardio entry onto the date.
 - Legacy `nudge:done` / `nudge:skip` (old messages still in the chat) map to `done` / rest.
 - Built by `planButtons` / `didButtons` in `telegram/messages.ts` and handled in `telegram/bot.ts`. A choice that would
   replace a session that has sets replies with an app link instead (the app asks for confirmation).

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { addDays, formatDayLabel, isValidIsoDate, todayIST } from "@/lib/dates";
 import Link from "next/link";
 import { DayPicker } from "@/components/day-picker";
+import { listCardio } from "@/lib/activities";
+import { cardioDayLine, cardioSummary } from "@/lib/cardio";
 import { listFoodLog, listFoods } from "@/lib/food";
 import { pickerTypes } from "@/lib/routine";
 import { listWorkoutTypes, sessionProgress } from "@/lib/training";
@@ -9,6 +11,7 @@ import { getDayState } from "@/lib/rules/dayState";
 import { DateHeader } from "@/components/date-header";
 import { FoodSection } from "./food-section";
 import { MetricInputs } from "./metric-inputs";
+import { CardioLine } from "./cardio-line";
 import { Totals } from "./totals";
 
 export const metadata: Metadata = { title: "Today" };
@@ -18,7 +21,13 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
   const today = todayIST();
   const date = typeof d === "string" && isValidIsoDate(d) && d <= today ? d : today;
 
-  const [state, entries, foodList, types] = await Promise.all([getDayState(date), listFoodLog(date), listFoods(), listWorkoutTypes({ includeArchived: true })]);
+  const [state, entries, foodList, types, cardio] = await Promise.all([
+    getDayState(date),
+    listFoodLog(date),
+    listFoods(),
+    listWorkoutTypes({ includeArchived: true }),
+    listCardio(date),
+  ]);
   const progress = state.flags.sessionId ? await sessionProgress(state.flags.sessionId) : null;
   const plan = state.dayPlan;
   const trainHref = date === today ? "/train" : `/train?d=${date}`;
@@ -53,6 +62,14 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
             </span>
           )
         }
+      />
+
+      <CardioLine
+        key={`cardio-${date}`}
+        date={date}
+        href={`${trainHref}#cardio`}
+        logged={cardio.length ? cardioDayLine(cardio) : state.cardio.entries ? "incline walk ✓" : null}
+        repeat={state.cardio.lastEntry ? cardioSummary(state.cardio.lastEntry) : null}
       />
 
       <Totals state={state} />

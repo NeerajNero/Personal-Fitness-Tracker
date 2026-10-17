@@ -25,7 +25,7 @@ Single user. Everything is computed in IST (`Asia/Kolkata`). Timestamps are stor
 | `src/lib/rules/` | "State of today" (`dayState.ts`) + nudge engine. See [rules-engine.md](rules-engine.md) |
 | `src/lib/metrics/` | Derived numbers: `phase.ts` (targets), `trends.ts`, `strength.ts`, `spend.ts`, `checkpoint.ts` |
 | `src/lib/telegram/` | `bot.ts` (handlers), `parse.ts` (commands, pure), `ops.ts` (command actions), `messages.ts` (templates), `ai.ts` (Gemini), `send.ts` |
-| `src/lib/food.ts`, `training.ts`, `daily.ts`, `measurements.ts` | **Shared writes** used by both the screens and the bot (`setDayPlan` decides what a day is) |
+| `src/lib/food.ts`, `training.ts`, `activities.ts` (cardio), `daily.ts`, `measurements.ts` | **Shared writes** used by both the screens and the bot (`setDayPlan` decides what a day is) |
 | `src/components/day-picker.tsx` + `src/app/(app)/day-actions.ts` | "What's today?" picker shared by Today and Train |
 | `src/lib/dates.ts` | IST helpers: `todayIST`, `nowTimeIST`, `addDays`, `istNow`, quiet-hours math |
 | `src/components/` | `tab-bar`, `date-header`, `day-picker`, `charts/line-chart.tsx` (hand-written SVG; no chart library) |
@@ -40,7 +40,7 @@ Single user. Everything is computed in IST (`Asia/Kolkata`). Timestamps are stor
   not inside a route or a component.
 - **Metrics:** loaders fetch the data, and the `*From` helpers are pure, so a page can load each dataset once and derive everything from it.
 - **Client/server boundary:** client components must not import anything that imports `@/db`. Client-safe modules:
-  `lib/format.ts` (incl. `MEAL_SERVING`), `lib/metrics/phase.ts`, `lib/routine.ts`, `lib/nudges.ts`, `lib/export-tables.ts`.
+  `lib/format.ts` (incl. `MEAL_SERVING`), `lib/cardio.ts` (cardio config, validation, summaries), `lib/metrics/phase.ts`, `lib/routine.ts`, `lib/nudges.ts`, `lib/export-tables.ts`.
   (A db import that leaked into the client bundle was fixed in `f731e7d`, so keep it that way.)
 - **Mutations:** Server Actions return `ActionResult` (`src/lib/action-result.ts`). Each one calls `requireSession()`,
   validates its input with zod, and calls `revalidatePath` on the screens it affects. Route handlers exist only for telegram, tick and export.

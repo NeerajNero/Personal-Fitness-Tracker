@@ -4,7 +4,9 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { activities, exercises, sessionExercises, sessions, sets } from "@/db/schema";
+import { exercises, sessionExercises, sessions, sets } from "@/db/schema";
+import { deleteCardio, insertCardio, repeatLastCardio, updateCardio } from "@/lib/activities";
+import type { CardioInput } from "@/lib/cardio";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
 import { MUSCLE_GROUPS } from "@/lib/routine";
@@ -37,17 +39,6 @@ export async function discardSession(sessionId: number): Promise<ActionResult> {
   await requireSession();
   try {
     await db.delete(sessions).where(eq(sessions.id, id.parse(sessionId)));
-    revalidate();
-    return { ok: true };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
-export async function setInclineWalk(sessionId: number, value: boolean): Promise<ActionResult> {
-  await requireSession();
-  try {
-    await db.update(sessions).set({ inclineWalk: z.boolean().parse(value) }).where(eq(sessions.id, id.parse(sessionId)));
     revalidate();
     return { ok: true };
   } catch (e) {
@@ -158,34 +149,49 @@ export async function addExerciseToSession(
   }
 }
 
-/* -------------------------------- activities ------------------------------- */
+/* --------------------------------- cardio ---------------------------------- */
 
-const activitySchema = z.object({
-  name: z.string().trim().min(1, "Name required").max(60, "Name too long"),
-  minutes: z.coerce.number().int("Whole minutes").min(1, "1–600 min").max(600, "1–600 min"),
-  notes: z.string().trim().max(200, "Note too long").transform((s) => (s === "" ? null : s)),
-});
-
-export async function addActivity(
-  date: string,
-  input: { name: string; minutes: string; notes: string },
-): Promise<ActionResult<{ id: number }>> {
+/** Add a cardio entry (validation + speed ⇄ distance derivation in normalizeCardio). */
+export async function addCardio(date: string, input: CardioInput): Promise<ActionResult<{ id: number }>> {
   await requireSession();
   try {
-    const d = dateSchema.parse(date);
-    const v = activitySchema.parse(input);
-    const [row] = await db.insert(activities).values({ date: d, ...v }).returning({ id: activities.id });
+    const e = await insertCardio(dateSchema.parse(date), input);
     revalidate();
-    return { ok: true, id: row.id };
+    return { ok: true, id: e.id };
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function deleteActivity(activityId: number): Promise<ActionResult> {
+export async function editCardio(entryId: number, input: CardioInput): Promise<ActionResult> {
   await requireSession();
   try {
-    await db.delete(activities).where(eq(activities.id, id.parse(activityId)));
+    const e = await updateCardio(id.parse(entryId), input);
+    if (!e) return { ok: false, error: "Entry not found" };
+    revalidate();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function removeCardio(entryId: number): Promise<ActionResult> {
+  await requireSession();
+  try {
+    await deleteCardio(id.parse(entryId));
+    revalidate();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** "Same as last time": copy the most recent entry onto `date` with the current time. */
+export async function repeatCardio(date: string): Promise<ActionResult> {
+  await requireSession();
+  try {
+    const e = await repeatLastCardio(dateSchema.parse(date));
+    if (!e) return { ok: false, error: "No earlier cardio to repeat" };
     revalidate();
     return { ok: true };
   } catch (e) {

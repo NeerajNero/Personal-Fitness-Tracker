@@ -7,16 +7,18 @@ The food + body-metrics screen. It should take under 10 seconds to use, one-hand
 2. **What's today?** (`DayPicker`, shared with Train): while unset, a button per active workout type with days since it was last
    done ("Pull · 4d", "new"), **next up** highlighted, plus 🛌 Rest. ⋯ shows Custom and archived types. Once chosen it collapses to
    one line ("Push · 2/5 logged · Open Train", or "🛌 Rest day") with **Change**.
-3. **Progress card**: kcal and protein bars plus one status line: kcal left/over · protein to go/✓ ·
+3. **Cardio line**: "Cardio: 20 min incline walk" when logged (links to Train). Otherwise "+ Cardio" plus a one-tap
+   "↺ <last entry>" repeat (`today/cardio-line.tsx`).
+4. **Progress card**: kcal and protein bars plus one status line: kcal left/over · protein to go/✓ ·
    steps (rest and unset days only) · smoke-free days. No ₹.
-4. **Weight / steps**: two compact inputs that save on blur/Enter.
-5. **My meals**: chips for favourite foods in the current phase. One tap logs 1 serving and shows a ×n badge.
+5. **Weight / steps**: two compact inputs that save on blur/Enter.
+6. **My meals**: chips for favourite foods in the current phase. One tap logs 1 serving and shows a ×n badge.
    - **↺ Same as yesterday**: shown only while the day is empty; copies yesterday's whole log.
    - **All foods…**: the collapsed catalogue with search.
-6. **Add a meal**: always open. Name + kcal + protein (optional) → Add. "Save to My meals" also stores it as a
+7. **Add a meal**: always open. Name + kcal + protein (optional) → Add. "Save to My meals" also stores it as a
    one-tap meal (saving again under the same name updates its numbers). This is where the owner types the numbers
    from their outside photo estimate.
-7. **Logged**: tap a row → Delete, −/+ or typed servings.
+8. **Logged**: tap a row → Delete, −/+ or typed servings.
 
 ## Behaviour rules
 - A saved meal is a `foods` row with `serving_label = MEAL_SERVING` ("1 meal"). `saveMeal` refuses to overwrite a regular

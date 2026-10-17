@@ -13,6 +13,10 @@ export type Series = {
   dots?: boolean;
   /** Draw the connecting line (default true). */
   line?: boolean;
+  /** Per-point dot colour (same order as `points`); falls back to `color`. */
+  pointColors?: (string | undefined)[];
+  /** Per-point text drawn above the dot (e.g. "6%"). */
+  pointLabels?: (string | undefined)[];
 };
 export type Band = { upper: Point[]; lower: Point[]; color?: string };
 export type Tick = { x: number; label: string };
@@ -111,7 +115,16 @@ export function LineChart({ series, band, xDomain, yDomain, xTicks = [], yTickCo
             <path d={path(s.points, sx, sy)} fill="none" stroke={s.color} strokeWidth={s.strokeWidth ?? 2} strokeDasharray={s.dashed ? "5 4" : undefined} strokeLinejoin="round" strokeLinecap="round" />
           ) : null}
           {s.dots || s.points.length === 1
-            ? s.points.map((p) => <circle key={`${p.x}-${p.y}`} cx={sx(p.x)} cy={sy(p.y)} r={2.5} fill={s.color} />)
+            ? s.points.map((p, i) => <circle key={`${i}-${p.x}-${p.y}`} cx={sx(p.x)} cy={sy(p.y)} r={s.pointColors ? 3.5 : 2.5} fill={s.pointColors?.[i] ?? s.color} />)
+            : null}
+          {s.pointLabels
+            ? s.points.map((p, i) =>
+                s.pointLabels![i] ? (
+                  <text key={`l${i}`} x={sx(p.x)} y={sy(p.y) - 7} textAnchor="middle" fill="var(--muted)">
+                    {s.pointLabels![i]}
+                  </text>
+                ) : null,
+              )
             : null}
         </g>
       ))}

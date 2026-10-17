@@ -7,7 +7,9 @@
  */
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { dailyMetrics, foodLog, routineDays, sessions, type Settings } from "@/db/schema";
+import { activities, dailyMetrics, foodLog, routineDays, sessions, type Settings } from "@/db/schema";
+import { lastCardio } from "@/lib/activities";
+import type { CardioEntry } from "@/lib/cardio";
 import { daysBetween } from "@/lib/dates";
 import { getTargets, type Targets } from "@/lib/metrics/phase";
 import { typeLabel } from "@/lib/routine";
@@ -63,6 +65,11 @@ export type DayState = {
   nextUp: TypeRef | null;
   /** Active types in rotation order with days since each was last trained before this date (null = never). */
   daysSince: (TypeRef & { days: number | null })[];
+  /**
+   * Cardio for the date. A legacy incline-walk tick (sessions.incline_walk) counts as an entry with no minutes.
+   * `lastEntry` = the most recent entry on or before the date (any type) — what "Same as last time" repeats.
+   */
+  cardio: { minutes: number; entries: number; lastEntry: CardioEntry | null };
   flags: {
     weightLogged: boolean;
     stepsLogged: boolean;
@@ -80,7 +87,7 @@ export type DayState = {
 };
 
 export async function getDayState(date: string, opts: { settings?: Settings } = {}): Promise<DayState> {
-  const [s, totals, metrics, types, session] = await Promise.all([
+  const [s, totals, metrics, types, session, cardioAgg, lastEntry] = await Promise.all([
     opts.settings ? Promise.resolve(opts.settings) : getSettings(),
     db
       .select({
@@ -114,6 +121,12 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
       .orderBy(desc(sessions.id))
       .limit(1)
       .then((r) => r[0] ?? null),
+    db
+      .select({ minutes: sql<number>`coalesce(sum(${activities.minutes}), 0)::int`, entries: sql<number>`count(*)::int` })
+      .from(activities)
+      .where(eq(activities.date, date))
+      .then((r) => r[0]),
+    lastCardio(date),
   ]);
 
   const targets = getTargets(date, s);
@@ -137,6 +150,7 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
       steps: metrics?.steps ?? null,
       waterGlasses: metrics?.waterGlasses ?? null,
     },
+    cardio: { minutes: cardioAgg.minutes, entries: cardioAgg.entries + (session?.inclineWalk ? 1 : 0), lastEntry },
     dayPlan,
     nextUp: nextUpFrom(active),
     daysSince: active.map((t) => ({ typeId: t.typeId, typeName: t.typeName, days: t.lastDate ? daysBetween(t.lastDate, date) : null })),

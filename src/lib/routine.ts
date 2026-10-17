@@ -8,7 +8,10 @@ export function typeLabel(name: string): string {
 }
 
 /** Reserved bot words — a workout type with one of these names could never be sent as a command. */
-export const BOT_COMMAND_WORDS = ["w", "s", "water", "done", "today", "undo", "help", "start", "copy", "same", "navel", "waist", "rest", "custom"] as const;
+export const BOT_COMMAND_WORDS = [
+  "w", "s", "water", "done", "today", "undo", "help", "start", "copy", "same", "navel", "waist", "rest", "custom",
+  "cardio", "walk", "incline", "run", "cycle", "bike", "cross", "stairs", "swim", "sport",
+] as const;
 
 /** A workout type as the day picker shows it. */
 export type PickerType = { id: number; label: string; archived: boolean; days: number | null };
