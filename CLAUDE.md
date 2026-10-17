@@ -112,8 +112,10 @@ Note shown with cues: upper-trap or forearm pain during pulls = shrugging + bice
    incline-walk checkbox · notes + discard behind ⋯ · "Other workout…" for a different day / free workout ·
    "+ Add an exercise" (pick existing or type new) · "Other activity" (name + minutes) · stall badge when e1RM flat for
    ≥3 sessions · lat cues (collapsed) on pull exercises. Shared write: `copyLastSets(sessionId, exerciseIds?)` in `src/lib/training.ts`.
-4. **Trends**: weight (daily + 7-day avg) · navel/waist vs straight goal line to 2027-10-11 · weekly protein hit-rate
-   and kcal adherence · e1RM per lift · protein spend vs budget (month) · Dec 10 checkpoint card · CSV export of every table
+4. **Trends** (simplified 2026-10): top = this week's verdict · weight (daily + 7-day avg) · navel vs straight goal line to
+   2027-10-11 · navel/waist log (latest 4, "show all"). Promoted to the top only when relevant: Dec 10 checkpoint card
+   (14 days before → 7 days after) and the maintenance suggestion (when it differs from the target by ≥50 kcal).
+   Everything else under "More details": goal progress, e1RM per lift, weekly protein/kcal adherence, spend vs budget, CSV export link.
 5. **Settings**: targets, phase override, foods editor, routine editor, nudge toggles + quiet hours, Telegram link, smoke-free date
 
 ## Telegram bot

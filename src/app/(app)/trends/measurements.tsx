@@ -22,6 +22,7 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
   const [list, dispatch] = useOptimistic<Row[], Op>(items, reducer);
   const [, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function submit(ev: FormEvent<HTMLFormElement>) {
@@ -58,10 +59,11 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
   }
 
   const newest = [...list].reverse();
+  const shown = showAll ? newest : newest.slice(0, 4);
 
   return (
     <Section
-      title="Measurements"
+      title="Navel & waist log"
       aside={
         <button type="button" onClick={() => setOpen((v) => !v)} className={`h-9 rounded-lg px-3 text-sm font-medium ${open ? "text-muted" : "text-accent"}`}>
           {open ? "Close" : "Log measurement"}
@@ -83,7 +85,7 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
         <p className="text-sm text-muted">No measurements yet. Navel at the belly button, relaxed, same time each week.</p>
       ) : (
         <ul className="divide-y divide-border">
-          {newest.map((m) => (
+          {shown.map((m) => (
             <li key={m.id} className={`flex h-12 items-center gap-3 ${m.id < 0 ? "opacity-60" : ""}`}>
               <span className="w-20 text-sm text-muted">{shortDate(m.date)}</span>
               <span className="flex-1 text-sm tabular-nums">
@@ -98,6 +100,11 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
           ))}
         </ul>
       )}
+      {newest.length > 4 ? (
+        <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-1 h-10 text-sm text-accent active:opacity-70">
+          {showAll ? "Show fewer" : `Show all ${newest.length}`}
+        </button>
+      ) : null}
       {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
     </Section>
   );

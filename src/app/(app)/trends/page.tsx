@@ -75,24 +75,42 @@ export default async function TrendsPage() {
       };
     });
 
+  // Time-bound or actionable cards jump to the top; everything else waits under "More".
+  const checkpointSoon = daysToCheckpoint >= -7 && daysToCheckpoint <= 14;
+  const maintenanceActionable = maintenance !== null && Math.abs(maintenance.suggestedTarget - settings.kcalTarget) >= 50;
+  const checkpointCard = <CheckpointCard summary={checkpoint} checkpointDate={settings.checkpointDate} daysToGo={daysToCheckpoint} />;
+  const maintenanceCard = maintenance ? <MaintenanceCard data={maintenance} currentTarget={settings.kcalTarget} /> : null;
+
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       <h1 className="text-2xl font-semibold">Trends</h1>
-      <WeightSection series={series} rate={rate} today={today} />
-      <Measurements items={measurements} today={today} />
-      <NavelSection measurements={measurements} settings={settings} today={today} />
-      <AdherenceTable weeks={weeks} />
       <VerdictCard verdict={verdict} />
-      {maintenance ? <MaintenanceCard data={maintenance} currentTarget={settings.kcalTarget} /> : null}
-      <LiftsSection lifts={lifts} />
-      <SpendSection spend={spend} />
-      <CheckpointCard summary={checkpoint} checkpointDate={settings.checkpointDate} daysToGo={daysToCheckpoint} />
-      <GoalCard settings={settings} measurements={measurements} today={today} />
-      <p className="pb-2 text-center text-sm">
-        <Link href="/settings#export" className="text-accent">
-          Export data (CSV)
-        </Link>
-      </p>
+      {checkpointSoon ? checkpointCard : null}
+      {maintenanceActionable ? maintenanceCard : null}
+      <WeightSection series={series} rate={rate} today={today} />
+      <NavelSection measurements={measurements} settings={settings} today={today} />
+      <Measurements items={measurements} today={today} />
+
+      <details className="group">
+        <summary className="flex h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-2xl border border-border bg-surface text-sm font-medium text-muted [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">More details</span>
+          <span className="hidden group-open:inline">Hide details</span>
+          <span aria-hidden className="transition-transform group-open:rotate-180">▾</span>
+        </summary>
+        <div className="mt-4 flex flex-col gap-4">
+          <GoalCard settings={settings} measurements={measurements} today={today} />
+          <LiftsSection lifts={lifts} />
+          <AdherenceTable weeks={weeks} />
+          {!maintenanceActionable ? maintenanceCard : null}
+          {!checkpointSoon ? checkpointCard : null}
+          <SpendSection spend={spend} />
+          <p className="pb-2 text-center text-sm">
+            <Link href="/settings#export" className="text-accent">
+              Export data (CSV)
+            </Link>
+          </p>
+        </div>
+      </details>
     </div>
   );
 }
