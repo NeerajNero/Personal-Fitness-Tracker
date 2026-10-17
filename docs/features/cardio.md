@@ -7,7 +7,7 @@ one should be a single tap ("same as last time") or one bot message. **No calori
 | Type | Fields besides minutes | Notes |
 |---|---|---|
 | Incline walk | speed (km/h), incline (%) | distance derived from speed × time |
-| Walk, Run | distance (km) **or** speed (km/h), one required | the other is derived; pace (min/km) shown with speed |
+| Walk, Run | optional distance (km) or speed (km/h) | minutes alone is valid; give one and the other is derived; pace (min/km) shown with speed |
 | Cycle, Cross-trainer, Swim | optional distance | speed derived when distance is given |
 | Stairs | none | |
 | Sport | name | stored in `activities.name`; legacy rows are sports |
@@ -15,6 +15,7 @@ one should be a single tap ("same as last time") or one bot message. **No calori
 Every type also has an optional effort (easy / moderate / hard) and an optional note.
 Validation (`cardioInputSchema`, shared by app and bot): minutes 1–300, speed 1–25, incline 0–30, distance 0.1–100.
 `normalizeCardio` drops fields a type doesn't show and derives speed ⇄ distance, so both are stored whenever possible.
+Minutes-only entries count toward cardio minutes and the weekly report. The conditioning chart skips entries without a speed.
 
 ## Where it shows
 - **Train → Cardio** (below the workout, or on its own on rest/unset days): "↺ Same as last time: Incline walk 20 min ·

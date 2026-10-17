@@ -8,7 +8,8 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 
 ### Added
 - **Cardio log:** incline walk, walk, run, cycle, cross-trainer, swim, stairs and sport, each showing only its fields
-  (speed, distance, incline, name), plus effort and a note. Speed ⇄ distance are derived, and pace is shown for walks/runs.
+  (speed, distance, incline, name), plus effort and a note. Every field but minutes is optional (`walk 30` is fine);
+  give speed or distance and the other is derived, and pace is shown for walks/runs.
   Train has a Cardio section with one-tap "Same as last time"; Today has a cardio line. Replaces "+ Activity".
 - Bot cardio: `incline 20 4.5 6%`, `walk 30 5`, `run 25 4.2km hard`, `sport badminton 45`, `cardio` to repeat. `undo` now removes
   the newest food or cardio entry; `today` shows cardio; day close offers "＋ <last cardio>"; the weekly report shows cardio minutes vs last week.

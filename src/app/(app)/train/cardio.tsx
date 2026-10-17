@@ -130,7 +130,7 @@ function CardioForm({
         {has("speed") ? <input name="speedKmh" type="number" inputMode="decimal" step="0.1" min={1} max={25} defaultValue={str(initial?.speedKmh)} placeholder="km/h" aria-label="Speed (km/h)" className={field} /> : null}
         {has("incline") ? <input name="inclinePct" type="number" inputMode="decimal" step="0.5" min={0} max={30} defaultValue={str(initial?.inclinePct)} placeholder="incline %" aria-label="Incline (%)" className={field} /> : null}
       </div>
-      {cfg.speedOrDistance ? <p className="text-xs text-muted">Distance or speed: either one; the other (and pace) is worked out.</p> : null}
+      {has("distance") && has("speed") ? <p className="text-xs text-muted">Distance and speed are optional. Give one and the other (and pace) is worked out.</p> : null}
       <div className="flex gap-2">
         {EFFORTS.map((x) => (
           <button key={x} type="button" aria-pressed={effort === x} onClick={() => setEffort(effort === x ? null : x)} className={`${chip} flex-1 ${effort === x ? "border-accent bg-accent text-accent-fg" : "border-border bg-bg"}`}>

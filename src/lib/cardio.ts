@@ -13,16 +13,14 @@ type TypeConfig = {
   label: string;
   /** Fields shown besides minutes, effort and note. */
   fields: CardioField[];
-  /** Walk/Run: distance or speed is required (the other is derived). */
-  speedOrDistance?: boolean;
   /** Show pace (min/km) next to speed. */
   pace?: boolean;
 };
 
 export const CARDIO_TYPES: Record<CardioType, TypeConfig> = {
   incline_walk: { label: "Incline walk", fields: ["speed", "incline"], pace: true },
-  walk: { label: "Walk", fields: ["distance", "speed"], speedOrDistance: true, pace: true },
-  run: { label: "Run", fields: ["distance", "speed"], speedOrDistance: true, pace: true },
+  walk: { label: "Walk", fields: ["distance", "speed"], pace: true },
+  run: { label: "Run", fields: ["distance", "speed"], pace: true },
   cycle: { label: "Cycle", fields: ["distance"] },
   cross_trainer: { label: "Cross-trainer", fields: ["distance"] },
   swim: { label: "Swim", fields: ["distance"] },
@@ -80,9 +78,6 @@ export const cardioInputSchema = z
   })
   .superRefine((v, ctx) => {
     if (v.type === "sport" && !v.name) ctx.addIssue({ code: "custom", message: "Sport name required", path: ["name"] });
-    if (CARDIO_TYPES[v.type].speedOrDistance && v.distanceKm == null && v.speedKmh == null) {
-      ctx.addIssue({ code: "custom", message: "Add distance or speed", path: ["distanceKm"] });
-    }
   });
 
 export type CardioInput = z.input<typeof cardioInputSchema>;
