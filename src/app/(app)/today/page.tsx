@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { addDays, formatDayLabel, isValidIsoDate, todayIST } from "@/lib/dates";
 import { listFoodLog, listFoods } from "@/lib/food";
 import { getDayState } from "@/lib/rules/dayState";
-import { Chips } from "./chips";
 import { DateHeader } from "@/components/date-header";
 import { FoodSection } from "./food-section";
 import { MetricInputs } from "./metric-inputs";
@@ -28,11 +27,9 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
         next={date < today ? addDays(date, 1) : null}
       />
 
-      <MetricInputs key={date} date={date} weightKg={state.metrics.weightKg} steps={state.metrics.steps} />
-
-      <Chips state={state} />
-
       <Totals state={state} />
+
+      <MetricInputs key={date} date={date} weightKg={state.metrics.weightKg} steps={state.metrics.steps} />
 
       <FoodSection
         key={`food-${date}`}

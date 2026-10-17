@@ -1,7 +1,8 @@
 /** Bot operations. Each returns the HTML reply. All DB writes go through the same shared functions the screens use. */
 import type { Food, Settings } from "@/db/schema";
 import { incrementWater, upsertDailyMetrics } from "@/lib/daily";
-import { deleteLatestFoodEntry, entryFromFood, insertFoodEntries, listFoods } from "@/lib/food";
+import { addDays, nowTimeIST } from "@/lib/dates";
+import { copyFoodLog, deleteLatestFoodEntry, entryFromFood, insertFoodEntries, listFoodLog, listFoods } from "@/lib/food";
 import { esc, n0, n1, qtyStr } from "@/lib/format";
 import { ROUTINE_LABEL } from "@/lib/routine";
 import { getDayState } from "@/lib/rules/dayState";
@@ -39,6 +40,22 @@ export async function opFood(date: string, query: string, n: number | null, sett
   const state = await getDayState(date, { settings });
   const line = entryLine(food.name, q.qty, food.servingLabel, food.kcal * q.qty, food.proteinG * q.qty);
   return withOverage(`${line}\n${runningLine(state)}`, state);
+}
+
+/** `dosa 350 12` — a one-off entry with numbers estimated elsewhere. */
+export async function opManual(date: string, label: string, kcal: number, proteinG: number, settings: Settings): Promise<string> {
+  await insertFoodEntries([{ date, time: nowTimeIST(), foodId: null, label, qty: 1, kcal, proteinG, costInr: 0, source: "telegram" }]);
+  const state = await getDayState(date, { settings });
+  return withOverage(`${entryLine(label, 1, null, kcal, proteinG)}\n${runningLine(state)}`, state);
+}
+
+/** `copy` — log everything from yesterday again. Only on an empty day so a repeat can't double it. */
+export async function opCopy(date: string, settings: Settings): Promise<string> {
+  if ((await listFoodLog(date)).length > 0) return "Today already has food logged — <code>undo</code> entries first if you want a clean copy.";
+  const n = await copyFoodLog(addDays(date, -1), date, "telegram");
+  if (n === 0) return "Nothing was logged yesterday.";
+  const state = await getDayState(date, { settings });
+  return withOverage(`↺ Copied ${n} ${n === 1 ? "entry" : "entries"} from yesterday.\n${runningLine(state)}`, state);
 }
 
 export async function opDone(date: string, settings: Settings): Promise<string> {

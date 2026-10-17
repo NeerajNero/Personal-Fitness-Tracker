@@ -45,7 +45,7 @@ function Field({
   }
 
   return (
-    <label className="flex flex-1 flex-col gap-1 rounded-2xl border border-border bg-surface p-3">
+    <label className="flex flex-1 flex-col gap-1 rounded-2xl border border-border bg-surface px-3 py-2">
       <span className="flex items-center justify-between text-xs font-medium text-muted">
         {label}
         <span aria-live="polite" className="text-sm">
@@ -65,7 +65,7 @@ function Field({
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           }}
           placeholder="—"
-          className={`w-full bg-transparent text-3xl font-semibold tabular-nums outline-none placeholder:text-border ${
+          className={`w-full bg-transparent text-2xl font-semibold tabular-nums outline-none placeholder:text-border ${
             status === "error" ? "text-danger" : ""
           }`}
         />

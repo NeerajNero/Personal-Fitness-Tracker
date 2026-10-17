@@ -15,7 +15,7 @@ import { getSettings } from "@/lib/settings";
 import { createPending, expirePending, parseFreeText, takePending, type ParsedItem } from "./ai";
 import { botToken } from "./env";
 import { entryLine, HELP, runningLine, withOverage } from "./messages";
-import { opDone, opFood, opMeasure, opSteps, opToday, opUndo, opWater, opWeight } from "./ops";
+import { opCopy, opDone, opFood, opManual, opMeasure, opSteps, opToday, opUndo, opWater, opWeight } from "./ops";
 import { markNoTraining } from "@/lib/rules/marks";
 import { parseCommand } from "./parse";
 
@@ -108,6 +108,8 @@ export function getBot(): Bot<BotContext> {
         case "today": return void (await reply(await opToday(date, s)));
         case "undo": return void (await reply(await opUndo(date, s)));
         case "help": return void (await reply(HELP));
+        case "copy": return void (await reply(await opCopy(date, s)));
+        case "manual": return void (await reply(await opManual(date, cmd.label, cmd.kcal, cmd.proteinG, s)));
         case "navel":
         case "waist": return void (await reply(await opMeasure(date, cmd.type, cmd.cm)));
         case "food": {

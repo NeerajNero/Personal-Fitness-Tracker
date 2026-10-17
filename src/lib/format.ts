@@ -5,3 +5,6 @@ export const qtyStr = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixe
 
 /** Escape for Telegram HTML parse mode. */
 export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Serving label that marks a food row as a saved meal ("My meals"). */
+export const MEAL_SERVING = "1 meal";

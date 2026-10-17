@@ -7,8 +7,8 @@ import { db } from "@/db";
 import { foodLog, foods } from "@/db/schema";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { upsertDailyMetrics } from "@/lib/daily";
-import { ISO_DATE, nowTimeIST } from "@/lib/dates";
-import { entryFromFood, insertFoodEntries } from "@/lib/food";
+import { addDays, ISO_DATE, nowTimeIST } from "@/lib/dates";
+import { copyFoodLog, entryFromFood, insertFoodEntries, listFoodLog, saveMeal } from "@/lib/food";
 import { requireSession } from "@/lib/session";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
@@ -74,35 +74,50 @@ export async function addFoodLog(date: string, foodId: number, qty: number): Pro
 const quickAddSchema = z.object({
   label: z.string().trim().min(1, "Name required").max(80, "Name too long"),
   kcal: z.coerce.number().min(0, "kcal ≥ 0").max(5000, "kcal too large"),
-  proteinG: z.coerce.number().min(0, "protein ≥ 0").max(500, "protein too large"),
-  costInr: z.union([z.literal("").transform(() => 0), z.coerce.number().min(0).max(10_000)]),
+  proteinG: z.union([z.literal("").transform(() => 0), z.coerce.number().min(0, "protein ≥ 0").max(500, "protein too large")]),
+  saveAsMeal: z.boolean(),
 });
 
-/** One-off entry with no catalogue food (food_id null, qty 1). */
+/**
+ * Manual entry (name + kcal + protein). With `saveAsMeal` the entry is also saved to My meals
+ * and logged against it, so next time it's one tap.
+ */
 export async function quickAddFoodLog(
   date: string,
-  input: { label: string; kcal: string; proteinG: string; costInr: string },
+  input: { label: string; kcal: string; proteinG: string; saveAsMeal: boolean },
 ): Promise<ActionResult<{ id: number }>> {
   await requireSession();
   try {
     const d = dateSchema.parse(date);
     const v = quickAddSchema.parse(input);
-    const [row] = await db
-      .insert(foodLog)
-      .values({
-        date: d,
-        time: nowTimeIST(),
-        foodId: null,
-        label: v.label,
-        qty: 1,
-        kcal: round(v.kcal, 1),
-        proteinG: round(v.proteinG, 1),
-        costInr: round(v.costInr, 2),
-        source: "app",
-      })
-      .returning({ id: foodLog.id });
+    if (v.saveAsMeal) {
+      const meal = await saveMeal({ label: v.label, kcal: v.kcal, proteinG: v.proteinG });
+      if ("error" in meal) return { ok: false, error: meal.error };
+      const [id] = await insertFoodEntries([entryFromFood(meal, 1, d, "app")]);
+      revalidatePath("/today");
+      revalidatePath("/settings");
+      return { ok: true, id };
+    }
+    const [id] = await insertFoodEntries([
+      { date: d, time: nowTimeIST(), foodId: null, label: v.label, qty: 1, kcal: round(v.kcal, 1), proteinG: round(v.proteinG, 1), costInr: 0, source: "app" },
+    ]);
     revalidatePath("/today");
-    return { ok: true, id: row.id };
+    return { ok: true, id };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Copy the previous day's food log onto `date`. Only allowed while `date` is empty, so a double tap can't duplicate. */
+export async function copyPreviousDay(date: string): Promise<ActionResult<{ count: number }>> {
+  await requireSession();
+  try {
+    const d = dateSchema.parse(date);
+    if ((await listFoodLog(d)).length > 0) return { ok: false, error: "Already has entries" };
+    const count = await copyFoodLog(addDays(d, -1), d, "app");
+    if (count === 0) return { ok: false, error: "Nothing logged the day before" };
+    revalidatePath("/today");
+    return { ok: true, count };
   } catch (e) {
     return fail(e);
   }

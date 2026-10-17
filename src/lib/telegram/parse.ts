@@ -12,12 +12,16 @@ export type Command =
   | { type: "help" }
   | { type: "navel"; cm: number }
   | { type: "waist"; cm: number }
+  | { type: "copy" }
+  | { type: "manual"; label: string; kcal: number; proteinG: number }
   | { type: "food"; query: string; n: number | null };
 
 const kg = z.coerce.number().min(30).max(300);
 const steps = z.coerce.number().int().min(0).max(100_000);
 const cm = z.coerce.number().min(40).max(200);
-const KEYWORDS: Record<string, Command["type"]> = { water: "water", done: "done", today: "today", undo: "undo", help: "help", start: "help" };
+const kcal = z.coerce.number().min(0).max(5000);
+const protein = z.coerce.number().min(0).max(500);
+const KEYWORDS: Record<string, Command["type"]> = { water: "water", done: "done", today: "today", undo: "undo", help: "help", start: "help", copy: "copy", same: "copy" };
 
 export function parseCommand(raw: string): Command | null {
   const text = raw.trim().replace(/\s+/g, " ");
@@ -41,6 +45,14 @@ export function parseCommand(raw: string): Command | null {
   if (mm) {
     const v = cm.safeParse(mm[2]);
     return v.success ? { type: mm[1].toLowerCase() as "navel" | "waist", cm: Math.round(v.data * 10) / 10 } : null;
+  }
+
+  // `<meal name> <kcal> <protein>` — manual entry from an outside estimate.
+  const m = /^([a-z][a-z .()'/-]*?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/i.exec(text);
+  if (m) {
+    const k = kcal.safeParse(m[2]);
+    const p = protein.safeParse(m[3]);
+    return k.success && p.success ? { type: "manual", label: m[1].trim(), kcal: Math.round(k.data * 10) / 10, proteinG: Math.round(p.data * 10) / 10 } : null;
   }
 
   // `<food words> [n]` — letters first, optional trailing number.

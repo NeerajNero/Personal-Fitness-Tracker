@@ -100,8 +100,12 @@ Note shown with cues: upper-trap or forearm pain during pulls = shrugging + bice
 
 ## Screens
 1. **Onboarding** (first run only): weight, height, age, sex → settings; confirm targets; link Telegram (show `/start <code>`)
-2. **Today**: date header · 4 big inputs (weight, steps; kcal and protein auto-summed) · meals list with tap-to-add favourites,
-   qty stepper, and quick add (label + kcal + protein) · "remaining" chips from the rules module · smoke-free counter
+2. **Today** (simplified 2026-10): date header · progress card (kcal + protein bars, one status line from the rules module:
+   remaining, today's training or steps, smoke-free) · compact weight/steps inputs · **My meals** chips (one tap = 1 serving;
+   "Same as yesterday" when the day is empty; "All foods…" search collapsed) · **Add a meal** card always open
+   (name + kcal + protein, optional "Save to My meals") · logged list (tap a row → qty −/+ and Delete). No ₹ on Today.
+   The owner estimates meals from a photo with an outside AI and types the numbers in — don't build photo/AI estimation into the app.
+   A saved meal is a `foods` row with `serving_label = "1 meal"` (`MEAL_SERVING`), `is_favourite = true`, `phase_tag = both` — no extra table.
 3. **Train**: today's routine day pre-filled with last session's weight × reps per exercise; edit only what changed ·
    "+ exercise" quick add (pick existing or type new) · "+ activity" (name + minutes) · incline-walk checkbox ·
    stall badge when e1RM flat for ≥3 sessions · lat cues visible on pull exercises
@@ -112,6 +116,7 @@ Note shown with cues: upper-trap or forearm pain during pulls = shrugging + bice
 ## Telegram bot
 Exact-match commands (no AI):
 - `w 74.2` weight · `s 8500` steps · `<food> <qty>` e.g. `paneer 150`, `roti 3`, `scoop` (qty defaults to 1 serving)
+- `dosa 350 12` manual meal (name kcal protein) · `copy` / `same` (copy yesterday's food log onto an empty today)
 - `water` (+1 glass; optional feature) · `done` (mark today's workout done; reply with app link to enter sets)
 - `today` (state summary from rules module) · `undo` (remove last log entry) · `navel 88.5` / `waist 85` (weekly measurement, upsert by date)
 Free text (AI): anything else → Gemini parses against the foods list → returns matched items, estimated unknowns, totals.

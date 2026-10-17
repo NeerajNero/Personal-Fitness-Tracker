@@ -1,7 +1,8 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { foodLog, foods, type Food, type FoodLog } from "@/db/schema";
 import { nowTimeIST } from "@/lib/dates";
+import { MEAL_SERVING } from "@/lib/format";
 
 export type { Food, FoodLog };
 
@@ -58,4 +59,31 @@ export async function deleteLatestFoodEntry(date: string): Promise<FoodLog | nul
   if (!row) return null;
   await db.delete(foodLog).where(eq(foodLog.id, row.id));
   return row;
+}
+
+/* -------------------------------- my meals -------------------------------- */
+/* A saved meal is a favourite food whose serving is one whole meal — so it shows in the Today
+   quick row, matches by name in the bot and is editable in Settings → Foods with no extra table. */
+
+/** Save (or update) a meal by name. Refuses to overwrite a regular catalogue food of the same name. */
+export async function saveMeal(m: { label: string; kcal: number; proteinG: number }): Promise<Food | { error: string }> {
+  const [existing] = await db.select().from(foods).where(sql`lower(${foods.name}) = ${m.label.toLowerCase()}`).limit(1);
+  if (existing && existing.servingLabel !== MEAL_SERVING) return { error: `"${existing.name}" is already a food — pick another meal name.` };
+  const values = { kcal: r(m.kcal, 1), proteinG: r(m.proteinG, 1), isFavourite: true, archived: false };
+  if (existing) {
+    const [row] = await db.update(foods).set({ ...values, updatedAt: new Date() }).where(eq(foods.id, existing.id)).returning();
+    return row;
+  }
+  const [row] = await db.insert(foods).values({ name: m.label, servingLabel: MEAL_SERVING, phaseTag: "both", costInr: 0, ...values }).returning();
+  return row;
+}
+
+/** Copy every entry of `from` onto `to` (times set to now). Returns the number copied. */
+export async function copyFoodLog(from: string, to: string, source: FoodSource): Promise<number> {
+  const rows = await listFoodLog(from);
+  const time = nowTimeIST();
+  const ids = await insertFoodEntries(
+    rows.map((e) => ({ date: to, time, foodId: e.foodId, label: e.label, qty: e.qty, kcal: e.kcal, proteinG: e.proteinG, costInr: e.costInr, source })),
+  );
+  return ids.length;
 }
