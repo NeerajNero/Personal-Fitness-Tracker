@@ -14,7 +14,7 @@ Single user. Everything is computed in IST (`Asia/Kolkata`). Timestamps are stor
 ## Directory map
 | Path | What lives there |
 |---|---|
-| `auth.ts` | Auth.js v5, Google provider, allowlist `ALLOWED_EMAIL` (fails closed). Imported as `@/auth` |
+| `auth.ts` | Auth.js v5, Google provider, allowlist `ALLOWED_EMAIL`, comma-separated (fails closed). Imported as `@/auth` |
 | `src/app/(app)/` | Gated screens: `today/`, `train/`, `trends/`, `settings/`. Each has `page.tsx` + client components + `actions.ts` (Server Actions) |
 | `src/app/(app)/layout.tsx` | **The auth + onboarding gate** (there is no proxy.ts) and the tab bar |
 | `src/app/onboarding/`, `src/app/login/` | First-run flow and sign-in (outside the gate) |

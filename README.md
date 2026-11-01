@@ -7,7 +7,7 @@ Log weight, food (kcal + protein) and lifts in seconds. It tells you each week w
 The app is for tapping a saved meal, editing a lift that progressed, and checking Trends.
 
 ## Stack
-Next.js 16 (App Router, TypeScript, Tailwind v4) · Neon Postgres + Drizzle · Auth.js (Google, single allowed email) ·
+Next.js 16 (App Router, TypeScript, Tailwind v4) · Neon Postgres + Drizzle · Auth.js (Google, allowlisted emails) ·
 grammY Telegram bot · Gemini flash-lite for free-text meal parsing · Vercel Hobby + cron-job.org.
 
 ## Quick start

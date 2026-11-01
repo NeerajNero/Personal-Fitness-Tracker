@@ -1,9 +1,15 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 
-// Single-user app: only ALLOWED_EMAIL may sign in. Compared case-insensitively.
-// If ALLOWED_EMAIL is unset, every sign-in is rejected (fail closed).
-const allowedEmail = (process.env.ALLOWED_EMAIL ?? "").trim().toLowerCase();
+// Only emails listed in ALLOWED_EMAIL may sign in. Comma-separated, compared
+// case-insensitively, whitespace around each entry is ignored.
+// If ALLOWED_EMAIL is unset or empty, every sign-in is rejected (fail closed).
+const allowedEmails = new Set(
+  (process.env.ALLOWED_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e !== ""),
+);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [Google],
@@ -13,7 +19,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     signIn({ user, profile }) {
       const email = (profile?.email ?? user.email ?? "").trim().toLowerCase();
-      return allowedEmail !== "" && email === allowedEmail;
+      return email !== "" && allowedEmails.has(email);
     },
   },
 });

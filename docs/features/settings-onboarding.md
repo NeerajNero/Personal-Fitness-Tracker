@@ -1,7 +1,7 @@
 # Settings (`/settings`), onboarding, auth
 
 ## Sign-in & gate
-- `/login` → Google via Auth.js. Only `ALLOWED_EMAIL` is accepted, and an unset value rejects everyone.
+- `/login` → Google via Auth.js. Only emails in `ALLOWED_EMAIL` (comma-separated) are accepted, and an unset value rejects everyone.
 - `src/app/(app)/layout.tsx` redirects to `/login` without a session and to `/onboarding` until `settings.onboarded_at` is set.
 - Server Actions call `requireSession()` themselves. The export route checks `auth()`.
 
