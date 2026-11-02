@@ -8,7 +8,9 @@ codes and tokens shown only as present/none. `pnpm test` asserts that for the co
 ## How it loads
 The row sits at the bottom of Settings, under "When something's off", outside the Setup group. It loads when opened
 (`loadDiagnostics`, a server action), because the admin probes include a network call to Telegram. **Me** and **Events**
-are for every user; **System** and **People** only for admins (`users.is_admin`). The phone adds **Device**, **PWA** and
+are for every user; **System** and **People** only for admins. **The gate is server-side**: `buildDiagnostics` and
+`runTickDryAs` (`src/lib/diag/load.ts`) read `users.is_admin` themselves and never compute the admin sections or run the
+dry tick for anyone else; the UI only decides what to draw. `pnpm test` (test 5) asserts this. The phone adds **Device**, **PWA** and
 **Client errors** on the client. **Copy diagnostics** puts every visible line on the clipboard as plain text with a header
 (`Recomp diagnostics · build <sha> · <UTC time> · <email>`); when the clipboard API refuses (http, old WebView), a
 selectable textarea appears instead. ↻ reloads. Admins also get **Run tick (dry)**, which runs `runTick({ dry: true })`
@@ -78,7 +80,8 @@ Env values, tokens, the webhook secret, full chat ids, link codes, other people'
 | `src/lib/diag/bot.ts` | `diagReply` (the `diag` command) |
 | `src/lib/diag/text.ts`, `src/lib/diag/client-log.ts` | Client-safe: report shape + `renderDiagText`, `maskChatId`; the in-memory client error log |
 | `src/lib/diag/report.ts`, `src/lib/action-result.ts` | Server-action error boundary (`reportActionError` via `fail`) |
-| `src/app/(app)/settings/diagnostics.tsx`, `diag-actions.ts` | The card (client sections, copy, fallback textarea, Run tick) and `loadDiagnostics` / `runTickDry` |
+| `src/lib/diag/load.ts` | `buildDiagnostics(userId, …)`, `runTickDryAs(userId)`, `isAdmin`: the server-side gate |
+| `src/app/(app)/settings/diagnostics.tsx`, `diag-actions.ts` | The card (client sections, copy, fallback textarea, Run tick) and the thin `loadDiagnostics` / `runTickDry` actions |
 | `src/components/client-log.tsx`, `public/sw.js` | Installs the client log; `SW_VERSION` + the version message |
 | `src/lib/rules/tick.ts` | `runTick` (events, pruning) |
 | `next.config.ts` | `NEXT_PUBLIC_BUILD_SHA` / `NEXT_PUBLIC_BUILD_TIME` from `VERCEL_GIT_COMMIT_SHA` at build |

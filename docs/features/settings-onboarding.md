@@ -53,5 +53,5 @@ All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forU
 | `src/app/(app)/settings/page.tsx`, `actions.ts`, `ui.tsx` | Settings screen, every mutation, shared bits |
 | `settings/targets-form.tsx`, `phase-section.tsx`, `telegram-card.tsx`, `nudge-settings.tsx` | Everyday cards |
 | `settings/foods-editor.tsx`, `workout-types-editor.tsx`, `body-stats-form.tsx`, `people.tsx` | Setup cards; admin People |
-| `settings/diagnostics.tsx`, `diag-actions.ts`, `src/lib/diag/*` | Diagnostics card, `loadDiagnostics` / `runTickDry` |
+| `settings/diagnostics.tsx`, `diag-actions.ts`, `src/lib/diag/*` | Diagnostics card; the actions wrap `buildDiagnostics` / `runTickDryAs` (admin gate in the lib) |
 | `src/lib/targets.ts`, `src/lib/settings.ts` | Targets per goal; `hasPhases` / `hasBudgets` / `hasNavelGoal` |

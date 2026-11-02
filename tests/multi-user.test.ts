@@ -6,7 +6,9 @@
  *   3. ALLOWED_EMAILS is the authority (a users row grants nothing) and a blocked chat drops out of the tick's list
  *      until that person writes to the bot again;
  *   4. diagnostics: a simulated bot message and a dry tick write diag events for the right user only, `diag` answers,
- *      and the copied text carries no chat id, token or link code.
+ *      and the copied text carries no chat id, token or link code;
+ *   5. the admin gate is server-side: a non-admin's report has no System / People, the dry tick is refused, and the
+ *      bot's `diag` has no webhook or per-user lines.
  * Run: pnpm test   (node --conditions=react-server so `server-only` resolves)
  */
 import assert from "node:assert/strict";
@@ -295,4 +297,41 @@ test("diagnostics: events land on the right user and the copied text holds no se
   assert.ok(text.includes("ana@example.com · allowed · onboarded · linked"));
   assert.ok(text.includes('"dayPlan"'), "DayState block present");
   assert.ok(text.includes("tick · due"), "events listed");
+});
+
+test("diagnostics: the admin gate is server-side", async () => {
+  const { buildDiagnostics, runTickDryAs } = await import("@/lib/diag/load");
+  const { diagReply } = await import("@/lib/diag/bot");
+  const { getBot } = await import("@/lib/telegram/bot");
+  const { getSettings } = await import("@/lib/settings");
+  const { findUserByEmail } = await import("@/lib/users");
+  const { asUserId } = await import("@/lib/db/scope");
+  const A = asUserId((await findUserByEmail("owner@example.com"))!.id);
+  const B = asUserId((await findUserByEmail("ana@example.com"))!.id);
+  const api = getBot().api; // still carries the transformer from the previous test
+
+  // Non-admin: only Me, the DayState block and her own events — System and People are never built.
+  const forB = await buildDiagnostics(B, { host: "recomp.test", api });
+  assert.equal(forB.admin, false);
+  assert.deepEqual(forB.report.sections.map((s) => s.title), ["Me", "Today's DayState (what the chips and the bot read)", "Events (last 20, mine)"]);
+  assert.ok(forB.report.sections.every((s) => !["System", "People"].includes(s.title)));
+  assert.ok(forB.report.sections[2].items!.every((it) => !it.includes("owner@example.com")), "no other user's events");
+  assert.ok(!JSON.stringify(forB.report).includes("Webhook"), "no webhook probe result for a non-admin");
+
+  // Admin: the same call adds System, People and everyone's events.
+  const forA = await buildDiagnostics(A, { host: "recomp.test", api });
+  assert.equal(forA.admin, true);
+  assert.deepEqual(forA.report.sections.map((s) => s.title).slice(2), ["System", "People", "Events (last 50, everyone)"]);
+
+  // The dry tick is refused for a non-admin before anything runs, and works for the admin.
+  await assert.rejects(runTickDryAs(B), /Admins only/);
+  assert.equal((await runTickDryAs(A)).dry, true);
+
+  // The bot's diag: five lines for her, no webhook or per-user tick line; seven for the admin.
+  const replyB = await diagReply({ userId: B, settings: await getSettings(B) }, api);
+  assert.equal(replyB.split("\n").length, 5);
+  assert.ok(!replyB.includes("webhook") && !replyB.includes("👥") && !replyB.includes("owner@example.com"), replyB);
+  const replyA = await diagReply({ userId: A, settings: await getSettings(A) }, api);
+  assert.equal(replyA.split("\n").length, 7);
+  assert.ok(replyA.includes("🌐 webhook") && replyA.includes("👥"));
 });

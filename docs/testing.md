@@ -1,6 +1,6 @@
 # Testing
 
-One test file, no mocks: `pnpm test` runs `tests/multi-user.test.ts` (four tests) with `node --test` against **PGlite**,
+One test file, no mocks: `pnpm test` runs `tests/multi-user.test.ts` (five tests) with `node --test` against **PGlite**,
 a real Postgres compiled to WebAssembly that runs in memory. It needs no `DATABASE_URL` and no network.
 
 ## How the database is swapped
@@ -41,6 +41,13 @@ from one chat writes a `bot · command` event for that user only; `runTick({ dry
 `due` event per linked user and a system `run` event; `diag` answers five lines (seven for the admin, through the same
 transformer for `getWebhookInfo`); and the admin report rendered by `renderDiagText` contains neither chat id, token nor
 link code while still naming env variables, the migration and the DayState block.
+
+## The diagnostics admin-gate test
+`buildDiagnostics(B)` for a non-admin yields exactly Me, the DayState block and her own events (no System, no People, no
+webhook result, nobody else's events); the same call for the admin adds System, People and everyone's events.
+`runTickDryAs(B)` rejects with "Admins only" and works for the admin. `diagReply` gives five lines for her without the
+webhook or per-user lines, seven for the admin. The server actions are thin wrappers around these, so the gate they
+exercise is the one the app uses.
 
 ## Adding a test
 - Add a `test("…", async () => { … })` to `tests/multi-user.test.ts` (it shares the migrated database and the two users),
