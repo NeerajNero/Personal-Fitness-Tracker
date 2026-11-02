@@ -1,19 +1,21 @@
+import { label } from "@/components/ui";
 import { VERDICT_LABEL, type WeeklyVerdict } from "@/lib/metrics/trends";
 
 const tone: Record<WeeklyVerdict["verdict"], string> = {
-  not_enough_data: "border-border",
-  hold: "border-accent/50",
-  eat_more: "border-danger/50",
-  eat_less: "border-warn/50",
-  tighten_logging: "border-warn/50",
+  not_enough_data: "text-muted",
+  hold: "text-done",
+  eat_more: "text-danger",
+  eat_less: "text-warn",
+  tighten_logging: "text-warn",
 };
 
+/** The answer first, as a sentence, then the reasons. No box: it's the headline of the screen. */
 export function VerdictCard({ verdict }: { verdict: WeeklyVerdict }) {
   return (
-    <section className={`rounded-2xl border-2 bg-surface p-4 ${tone[verdict.verdict]}`}>
-      <p className="text-xs font-medium text-muted">This week&apos;s verdict</p>
-      <h2 className="text-2xl font-semibold">{VERDICT_LABEL[verdict.verdict]}</h2>
-      <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm text-muted">
+    <section>
+      <p className={label}>This week</p>
+      <h2 className={`mt-1 text-[1.75rem] font-bold leading-tight tracking-tight ${tone[verdict.verdict]}`}>{VERDICT_LABEL[verdict.verdict]}</h2>
+      <ul className="mt-2 flex flex-col gap-1 text-sm text-muted">
         {verdict.reasons.map((r) => (
           <li key={r}>{r}</li>
         ))}

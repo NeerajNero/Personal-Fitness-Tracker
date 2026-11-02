@@ -4,14 +4,14 @@ The food + body-metrics screen. It should take under 10 seconds to use, one-hand
 
 ## What the owner sees (top → bottom)
 1. **Date header**: ‹ › arrows; `?d=YYYY-MM-DD` for past days (never the future).
-2. **What's today?** (`DayPicker`, shared with Train): while unset, a button per active workout type with days since it was last
-   done ("Pull · 4d", "new"), **next up** highlighted, plus 🛌 Rest. ⋯ shows Custom and archived types. Once chosen it collapses to
-   one line ("Push · 2/5 logged · Open Train", or "🛌 Rest day") with **Change**.
-3. **Cardio line**: "Cardio: 20 min incline walk" when logged (links to Train). Otherwise "+ Cardio" plus a one-tap
-   "↺ <last entry>" repeat (`today/cardio-line.tsx`).
-4. **Progress card**: kcal and protein bars plus one status line: kcal left/over · protein to go/✓ ·
-   steps (rest and unset days only) · smoke-free days. No ₹.
-5. **Weight / steps**: two compact inputs that save on blur/Enter.
+2. **Today's workout** (`WorkoutCard`, shared with Train; [../design.md](../design.md#todays-workout-card)): the next type
+   in rotation as the hero with Start and "Something else" (the picker: other types, Rest, Custom), "Pull, 3 of 6 done"
+   with Continue once started, the step target with a cardio suggestion on rest days, or "Set up your home plan".
+3. **Two hero numbers** (`totals.tsx`): kcal left (or over, in red) and protein to go (or done, in green with the tick that
+   animates the moment it completes), each with a thin bar; steps on rest and unset days; the smoke-free streak when set.
+4. **Weight / steps**: two inputs with their icons that save on blur/Enter; the number is the big thing in each.
+5. **Cardio line**: "Cardio 20 min incline walk" when logged (links to Train); otherwise "Log cardio" plus a one-tap
+   "Same as last time" repeat (`today/cardio-line.tsx`).
 6. **My meals**: chips for favourite foods in the current phase. One tap logs 1 serving and shows a ×n badge.
    - **↺ Same as yesterday**: shown only while the day is empty; copies yesterday's whole log.
    - **All foods…**: the collapsed catalogue with search.
@@ -30,9 +30,9 @@ The food + body-metrics screen. It should take under 10 seconds to use, one-hand
 ## Files
 | File | Role |
 |---|---|
-| `src/app/(app)/today/page.tsx` | Loads the user's DayState, log, foods and workout types in parallel; session progress for the picker line |
-| `src/components/day-picker.tsx` + `src/app/(app)/day-actions.ts` | Day picker + `chooseDay` action (Today and Train) |
-| `today/totals.tsx` | Progress card + status line |
+| `src/app/(app)/today/page.tsx` | Loads the user's DayState, log, foods and workout types in parallel, then the workout card's data |
+| `src/components/workout-card.tsx`, `day-picker.tsx`, `src/lib/workout-card.ts` + `src/app/(app)/day-actions.ts` | Today's workout card, the picker, its data, `chooseDay` (Today and Train) |
+| `today/totals.tsx` | The two hero numbers, bars, steps and streak (client: the protein tick animates on completion) |
 | `today/metric-inputs.tsx` | Weight / steps |
 | `today/food-section.tsx` | My meals, All foods, Add a meal, Logged list (client, optimistic) |
 | `today/actions.ts` | `saveWeight`, `saveSteps`, `addFoodLog`, `quickAddFoodLog`, `copyPreviousDay`, `updateFoodLogQty`, `deleteFoodLog` |

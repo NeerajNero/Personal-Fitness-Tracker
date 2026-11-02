@@ -1,48 +1,69 @@
-import { n0 } from "@/lib/format";
-import type { DayState } from "@/lib/rules/dayState";
+"use client";
 
-function Bar({ label, value, target, unit, over }: { label: string; value: number; target: number; unit: string; over: boolean }) {
+import { useState } from "react";
+import { CheckIcon, StepsIcon, StreakIcon } from "@/components/icons";
+import { hero, label } from "@/components/ui";
+import { n0 } from "@/lib/format";
+
+type Props = {
+  totals: { kcal: number; protein: number };
+  targets: { kcal: number; kcalMax: number; proteinMin: number; steps: number };
+  remaining: { kcal: number; protein: number };
+  steps: number | null;
+  showSteps: boolean;
+  smokeFreeDays: number | null;
+};
+
+function Bar({ value, target, tone }: { value: number; target: number; tone: "accent" | "done" | "danger" }) {
   const pct = Math.min(100, (value / target) * 100);
+  const fill = { accent: "bg-accent", done: "bg-done", danger: "bg-danger" }[tone];
   return (
-    <div>
-      <div className="mb-1 flex items-baseline justify-between text-sm">
-        <span className="font-medium">{label}</span>
-        <span className="text-muted">
-          <span className={over ? "font-medium text-danger" : "font-medium text-fg"}>{Math.round(value)}</span> / {target} {unit}
-        </span>
-      </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-border">
-        <div
-          className={`h-full rounded-full transition-[width] ${over ? "bg-danger" : "bg-accent"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
+      <div className={`h-full rounded-full ${fill}`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
-/** One line under the bars: what's left, steps on rest/unset days, smoke-free streak. */
-function statusLine({ remaining, totals, targets, dayPlan, metrics, smokeFreeDays }: DayState): string {
-  const parts = [
-    remaining.kcal >= 0 ? `${n0(remaining.kcal)} kcal left` : `${n0(-remaining.kcal)} kcal over`,
-    remaining.protein > 0 ? `${n0(remaining.protein)} g protein to go` : `protein ✓ ${n0(totals.protein)} g`,
-  ];
-  // The workout itself is on the day picker line; steps matter on rest and unset days.
-  if (dayPlan.kind === "rest" || dayPlan.kind === "unset") {
-    const steps = metrics.steps ?? 0;
-    parts.push(`${n0(steps)} / ${n0(targets.steps)} steps${steps >= targets.steps ? " ✓" : ""}`);
-  }
-  if (smokeFreeDays !== null) parts.push(`${smokeFreeDays} d smoke-free`);
-  return parts.join(" · ");
-}
+/** The two numbers that answer "how am I doing today": kcal left and protein to go. Steps on rest days, the streak if set. */
+export function Totals({ totals, targets, remaining, steps, showSteps, smokeFreeDays }: Props) {
+  const over = totals.kcal > targets.kcalMax;
+  const proteinDone = remaining.protein <= 0;
+  // Celebrate only the moment protein is completed on this screen, not every time the page opens already done.
+  const [doneAtMount] = useState(proteinDone);
+  const celebrate = proteinDone && !doneAtMount;
 
-export function Totals({ state }: { state: DayState }) {
-  const { totals, targets } = state;
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
-      <Bar label="Calories" value={totals.kcal} target={targets.kcal} unit="kcal" over={totals.kcal > targets.kcalRange[1]} />
-      <Bar label="Protein" value={totals.protein} target={targets.proteinMin} unit="g" over={false} />
-      <p className="text-sm text-muted">{statusLine(state)}</p>
+    <section className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <p className={label}>{over ? "kcal over" : "kcal left"}</p>
+          <p className={`${hero} mt-1 ${over ? "text-danger" : ""}`}>{n0(Math.abs(remaining.kcal))}</p>
+          <p className="mt-1 text-[13px] text-muted">{n0(totals.kcal)} of {n0(targets.kcal)} eaten</p>
+          <Bar value={totals.kcal} target={targets.kcal} tone={over ? "danger" : "accent"} />
+        </div>
+        <div>
+          <p className={label}>{proteinDone ? "protein done" : "protein to go"}</p>
+          <p className={`${hero} mt-1 flex items-center gap-2 ${proteinDone ? "text-done" : ""}`}>
+            {proteinDone ? <CheckIcon size={30} strokeWidth={2.5} className={celebrate ? "celebrate" : undefined} /> : null}
+            {proteinDone ? n0(totals.protein) : n0(remaining.protein)}
+            <span className="text-xl font-semibold text-muted">g</span>
+          </p>
+          <p className="mt-1 text-[13px] text-muted">{n0(totals.protein)} of {targets.proteinMin} g</p>
+          <Bar value={totals.protein} target={targets.proteinMin} tone={proteinDone ? "done" : "accent"} />
+        </div>
+      </div>
+      {showSteps || smokeFreeDays !== null ? (
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
+          {showSteps ? (
+            <span className={`flex items-center gap-1.5 ${(steps ?? 0) >= targets.steps ? "text-done" : ""}`}>
+              <StepsIcon /> {n0(steps ?? 0)} of {n0(targets.steps)} steps
+            </span>
+          ) : null}
+          {smokeFreeDays !== null ? (
+            <span className="flex items-center gap-1.5"><StreakIcon /> {smokeFreeDays} days smoke-free</span>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { ChevronDown, Download } from "lucide-react";
 import { signOut } from "@/auth";
+import { ICON } from "@/components/icons";
+import { btn, label } from "@/components/ui";
 import { todayIST } from "@/lib/dates";
 import { EXPORT_TABLES } from "@/lib/export-tables";
 import { listAllFoods } from "@/lib/food";
@@ -46,32 +49,32 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-5">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
 
       <TargetsForm s={s} phased={phased} budgets={hasBudgets(s)} />
       {phased ? <PhaseSection s={s} phaseToday={getPhase(today, s)} /> : null}
       <TelegramCard linked={s.telegramChatId !== null} code={s.telegramLinkCode} bot={bot} />
       <NudgeSettings toggles={toggles} quietStart={s.quietHoursStart.slice(0, 5)} quietEnd={s.quietHoursEnd.slice(0, 5)} dailyCap={s.nudgeDailyCap} />
 
-      <h2 className="mt-3 text-sm font-medium text-muted">Setup — rarely changed</h2>
+      <h2 className={`mt-3 ${label}`}>Setup, rarely changed</h2>
       <FoodsEditor foods={allFoods} />
-      <WorkoutTypesEditor types={types} allExercises={allExercises} weeklyTarget={s.weeklySessionTarget} />
+      <WorkoutTypesEditor types={types} allExercises={allExercises} weeklyTarget={s.weeklySessionTarget} home={s.trainingLocation === "home"} />
       <BodyStatsForm s={s} today={today} />
 
       <details id="export" className="group rounded-2xl border border-border bg-surface">
-        <summary className="flex cursor-pointer list-none items-center justify-between p-4 [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
           <span>
             <span className="block font-semibold">Export data</span>
-            <span className="block text-xs text-muted">One CSV per table, your rows only. Settings is not exported.</span>
+            <span className={`block ${label}`}>One CSV per table, your rows only. Settings is not exported.</span>
           </span>
-          <span className="text-muted transition-transform group-open:rotate-180">⌄</span>
+          <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180" />
         </summary>
         <ul className="grid grid-cols-2 gap-2 px-4 pb-4">
           {EXPORT_TABLES.map((t) => (
             <li key={t}>
               <a href={`/api/export/${t}`} download className="flex h-11 items-center justify-between rounded-xl border border-border bg-bg px-3 text-sm font-medium active:opacity-70">
                 {t.replace(/_/g, " ")}
-                <span aria-hidden className="text-muted">↓</span>
+                <Download {...ICON} className="text-muted" />
               </a>
             </li>
           ))}
@@ -80,7 +83,7 @@ export default async function SettingsPage() {
 
       {people ? <People rows={people} /> : null}
 
-      <h2 className="mt-3 text-sm font-medium text-muted">When something&apos;s off</h2>
+      <h2 className={`mt-3 ${label}`}>When something&apos;s off</h2>
       <Diagnostics />
 
       <form
@@ -89,7 +92,7 @@ export default async function SettingsPage() {
           await signOut({ redirectTo: "/login" });
         }}
       >
-        <button type="submit" className="h-12 w-full rounded-xl border border-border bg-surface text-base font-medium text-danger active:opacity-80">
+        <button type="submit" className={`${btn} h-12 w-full text-base text-danger`}>
           Sign out
         </button>
       </form>

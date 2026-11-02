@@ -12,17 +12,17 @@ export function SpendSection({ spend }: { spend: MonthSpend }) {
   const monthName = new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", month: "long" }).format(new Date(`${spend.from}T00:00:00Z`));
 
   return (
-    <Section title="Protein spend" aside={<span className="text-xs text-muted">{monthName} · day {spend.dayOfMonth}/{spend.daysInMonth}</span>}>
+    <Section title="Protein spend" aside={<span className="text-xs text-muted">{monthName}, day {spend.dayOfMonth} of {spend.daysInMonth}</span>}>
       <div className="flex items-baseline justify-between text-sm">
         <span className={`text-xl font-semibold tabular-nums ${text}`}>{inr(spend.spent)}</span>
-        <span className="text-muted">of {inr(budget)} · {pct}%</span>
+        <span className="text-muted">of {inr(budget)}, {pct}%</span>
       </div>
       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-border">
         <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
       <p className={`mt-2 text-xs ${spend.projectedMonthEnd > budget ? "text-danger" : "text-muted"}`}>
         Projected month end {inr(spend.projectedMonthEnd)} at the current rate
-        {spend.projectedMonthEnd > budget ? ` — ${inr(spend.projectedMonthEnd - budget)} over budget` : ""}.
+        {spend.projectedMonthEnd > budget ? `, ${inr(spend.projectedMonthEnd - budget)} over budget` : ""}.
       </p>
 
       {spend.foodsRanked.length ? (
@@ -47,7 +47,7 @@ export function SpendSection({ spend }: { spend: MonthSpend }) {
           </tbody>
         </table>
       ) : (
-        <p className="mt-3 text-sm text-muted">No food logged this month yet.</p>
+        <p className="mt-3 text-sm text-muted">No food logged this month yet. Log a meal on Today and the ranking appears.</p>
       )}
     </Section>
   );

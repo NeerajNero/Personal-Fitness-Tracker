@@ -33,7 +33,7 @@ export function BodyStatsForm({ s, today }: { s: Settings; today: string }) {
   }
 
   return (
-    <Card title="Body & habits" sub="Same fields as onboarding." collapsible defaultOpen={false}>
+    <Card title="Body and habits" sub="The same numbers as onboarding. Targets are not recomputed when you change them." collapsible defaultOpen={false}>
       <form action={action} className="grid grid-cols-2 gap-2">
         <Field label="Weight (kg)" error={fe.weightKg}><input name="weightKg" type="number" inputMode="decimal" step="0.1" defaultValue={s.weightKg ?? ""} required className={input} /></Field>
         <Field label="Height (cm)" error={fe.heightCm}><input name="heightCm" type="number" inputMode="decimal" step="0.5" defaultValue={s.heightCm ?? ""} required className={input} /></Field>
@@ -45,7 +45,7 @@ export function BodyStatsForm({ s, today }: { s: Settings; today: string }) {
             <option value="female">Female</option>
           </select>
         </Field>
-        <button type="submit" disabled={pending} className={`${primary} col-span-2`}>{pending ? "Saving…" : "Save body stats"}</button>
+        <button type="submit" disabled={pending} className={`${primary} col-span-2`}>{pending ? "Saving" : "Save body stats"}</button>
         <div className="col-span-2"><Status saved={saved} error={state && !state.ok ? (state.error ?? null) : null} /></div>
       </form>
 

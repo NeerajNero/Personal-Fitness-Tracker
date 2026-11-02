@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { ICON } from "@/components/icons";
 import { addDays, daysBetween, todayIST } from "@/lib/dates";
 import { checkpointSummary } from "@/lib/metrics/checkpoint";
 import { monthSpend } from "@/lib/metrics/spend";
@@ -93,7 +95,7 @@ export default async function TrendsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Trends</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Trends</h1>
       <VerdictCard verdict={verdict} />
       {checkpointSoon ? checkpointCard : null}
       {maintenanceActionable ? maintenanceCard : null}
@@ -102,10 +104,10 @@ export default async function TrendsPage() {
       <Measurements items={measurements} today={today} />
 
       <details className="group">
-        <summary className="flex h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-2xl border border-border bg-surface text-sm font-medium text-muted [&::-webkit-details-marker]:hidden">
+        <summary className="flex h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium text-muted [&::-webkit-details-marker]:hidden">
           <span className="group-open:hidden">More details</span>
           <span className="hidden group-open:inline">Hide details</span>
-          <span aria-hidden className="transition-transform group-open:rotate-180">▾</span>
+          <ChevronDown {...ICON} className="group-open:rotate-180" />
         </summary>
         <div className="mt-4 flex flex-col gap-4">
           {hasNavelGoal(settings) ? <GoalCard settings={settings} measurements={measurements} today={today} /> : null}
@@ -117,8 +119,8 @@ export default async function TrendsPage() {
           {!checkpointSoon ? checkpointCard : null}
           {spend ? <SpendSection spend={spend} /> : null}
           <p className="pb-2 text-center text-sm">
-            <Link href="/settings#export" className="text-accent">
-              Export data (CSV)
+            <Link href="/settings#export" className="font-medium text-accent">
+              Export your data as CSV
             </Link>
           </p>
         </div>

@@ -1,30 +1,35 @@
 @import "tailwindcss";
 
-/* Design tokens — light defaults, dark via prefers-color-scheme. */
+/*
+ * Design tokens (docs/design.md). Light first, dark follows the system.
+ * One accent (today's next action + progress), one muted "done" colour, no shadows anywhere.
+ */
 :root {
   color-scheme: light dark;
-  --bg: #fafaf9;
+  --bg: #f3f4f6;
   --surface: #ffffff;
-  --fg: #1c1917;
-  --muted: #78716c;
-  --border: #e7e5e4;
-  --accent: #16a34a;
+  --fg: #111318;
+  --muted: #6b7280;
+  --border: #e2e4e9;
+  --accent: #2563eb;
   --accent-fg: #ffffff;
+  --done: #3f6f5e;
   --danger: #dc2626;
-  --warn: #d97706;
+  --warn: #b45309;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0c0a09;
-    --surface: #1c1917;
-    --fg: #fafaf9;
-    --muted: #a8a29e;
-    --border: #292524;
-    --accent: #22c55e;
-    --accent-fg: #052e16;
-    --danger: #f87171;
-    --warn: #fbbf24;
+    --bg: #0e1013;
+    --surface: #171a1f;
+    --fg: #f2f3f5;
+    --muted: #9aa1ab;
+    --border: #262a31;
+    --accent: #5b8def;
+    --accent-fg: #0b1220;
+    --done: #7fb69f;
+    --danger: #f26d6d;
+    --warn: #e0a33a;
   }
 }
 
@@ -36,15 +41,27 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
+  --color-done: var(--done);
   --color-danger: var(--danger);
   --color-warn: var(--warn);
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --spacing-tabbar: 4rem;
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
+  font-feature-settings: "tnum", "cv11"; /* tabular figures everywhere: numbers line up in rows and grids */
   -webkit-tap-highlight-color: transparent;
+}
+
+/* The one motion in the app: the moment a workout, or the protein target, is completed. */
+@keyframes pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .celebrate { animation: pop 480ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 }

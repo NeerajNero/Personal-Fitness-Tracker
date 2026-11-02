@@ -22,6 +22,16 @@ export function pickerTypes(types: { id: number; label: string; archived: boolea
   return types.map((t) => ({ id: t.id, label: t.label, archived: t.archived, days: days.get(t.id) ?? null }));
 }
 
+/** The muscle group most of a list of exercises train (a workout type's icon). */
+export function dominantGroup(groups: string[]): string {
+  const counts = new Map<string, number>();
+  for (const g of groups) counts.set(g, (counts.get(g) ?? 0) + 1);
+  let best = "other";
+  let n = 0;
+  for (const [g, c] of counts) if (c > n) [best, n] = [g, c];
+  return best;
+}
+
 export const MUSCLE_GROUPS = [
   "back", "chest", "shoulders", "rear delts", "biceps", "triceps",
   "quads", "hamstrings", "glutes", "calves", "posterior chain", "core", "other",

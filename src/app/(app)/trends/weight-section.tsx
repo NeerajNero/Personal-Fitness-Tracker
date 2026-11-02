@@ -6,6 +6,7 @@ import { addDays } from "@/lib/dates";
 import type { Goal } from "@/db/schema";
 import type { WeeklyRate, WeightPoint } from "@/lib/metrics/trends";
 import { GOALS } from "@/lib/targets";
+import { hero, label } from "@/components/ui";
 import { Section } from "./section";
 
 type Range = 30 | 90 | "all";
@@ -22,7 +23,7 @@ export function WeightSection({ series, rate, today, goal }: { series: WeightPoi
           key={r}
           type="button"
           onClick={() => setRange(r)}
-          className={`h-7 rounded-md px-2.5 font-medium ${range === r ? "bg-accent text-accent-fg" : "text-muted"}`}
+          className={`h-8 rounded-md px-2.5 font-medium ${range === r ? "bg-accent text-accent-fg" : "text-muted"}`}
         >
           {r === "all" ? "All" : `${r}d`}
         </button>
@@ -32,8 +33,14 @@ export function WeightSection({ series, rate, today, goal }: { series: WeightPoi
 
   return (
     <Section title="Weight" aside={toggle}>
+      {rate ? (
+        <p className="mb-3 flex items-baseline gap-2">
+          <span className={hero}>{rate.latest.avg7.toFixed(1)}</span>
+          <span className={label}>kg, 7-day average</span>
+        </p>
+      ) : null}
       {visible.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted">No weigh-ins {range === "all" ? "yet" : "in this range"}.</p>
+        <p className="py-6 text-center text-sm text-muted">No weigh-ins {range === "all" ? "yet" : "in this range"}. Log one on Today, or send <span className="font-medium text-fg">w 74.2</span> to the bot.</p>
       ) : (
         <LineChart
           ariaLabel="Daily weight and 7-day average"
@@ -51,15 +58,15 @@ export function WeightSection({ series, rate, today, goal }: { series: WeightPoi
         {rate ? (
           <>
             <p>
-              <span className="font-medium">{rate.kgPerWeek > 0 ? "+" : ""}{rate.kgPerWeek.toFixed(2)} kg/week</span>
-              <span className="text-muted"> · {rate.pctPerWeek > 0 ? "+" : ""}{rate.pctPerWeek.toFixed(2)} %/week · 7-day avg {rate.latest.avg7.toFixed(1)} kg</span>
+              <span className="font-semibold">{rate.kgPerWeek > 0 ? "+" : ""}{rate.kgPerWeek.toFixed(2)} kg a week</span>
+              <span className="text-muted">, {rate.pctPerWeek > 0 ? "+" : ""}{rate.pctPerWeek.toFixed(2)}% of bodyweight</span>
             </p>
             {rate.tooFast ? (
-              <p className="mt-1 font-medium text-danger">Losing faster than {GOALS[goal].maxLossPctPerWeek} %/week — eat slightly more to protect muscle.</p>
+              <p className="mt-1 font-medium text-danger">Losing faster than {GOALS[goal].maxLossPctPerWeek}% a week. Eat slightly more to protect muscle.</p>
             ) : null}
           </>
         ) : (
-          <p className="text-muted">Weekly rate appears after about a week of weigh-ins.</p>
+          <p className="text-muted">The weekly rate appears after about a week of weigh-ins.</p>
         )}
       </div>
     </Section>

@@ -100,12 +100,12 @@ export type Hint = {
   last: { weightKg: number; reps: number[] } | null;
 };
 
-const fmtW = (w: number) => (w <= 0 ? "BW" : Number.isInteger(w) ? `${w}` : w.toFixed(1).replace(/\.0$/, ""));
+const fmtW = (w: number) => (w <= 0 ? "bodyweight" : Number.isInteger(w) ? `${w}` : w.toFixed(1).replace(/\.0$/, ""));
 
 /** Progression suggestion from the previous session's working sets. */
 export function hintFromSets(last: SetLite[] | null, muscleGroup: string, targetSets: number, targetReps: number): Hint {
   if (!last || last.length === 0) {
-    return { text: `first time — aim for ${targetSets} × ${targetReps}`, mode: "first", suggestedWeight: null, last: null };
+    return { text: `First time, aim for ${targetSets} × ${targetReps}`, mode: "first", suggestedWeight: null, last: null };
   }
   const weightKg = Math.max(...last.map((s) => s.weightKg));
   const reps = last.map((s) => s.reps);
@@ -113,12 +113,12 @@ export function hintFromSets(last: SetLite[] | null, muscleGroup: string, target
   const allHit = last.length >= targetSets && last.every((s) => s.reps >= targetReps);
   if (allHit) {
     if (weightKg <= 0) {
-      return { text: `last BW × ${repsStr} → add reps or add load`, mode: "increase", suggestedWeight: null, last: { weightKg, reps } };
+      return { text: `Last bodyweight × ${repsStr}, add reps or add load`, mode: "increase", suggestedWeight: null, last: { weightKg, reps } };
     }
     const next = weightKg + loadIncrementKg(muscleGroup);
-    return { text: `last ${fmtW(weightKg)} × ${repsStr} → try ${fmtW(next)}`, mode: "increase", suggestedWeight: next, last: { weightKg, reps } };
+    return { text: `Last ${fmtW(weightKg)} × ${repsStr}, try ${fmtW(next)} next`, mode: "increase", suggestedWeight: next, last: { weightKg, reps } };
   }
-  return { text: `last ${fmtW(weightKg)} × ${repsStr} → same weight, add reps`, mode: "reps", suggestedWeight: weightKg, last: { weightKg, reps } };
+  return { text: `Last ${fmtW(weightKg)} × ${repsStr}, same weight, add reps`, mode: "reps", suggestedWeight: weightKg, last: { weightKg, reps } };
 }
 
 /* ------------------------- per-exercise convenience ------------------------ */

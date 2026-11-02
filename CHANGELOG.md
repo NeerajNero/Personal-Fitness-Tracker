@@ -7,6 +7,12 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 ## Unreleased
 
 ### Added
+- **Today's workout card** at the top of Today and Train: the next type in rotation with its icon, exercise count,
+  estimated minutes (your session length, or sets × 2.5 min), when it was last done and the last top set of its first
+  two lifts, one Start button, and "Something else" for the full picker. Once started it shows "Pull, 3 of 6 done".
+  Rest days show the step target with today's count and a suggestion from your cardio log ("20-minute walk, like last
+  Wednesday"). Home users without workout types see "Set up your home plan", and Settings → Workout types explains that
+  bodyweight plans arrive in the next release. The morning brief adds the estimated minutes.
 - **Settings → Diagnostics** (every user; admins get more) and `diag` in Telegram: build, env present/missing by name,
   database check and migration, webhook status, last tick run per user, Gemini status, each account's link state and last
   bot activity (admin); your account, session age, Telegram link (chat id masked), row counts, today's DayState as the
@@ -58,6 +64,13 @@ Skip pure refactors and internal-only changes unless they change behaviour.
   (Settings → People shows it); reminders pause until they write to the bot again.
 
 ### Changed
+- **Look and feel.** One typeface (Manrope) with tabular figures; a light, high-contrast palette with one accent (blue)
+  for today's next action and progress and a separate muted green for anything done; dark mode follows the system.
+  Numbers lead every screen: kcal left and protein to go on Today, "3 of 6 logged" on Train, the 7-day average on
+  Trends. Fewer boxes, no shadows; lucide icons for the tabs, muscle groups, veg / non-veg, steps, weigh-in, meals, checks
+  and the streak. Sentence-case copy throughout, every empty state says what to do next, every error says how to fix it,
+  and progression hints read "Last 60 × 8/8/8, try 62.5 next". The only animation is the tick when a workout or the
+  protein target is completed, and it respects reduced motion.
 - README rewritten as a from-zero setup guide (Neon, Google OAuth, BotFather, Gemini, Vercel env, cron-job.org), with
   scripts, adding/removing a person, privacy, security model, costs and troubleshooting. New docs: `users.md`,
   `testing.md`, `troubleshooting.md`; `operations.md` covers the migration deploy order, webhook rotation and backups.

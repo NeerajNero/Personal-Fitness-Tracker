@@ -1,7 +1,9 @@
 "use client";
 
+import { Plus, Star } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import type { Food } from "@/db/schema";
+import { ICON, NonVegIcon, VegIcon } from "@/components/icons";
 import { saveFood, setFoodArchived, setFoodFavourite, type FormState } from "./actions";
 import { btn, Card, Field, input, primary } from "./ui";
 
@@ -17,13 +19,13 @@ export function FoodsEditor({ foods }: { foods: Food[] }) {
   const archived = foods.filter((f) => f.archived);
 
   return (
-    <Card title="Foods & My meals" sub={`${active.length} active · tap a food to edit. Archive instead of delete — logs keep their history.`} collapsible defaultOpen={false}>
+    <Card title="Foods and My meals" sub={`${active.length} active. Tap a food to edit it; archive instead of deleting, so past logs keep their numbers.`} collapsible defaultOpen={false}>
       {GROUPS.map((g) => {
         const list = active.filter((f) => f.phaseTag === g.tag);
         if (!list.length) return null;
         return (
           <div key={g.tag} className="mb-3">
-            <h3 className="mb-1 text-xs font-medium text-muted">{g.label}</h3>
+            <h3 className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted">{g.tag === "veg" ? <VegIcon size={14} /> : g.tag === "nonveg" ? <NonVegIcon size={14} /> : null}{g.label}</h3>
             <ul className="divide-y divide-border rounded-xl border border-border">
               {list.map((f) => <FoodRow key={f.id} food={f} />)}
             </ul>
@@ -34,7 +36,7 @@ export function FoodsEditor({ foods }: { foods: Food[] }) {
       {adding ? (
         <FoodForm food={null} onDone={() => setAdding(false)} />
       ) : (
-        <button type="button" onClick={() => setAdding(true)} className={`${btn} w-full`}>+ Add food</button>
+        <button type="button" onClick={() => setAdding(true)} className={`${btn} w-full`}><Plus {...ICON} /> Add a food</button>
       )}
 
       {archived.length ? (
@@ -62,14 +64,14 @@ function FoodRow({ food }: { food: Food }) {
       const r = await setFoodFavourite(food.id, v);
       if (!r.ok) {
         setFav(!v);
-        setError(r.error);
+        setError(`${r.error}. The star wasn't saved; try again.`);
       }
     });
   }
   function archive(archived: boolean) {
     start(async () => {
       const r = await setFoodArchived(food.id, archived);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(`${r.error}. Nothing changed; reload and try again.`);
       else setOpen(false);
     });
   }
@@ -79,10 +81,10 @@ function FoodRow({ food }: { food: Food }) {
       <div className="flex min-h-12 items-center gap-2 pl-3 pr-1">
         <button type="button" onClick={() => setOpen((v) => !v)} className="min-w-0 flex-1 py-2 text-left">
           <span className="block truncate font-medium">{food.name}</span>
-          <span className="block text-xs text-muted">{food.servingLabel} · {Math.round(food.kcal)} kcal · {food.proteinG} g · ₹{food.costInr}</span>
+          <span className="block text-xs text-muted">{food.servingLabel}, {Math.round(food.kcal)} kcal, {food.proteinG} g protein{food.costInr ? `, ₹${food.costInr}` : ""}</span>
         </button>
         {!food.archived ? (
-          <button type="button" onClick={toggleFav} aria-label={fav ? "Unfavourite" : "Favourite"} aria-pressed={fav} className={`flex size-10 items-center justify-center text-lg ${fav ? "text-warn" : "text-border"}`}>★</button>
+          <button type="button" onClick={toggleFav} aria-label={fav ? "Remove from My meals" : "Add to My meals"} aria-pressed={fav} className={`flex size-11 items-center justify-center ${fav ? "text-accent" : "text-muted"}`}><Star {...ICON} size={20} fill={fav ? "currentColor" : "none"} /></button>
         ) : (
           <button type="button" onClick={() => archive(false)} className={`${btn} h-9 px-3 text-xs`}>Restore</button>
         )}
@@ -120,10 +122,10 @@ function FoodForm({ food, onDone, onArchive }: { food: Food | null; onDone: () =
       </Field>
       <label className="col-span-2 flex h-11 items-center gap-2 text-sm">
         <input type="checkbox" name="isFavourite" defaultChecked={food?.isFavourite ?? false} className="size-5 accent-[var(--accent)]" />
-        Favourite (shows in the Today quick row)
+        Show in My meals on Today
       </label>
       <div className="col-span-2 flex gap-2">
-        <button type="submit" disabled={pending} className={`${primary} h-11 flex-1`}>{pending ? "Saving…" : food ? "Save" : "Add food"}</button>
+        <button type="submit" disabled={pending} className={`${primary} h-11 flex-1`}>{pending ? "Saving" : food ? "Save" : "Add food"}</button>
         <button type="button" onClick={onDone} className={btn}>Cancel</button>
         {onArchive ? <button type="button" onClick={onArchive} className={`${btn} text-danger`}>Archive</button> : null}
       </div>

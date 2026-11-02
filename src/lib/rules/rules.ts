@@ -90,7 +90,7 @@ export const RULES: Rule[] = [
       } else if (nextUp) {
         const days = state.daysSince.find((d) => d.typeId === nextUp.typeId)?.days ?? null;
         const ago = days === null ? "first time" : days === 0 ? "last done today" : `last done ${days} ${days === 1 ? "day" : "days"} ago`;
-        lines.push(`🏋️ Next up: <b>${esc(nextUp.typeName)}</b> (${ago})`);
+        lines.push(`🏋️ Next up: <b>${esc(nextUp.typeName)}</b> (${ago}, about ${await load.typeMinutes(nextUp.typeId)} min)`);
         await topSets(nextUp.typeId);
         lines.push("What's today? Tap below, or send a type name / <code>rest</code>.");
         inlineKeyboard = planButtons(state);

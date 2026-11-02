@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { ErrorLine, label, primary } from "@/components/ui";
 import { EQUIPMENT, EQUIPMENT_LABEL, GOAL_KEYS, GOALS } from "@/lib/targets";
 import { completeOnboarding, type OnboardingState } from "./actions";
 
-const inputCls = "h-14 w-full rounded-xl border border-border bg-surface px-4 text-lg outline-none focus:border-accent";
-const chipCls = "flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface px-3 text-center text-base has-checked:border-accent has-checked:text-accent";
+const inputCls = "h-14 w-full rounded-xl border border-border bg-surface px-4 text-lg font-semibold outline-none focus:border-accent";
+const chipCls = "flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-border bg-surface px-3 text-center text-base font-medium has-checked:border-accent has-checked:text-accent";
 
 export function OnboardingForm() {
   const [state, action, pending] = useActionState<OnboardingState, FormData>(completeOnboarding, null);
@@ -39,10 +40,10 @@ export function OnboardingForm() {
       <Field label="Goal" error={err.goal}>
         <div className="flex flex-col gap-2">
           {GOAL_KEYS.map((g) => (
-            <label key={g} className="flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 has-checked:border-accent">
-              <input type="radio" name="goal" value={g} defaultChecked={g === "recomp"} required className="accent-accent" />
+            <label key={g} className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 has-checked:border-accent">
+              <input type="radio" name="goal" value={g} defaultChecked={g === "recomp"} required className="size-5 accent-[var(--accent)]" />
               <span>
-                <span className="block font-medium">{GOALS[g].label}</span>
+                <span className="block font-semibold">{GOALS[g].label}</span>
                 <span className="block text-sm text-muted">{GOALS[g].blurb}</span>
               </span>
             </label>
@@ -83,19 +84,19 @@ export function OnboardingForm() {
         </Field>
       </div>
 
-      {state?.error ? <p className="text-sm text-danger">{state.error}</p> : null}
+      <ErrorLine>{state?.error ? `${state.error}. Check the fields marked in red and try again.` : null}</ErrorLine>
 
-      <button type="submit" disabled={pending} className="mt-2 h-14 rounded-xl bg-accent text-lg font-medium text-accent-fg disabled:opacity-60 active:opacity-80">
-        {pending ? "Saving…" : "Continue"}
+      <button type="submit" disabled={pending} className={`${primary} mt-2 h-14 text-lg`}>
+        {pending ? "Saving" : "Continue"}
       </button>
     </form>
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ label: text, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-muted">{label}</span>
+      <span className={label}>{text}</span>
       {children}
       {error ? <span className="text-sm text-danger">{error}</span> : null}
     </label>

@@ -5,6 +5,8 @@ import type { Food, FoodLog } from "@/lib/food";
 import { MEAL_SERVING } from "@/lib/format";
 import { foodInPhase } from "@/lib/metrics/phase";
 import type { Phase } from "@/lib/metrics/phase";
+import { MealIcon, RepeatIcon } from "@/components/icons";
+import { Empty, ErrorLine, Heading, input as field, primary } from "@/components/ui";
 import { addFoodLog, copyPreviousDay, deleteFoodLog, quickAddFoodLog, updateFoodLogQty } from "./actions";
 
 type Entry = Pick<FoodLog, "id" | "time" | "foodId" | "label" | "qty" | "kcal" | "proteinG" | "costInr">;
@@ -32,7 +34,6 @@ function reducer(list: Entry[], a: OptAction): Entry[] {
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const fmtQty = (q: number) => (Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/\.?0+$/, ""));
 const btn = "flex items-center justify-center rounded-xl border border-border bg-surface active:opacity-70";
-const field = "h-12 min-w-0 rounded-xl border border-border bg-bg px-3 outline-none focus:border-accent";
 
 let tempId = -1;
 
@@ -59,7 +60,7 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
         entry: { id: tempId--, time: "", foodId: food.id, label: food.name, qty: 1, kcal: food.kcal, proteinG: food.proteinG, costInr: food.costInr },
       });
       const r = await addFoodLog(date, food.id, 1);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(`${r.error}. The meal wasn't logged; tap it again.`);
     });
   }
 
@@ -69,7 +70,7 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
     startTransition(async () => {
       dispatch({ type: "qty", id: e.id, qty });
       const r = await updateFoodLogQty(e.id, qty);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(`${r.error}. The servings weren't changed.`);
     });
   }
 
@@ -79,7 +80,7 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
     startTransition(async () => {
       dispatch({ type: "delete", id });
       const r = await deleteFoodLog(id);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(`${r.error}. The entry is still there; reload and try again.`);
     });
   }
 
@@ -87,7 +88,7 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
     setError(null);
     startTransition(async () => {
       const r = await copyPreviousDay(date);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(`${r.error}. Nothing was copied.`);
     });
   }
 
@@ -109,7 +110,7 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
       });
       const r = await quickAddFoodLog(date, input);
       if (r.ok) form.reset();
-      else setError(r.error);
+      else setError(`${r.error}. The meal wasn't added; fix the numbers and try again.`);
     });
   }
 
@@ -117,12 +118,12 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
     <section className="flex flex-col gap-5">
       {/* My meals — one tap logs one serving */}
       <div>
-        <h2 className="mb-2 text-sm font-medium text-muted">My meals</h2>
-        <ul className="flex flex-wrap gap-2">
+        <Heading>My meals</Heading>
+        <ul className="mt-2 flex flex-wrap gap-2">
           {list.length === 0 ? (
             <li>
-              <button type="button" disabled={pending} onClick={copyYesterday} className={`${btn} h-12 border-accent px-4 text-sm font-medium text-accent disabled:opacity-50`}>
-                ↺ Same as yesterday
+              <button type="button" disabled={pending} onClick={copyYesterday} className={`${btn} h-12 gap-1.5 border-accent px-4 text-sm font-medium text-accent disabled:opacity-50`}>
+                <RepeatIcon /> Same as yesterday
               </button>
             </li>
           ) : null}
@@ -135,8 +136,8 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
                     {f.name}
                     {n > 0 ? <span className="ml-1.5 rounded-full bg-accent/15 px-1.5 text-xs text-accent">×{fmtQty(n)}</span> : null}
                   </span>
-                  <span className="text-[11px] text-muted tabular-nums">
-                    {Math.round(f.kcal)} kcal · {round1(f.proteinG)} g
+                  <span className="text-[11px] text-muted">
+                    {Math.round(f.kcal)} kcal, {round1(f.proteinG)} g
                   </span>
                 </button>
               </li>
@@ -144,16 +145,16 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
           })}
           <li>
             <button type="button" onClick={() => setShowAll((v) => !v)} className={`${btn} h-12 px-4 text-sm text-muted ${showAll ? "border-accent text-accent" : ""}`}>
-              {showAll ? "Hide foods" : "All foods…"}
+              {showAll ? "Hide foods" : "All foods"}
             </button>
           </li>
         </ul>
 
         {showAll ? (
           <div className="mt-2 rounded-2xl border border-border bg-surface p-2">
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search foods" className={`${field} w-full`} />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search foods" className={field} />
             <ul className="mt-2 max-h-72 divide-y divide-border overflow-y-auto">
-              {matches.length === 0 ? <li className="p-3 text-sm text-muted">No match.</li> : null}
+              {matches.length === 0 ? <li className="p-3 text-sm text-muted">No food matches that. Add it below, or in Settings under Foods.</li> : null}
               {matches.map((f) => (
                 <li key={f.id}>
                   <button type="button" onClick={() => add(f)} className="flex h-14 w-full items-center justify-between px-2 text-left active:bg-bg">
@@ -161,8 +162,8 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
                       <span className="font-medium">{f.name}</span>
                       <span className="ml-2 text-xs text-muted">{f.servingLabel}</span>
                     </span>
-                    <span className="text-xs text-muted tabular-nums">
-                      {Math.round(f.kcal)} kcal · {round1(f.proteinG)} g
+                    <span className="text-xs text-muted">
+                      {Math.round(f.kcal)} kcal, {round1(f.proteinG)} g
                     </span>
                   </button>
                 </li>
@@ -174,12 +175,12 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
 
       {/* Manual entry — paste the numbers from your photo estimate */}
       <form onSubmit={manualAdd} className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-3">
-        <h2 className="text-sm font-medium text-muted">Add a meal</h2>
+        <Heading><span className="flex items-center gap-1.5"><MealIcon /> Add a meal</span></Heading>
         <input name="label" required maxLength={80} placeholder="What did you eat?" className={field} />
         <div className="flex gap-2">
           <input name="kcal" type="number" inputMode="decimal" min={0} required placeholder="kcal" className={`${field} w-0 flex-1`} />
           <input name="proteinG" type="number" inputMode="decimal" min={0} step="0.1" placeholder="protein g" className={`${field} w-0 flex-1`} />
-          <button type="submit" className="h-12 rounded-xl bg-accent px-5 font-medium text-accent-fg active:opacity-80">
+          <button type="submit" className={`${primary} px-5`}>
             Add
           </button>
         </div>
@@ -189,15 +190,15 @@ export function FoodSection({ date, entries, foods, phase }: { date: string; ent
         </label>
       </form>
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      <ErrorLine>{error}</ErrorLine>
 
       {/* Logged today */}
       <div>
-        <h2 className="mb-2 text-sm font-medium text-muted">Logged</h2>
+        <Heading>Logged</Heading>
         {list.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted">Nothing logged yet.</p>
+          <div className="mt-2"><Empty>Nothing logged yet. Tap a meal above, or type one in.</Empty></div>
         ) : (
-          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+          <ul className="mt-2 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
             {list.map((e) => (
               <MealRow
                 key={e.id}
@@ -243,8 +244,8 @@ function MealRow({
             </span>
           ) : null}
         </span>
-        <span className="shrink-0 text-right text-sm tabular-nums">
-          <span className="block">{Math.round(e.kcal)} kcal</span>
+        <span className="shrink-0 text-right text-sm">
+          <span className="block font-semibold">{Math.round(e.kcal)} kcal</span>
           <span className="block text-xs text-muted">{round1(e.proteinG)} g</span>
         </span>
       </button>
@@ -272,7 +273,7 @@ function MealRow({
             onKeyDown={(ev) => {
               if (ev.key === "Enter") (ev.target as HTMLInputElement).blur();
             }}
-            className="h-11 w-16 rounded-xl border border-border bg-bg text-center text-lg tabular-nums outline-none focus:border-accent"
+            className="h-11 w-16 rounded-xl border border-border bg-bg text-center text-lg outline-none focus:border-accent"
             aria-label="Servings"
           />
           <button type="button" onClick={() => onQty(round1(e.qty + 0.5))} className={`${btn} size-11 text-xl`} aria-label="More">

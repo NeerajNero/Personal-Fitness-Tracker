@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { Goal } from "@/db/schema";
 import type { Maintenance } from "@/lib/metrics/trends";
 import { GOALS } from "@/lib/targets";
+import { btn, primary } from "@/components/ui";
 import { applyKcalTarget } from "./actions";
 import { Section } from "./section";
 
@@ -18,7 +19,7 @@ export function MaintenanceCard({ data, currentTarget, goal }: { data: Maintenan
     setError(null);
     start(async () => {
       const r = await applyKcalTarget(data.suggestedTarget);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(`${r.error}. The target wasn't changed; try again from Settings if it keeps failing.`);
       setArmed(false);
     });
   }
@@ -41,20 +42,20 @@ export function MaintenanceCard({ data, currentTarget, goal }: { data: Maintenan
       </p>
 
       {same ? (
-        <p className="mt-3 text-sm text-accent">Your target already matches the suggestion.</p>
+        <p className="mt-3 text-sm text-done">Your target already matches the suggestion.</p>
       ) : armed ? (
         <div className="mt-3 flex items-center gap-2">
-          <span className="flex-1 text-sm">Set {data.suggestedTarget.toLocaleString("en-IN")} kcal (±25) as the daily target?</span>
-          <button type="button" disabled={pending} onClick={() => setArmed(false)} className="h-11 rounded-xl border border-border bg-bg px-3 text-sm">
+          <span className="flex-1 text-sm">Set {data.suggestedTarget.toLocaleString("en-IN")} kcal, give or take 25, as the daily target?</span>
+          <button type="button" disabled={pending} onClick={() => setArmed(false)} className={btn}>
             Cancel
           </button>
-          <button type="button" disabled={pending} onClick={apply} className="h-11 rounded-xl bg-accent px-3 text-sm font-medium text-accent-fg disabled:opacity-60">
-            {pending ? "Saving…" : "Confirm"}
+          <button type="button" disabled={pending} onClick={apply} className={`${primary} h-11 px-4 text-sm`}>
+            {pending ? "Saving" : "Confirm"}
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => setArmed(true)} className="mt-3 h-12 w-full rounded-xl border border-border bg-bg text-sm font-medium active:opacity-70">
-          Apply target
+        <button type="button" onClick={() => setArmed(true)} className={`${btn} mt-3 w-full`}>
+          Use this target
         </button>
       )}
       {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}

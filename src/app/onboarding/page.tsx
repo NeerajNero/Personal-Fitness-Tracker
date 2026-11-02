@@ -12,8 +12,8 @@ export default async function OnboardingPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <h1 className="text-3xl font-semibold tracking-tight">Let&apos;s set you up</h1>
-      <p className="mt-1 mb-8 text-muted">A few numbers and a goal. Everything else is derived.</p>
+      <h1 className="text-3xl font-bold tracking-tight">Set yourself up</h1>
+      <p className="mt-1 mb-8 text-muted">A few numbers and a goal. Your calorie and protein targets come from these.</p>
       <OnboardingForm />
     </main>
   );

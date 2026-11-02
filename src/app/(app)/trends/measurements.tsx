@@ -1,6 +1,9 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useOptimistic, useState, useTransition, type FormEvent } from "react";
+import { ICON } from "@/components/icons";
+import { primary } from "@/components/ui";
 import type { Measurement } from "@/db/schema";
 import { shortDate } from "@/components/charts/line-chart";
 import { deleteMeasurement, upsertMeasurement } from "./actions";
@@ -45,7 +48,7 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
       if (r.ok) {
         form.reset();
         setOpen(false);
-      } else setError(r.error);
+      } else setError(`${r.error}. The measurement wasn't saved; check the numbers and try again.`);
     });
   }
 
@@ -54,7 +57,7 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
     startTransition(async () => {
       dispatch({ type: "delete", id });
       const r = await deleteMeasurement(id);
-      if (!r.ok) setError(r.error);
+      if (!r.ok) setError(`${r.error}. The entry is still there; reload and try again.`);
     });
   }
 
@@ -75,14 +78,14 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
           <input name="date" type="date" defaultValue={today} max={today} required className={`${input} col-span-2`} />
           <input name="navelCm" type="number" inputMode="decimal" step="0.1" min={40} max={200} placeholder="Navel cm" className={input} />
           <input name="waistCm" type="number" inputMode="decimal" step="0.1" min={40} max={200} placeholder="Waist cm" className={input} />
-          <button type="submit" className="col-span-2 h-12 rounded-xl bg-accent font-medium text-accent-fg active:opacity-80">
+          <button type="submit" className={`${primary} col-span-2`}>
             Save
           </button>
         </form>
       ) : null}
 
       {newest.length === 0 ? (
-        <p className="text-sm text-muted">No measurements yet. Navel at the belly button, relaxed, same time each week.</p>
+        <p className="text-sm text-muted">No measurements yet. Tap Log measurement: navel at the belly button, relaxed, same time each week.</p>
       ) : (
         <ul className="divide-y divide-border">
           {shown.map((m) => (
@@ -90,11 +93,11 @@ export function Measurements({ items, today }: { items: Measurement[]; today: st
               <span className="w-20 text-sm text-muted">{shortDate(m.date)}</span>
               <span className="flex-1 text-sm tabular-nums">
                 {m.navelCm !== null ? <>navel <span className="font-medium">{m.navelCm}</span></> : null}
-                {m.navelCm !== null && m.waistCm !== null ? <span className="text-muted"> · </span> : null}
+                {m.navelCm !== null && m.waistCm !== null ? <span className="text-muted">, </span> : null}
                 {m.waistCm !== null ? <>waist <span className="font-medium">{m.waistCm}</span></> : null}
               </span>
-              <button type="button" onClick={() => remove(m.id)} disabled={m.id < 0} aria-label={`Delete ${m.date}`} className="flex size-10 items-center justify-center text-lg text-muted active:opacity-70 disabled:opacity-40">
-                ×
+              <button type="button" onClick={() => remove(m.id)} disabled={m.id < 0} aria-label={`Delete ${m.date}`} className="flex size-11 items-center justify-center text-muted active:opacity-70 disabled:opacity-40">
+                <X {...ICON} />
               </button>
             </li>
           ))}

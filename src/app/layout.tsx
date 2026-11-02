@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Manrope } from "next/font/google";
 import { ClientLog } from "@/components/client-log";
 import { SwRegister } from "@/components/sw-register";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+/* One typeface with tabular figures; the mono stack for Diagnostics comes from the system. */
+const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: { default: "Recomp", template: "%s · Recomp" },
@@ -21,14 +21,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafaf9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0c0a09" },
+    { media: "(prefers-color-scheme: light)", color: "#f3f4f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1013" },
   ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" className={`${manrope.variable} h-full antialiased`}>
       <body className="min-h-dvh bg-bg font-sans text-fg">
         {children}
         <SwRegister />

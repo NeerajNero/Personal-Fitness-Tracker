@@ -25,8 +25,9 @@ bot. Already-onboarded users are redirected to Today, so targets are never recom
 - **Telegram reminders**: 4 main toggles. "More reminders, quiet hours, daily cap" folds the rest (`nudge-settings.tsx`)
 
 **Setup: rarely changed** (all collapsed)
-- **Foods & My meals**: edit, favourite ★, archive (`foods-editor.tsx`). Saved meals show here with the serving "1 meal".
-- **Workout types** (`workout-types-editor.tsx`): sessions-per-week target · each active type (▲▼ = rotation order, Rename,
+- **Foods and My meals**: grouped under veg / non-veg icons; edit, star into My meals, archive (`foods-editor.tsx`). Saved meals show here with the serving "1 meal".
+- **Workout types** (`workout-types-editor.tsx`): a banner for home users with no types yet (bodyweight plans arrive in the
+  next release; add a type by hand meanwhile) · sessions-per-week target · each active type (up/down = rotation order, Rename,
   Archive; expand for its exercises: order, sets × reps, cues, + Exercise) · Add type · Archived list with Restore.
   Names are bot commands: a reserved bot word (`BOT_COMMAND_WORDS`, incl. the cardio words walk/run/…) or a duplicate is refused; a food with the same name only warns.
 - **Body & habits**: onboarding stats + smoke-free date (`body-stats-form.tsx`)
@@ -50,7 +51,7 @@ All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forU
 | `auth.ts`, `src/lib/session.ts`, `src/lib/users.ts` | Allowlist, `requireUser`, users rows (details in [../users.md](../users.md)) |
 | `src/app/login/page.tsx`, `src/app/(app)/layout.tsx` | Sign-in page; the gate |
 | `src/app/onboarding/{page,onboarding-form,actions}.tsx`, `onboarding/confirm/page.tsx` | Onboarding flow |
-| `src/app/(app)/settings/page.tsx`, `actions.ts`, `ui.tsx` | Settings screen, every mutation, shared bits |
+| `src/app/(app)/settings/page.tsx`, `actions.ts`, `ui.tsx` | Settings screen, every mutation, `Field` / `Status` (the classes come from `src/components/ui.tsx`) |
 | `settings/targets-form.tsx`, `phase-section.tsx`, `telegram-card.tsx`, `nudge-settings.tsx` | Everyday cards |
 | `settings/foods-editor.tsx`, `workout-types-editor.tsx`, `body-stats-form.tsx`, `people.tsx` | Setup cards; admin People |
 | `settings/diagnostics.tsx`, `diag-actions.ts`, `src/lib/diag/*` | Diagnostics card; the actions wrap `buildDiagnostics` / `runTickDryAs` (admin gate in the lib) |

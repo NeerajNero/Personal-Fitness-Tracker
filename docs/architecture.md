@@ -34,9 +34,10 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
 | `src/lib/export.ts` | Per-user CSV builder used by the export route |
 | `public/sw.js`, `public/manifest.webmanifest` | Network-only service worker (installability only; answers a version message) and the PWA manifest |
 | `src/components/client-log.tsx` | Captures `console.error` / unhandled rejections in memory for Diagnostics (root layout) |
-| `src/components/day-picker.tsx` + `src/app/(app)/day-actions.ts` | "What's today?" picker shared by Today and Train |
+| `src/components/workout-card.tsx`, `day-picker.tsx` + `src/app/(app)/day-actions.ts` | Today's workout card and the picker it opens, shared by Today and Train |
 | `src/lib/dates.ts` | IST helpers: `todayIST`, `nowTimeIST`, `addDays`, `istNow`, quiet-hours math |
-| `src/components/` | `tab-bar`, `date-header`, `day-picker`, `charts/line-chart.tsx` (hand-written SVG; no chart library) |
+| `src/components/` | `ui.tsx` (shared classes and primitives), `icons.tsx` (the lucide vocabulary), `workout-card.tsx` + `day-picker.tsx` (today's workout, the picker it opens), `tab-bar`, `date-header`, `charts/line-chart.tsx` (hand-written SVG; no chart library). See [design.md](design.md) |
+| `src/lib/workout-card.ts` | Data for the workout card and the session-minute estimate the morning brief uses |
 | `scripts/` | `seed.ts` (shared exercise library only), `remove-user.ts` (delete a person, `:dry`), `backup.ts` (JSON dump of every table, `--full` keeps chat ids), `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` (PWA icons, one-off) |
 | `drizzle/` | SQL migrations (0001 = views, 0007 = multi-user; both hand-written; 0008–0009 generated then made re-runnable) |
 | `tests/` | `multi-user.test.ts`: migrations + two-user isolation on PGlite (`pnpm test`) |
@@ -51,6 +52,8 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
   `copyFoodLog`, `setDayPlan`, `copyLastSets`, `upsertDailyMetrics`, `upsertMeasurementByDate`). Add new writes there,
   not inside a route or a component.
 - **Metrics:** loaders fetch the data, and the `*From` helpers are pure, so a page can load each dataset once and derive everything from it.
+- **Look:** tokens in `globals.css`, classes and primitives in `components/ui.tsx`, icons in `components/icons.tsx`; the
+  rules are in [design.md](design.md).
 - **Client/server boundary:** client components must not import anything that imports `@/db`. Client-safe modules:
   `lib/format.ts` (incl. `MEAL_SERVING`), `lib/cardio.ts` (cardio config, validation, summaries), `lib/metrics/phase.ts`, `lib/routine.ts`, `lib/nudges.ts`, `lib/export-tables.ts`, `lib/targets.ts`, `lib/library.ts`, `lib/diag/text.ts`, `lib/diag/client-log.ts`.
   (A db import that leaked into the client bundle was fixed in `f731e7d`, so keep it that way.)

@@ -9,6 +9,7 @@ import { monthSpend, type MonthSpend } from "@/lib/metrics/spend";
 import { loadLastSessionSets, type LastSession } from "@/lib/metrics/strength";
 import { loadMeasurements, mondayOf, weeklyRate, weeklyVerdict, type WeeklyRate, type WeeklyVerdict } from "@/lib/metrics/trends";
 import { listRoutineExerciseNames } from "@/lib/training";
+import { estimateTypeMinutes } from "@/lib/workout-card";
 import type { DayState } from "./dayState";
 import { buildWeeklyReport, type WeeklyReport } from "./weekly";
 
@@ -25,6 +26,8 @@ export type Loaders = {
   /** A workout type's exercises with the top set from their last session (exercises never done are omitted). */
   typeTopSets: (typeId: number) => Promise<TopSet[]>;
   typeExerciseNames: (typeId: number) => Promise<string[]>;
+  /** Session length: the user's `session_minutes`, else the type's sets × 2.5 min. */
+  typeMinutes: (typeId: number) => Promise<number>;
   weeklyReport: (weekStart: string) => Promise<WeeklyReport>;
   checkpoint: (from: string, to: string) => Promise<CheckpointSummary>;
 };
@@ -48,6 +51,7 @@ export function makeLoaders(userId: UserId, now: IstNow, settings: Settings, sta
   const checkpoints = new Map<string, Promise<CheckpointSummary>>();
   const names = new Map<number, Promise<string[]>>();
   const tops = new Map<number, Promise<TopSet[]>>();
+  const minutes = new Map<number, Promise<number>>();
 
   return {
     foods,
@@ -61,6 +65,7 @@ export function makeLoaders(userId: UserId, now: IstNow, settings: Settings, sta
       return (await measurements()).filter((m) => m.date >= start && m.date <= end);
     },
     typeExerciseNames: (typeId) => memoBy(names, typeId, async () => (await listRoutineExerciseNames(userId, typeId)).map((r) => r.name)),
+    typeMinutes: (typeId) => memoBy(minutes, typeId, () => estimateTypeMinutes(userId, typeId, settings)),
     typeTopSets: (typeId) =>
       memoBy(tops, typeId, async () => {
         const rows = await u.db

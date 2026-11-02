@@ -5,7 +5,7 @@ import { dateTicks, dayNum, LineChart, shortDate } from "@/components/charts/lin
 import { CARDIO_TYPES, EFFORTS, type CardioEntry, type CardioType, type Effort } from "@/lib/cardio";
 import { Section } from "./section";
 
-const EFFORT_COLOR: Record<Effort, string> = { easy: "var(--muted)", moderate: "var(--accent)", hard: "var(--danger)" };
+const EFFORT_COLOR: Record<Effort, string> = { easy: "var(--muted)", moderate: "var(--done)", hard: "var(--danger)" };
 
 /** Weekly cardio minutes (last 8 weeks) and a conditioning chart: speed per entry for one type, incline labelled, effort coloured. No calorie estimates. */
 export function CardioSection({ weeks, entries }: { weeks: { weekStart: string; minutes: number }[]; entries: CardioEntry[] }) {
@@ -21,7 +21,7 @@ export function CardioSection({ weeks, entries }: { weeks: { weekStart: string; 
   const oldestFirst = [...weeks].reverse();
 
   return (
-    <Section title="Cardio" aside={<span className="text-xs text-muted">minutes / week</span>}>
+    <Section title="Cardio" aside={<span className="text-xs text-muted">minutes a week</span>}>
       <ul className="flex flex-col gap-1.5">
         {oldestFirst.map((w) => (
           <li key={w.weekStart} className="grid grid-cols-[3.5rem_1fr_3rem] items-center gap-2 text-xs tabular-nums">
@@ -36,7 +36,7 @@ export function CardioSection({ weeks, entries }: { weeks: { weekStart: string; 
 
       <h3 className="mt-5 text-sm font-medium">Conditioning</h3>
       {types.length === 0 ? (
-        <p className="mt-1 text-sm text-muted">Log speed or distance (walk, run, incline walk, cycle…) to see speed over time.</p>
+        <p className="mt-1 text-sm text-muted">Log a walk, run, incline walk or ride with its speed or distance, and speed over time appears here.</p>
       ) : (
         <>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -66,7 +66,7 @@ export function CardioSection({ weeks, entries }: { weeks: { weekStart: string; 
             />
           </div>
           <p className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted">
-            <span>km/h per entry{type === "incline_walk" ? " · labels = incline" : ""}</span>
+            <span>km/h per entry{type === "incline_walk" ? ", labels show incline" : ""}</span>
             {EFFORTS.map((x) => (
               <span key={x} className="flex items-center gap-1">
                 <span className="inline-block size-2 rounded-full" style={{ background: EFFORT_COLOR[x] }} />

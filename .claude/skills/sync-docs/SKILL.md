@@ -20,6 +20,7 @@ Keep this cheap: work from the diff, not from re-reading the repo.
    | `src/lib/telegram/**`, `src/app/api/telegram/**` | `docs/features/telegram-bot.md` |
    | `src/lib/rules/**`, `src/app/api/tick/**`, `src/lib/nudges.ts` | `docs/rules-engine.md` |
    | `src/db/schema.ts`, `drizzle/*.sql`, `scripts/seed.ts` | `docs/data-model.md` (+ `docs/product.md` for seed/targets) |
+   | `src/app/globals.css`, `src/components/{ui,icons,workout-card,day-picker}.tsx`, `src/lib/workout-card.ts`, any screen's look or copy | `docs/design.md` |
    | new top-level module, moved responsibility, client/server boundary | `docs/architecture.md` |
    | `package.json` scripts, `.env.example`, `scripts/**`, deploy/config | `docs/operations.md` + the README (setup checklist, scripts table) |
    | `src/lib/diag/**`, `src/app/(app)/settings/diag*`, `src/components/client-log.tsx`, `public/sw.js` | `docs/diagnostics.md` |

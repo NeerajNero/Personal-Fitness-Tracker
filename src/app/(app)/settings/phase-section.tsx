@@ -24,7 +24,7 @@ export function PhaseSection({ s, phaseToday }: { s: Settings; phaseToday: Phase
       if (r.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
-      } else setError(r.error);
+      } else setError(`${r.error}. The phase wasn't changed; try again.`);
     });
   }
 
@@ -39,7 +39,7 @@ export function PhaseSection({ s, phaseToday }: { s: Settings; phaseToday: Phase
               setMode(m);
               save({ mode: m });
             }}
-            className={`h-12 rounded-xl border text-sm font-medium capitalize ${mode === m ? "border-accent bg-accent/10 text-accent" : "border-border bg-bg"}`}
+            className={`h-12 rounded-xl border text-sm font-medium capitalize ${mode === m ? "border-accent text-accent" : "border-border bg-bg"}`}
           >
             {m === "nonveg" ? "Non-veg" : m}
           </button>

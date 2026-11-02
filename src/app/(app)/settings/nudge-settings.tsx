@@ -1,6 +1,8 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useState, useTransition } from "react";
+import { ICON } from "@/components/icons";
 import type { NudgeToggle } from "@/lib/nudges";
 import { saveDailyCap, saveQuietHours, setNudgeToggle } from "./actions";
 
@@ -15,16 +17,16 @@ type Row = { key: NudgeToggle; label: string; when: string };
 
 /** The default set: one message morning and night, plus the weekly check-in and rare milestones. */
 const MAIN: Row[] = [
-  { key: "nudgeMorningBrief", label: "Morning brief", when: "07:30 · today's workout + weigh-in" },
-  { key: "nudgeDayClose", label: "Day close", when: "22:00 · summary + what's missing" },
-  { key: "nudgeWeeklyMeasure", label: "Weekly measure + report", when: "Sunday 19:00 (Monday 08:00 fallback)" },
-  { key: "nudgeMilestones", label: "Milestones", when: "protein phase switch, checkpoint day, smoke-free weeks (in the morning brief) — when those dates are set" },
+  { key: "nudgeMorningBrief", label: "Morning brief", when: "07:30, today's workout and weigh-in" },
+  { key: "nudgeDayClose", label: "Day close", when: "22:00, summary and what's missing" },
+  { key: "nudgeWeeklyMeasure", label: "Weekly measure and report", when: "Sunday 19:00, or Monday 08:00 if missed" },
+  { key: "nudgeMilestones", label: "Milestones", when: "protein phase switch, checkpoint day, smoke-free weeks, when those dates are set" },
 ];
 
 const EXTRA: Row[] = [
-  { key: "nudgeLunchCheck", label: "Lunch check", when: "13:30 · if nothing logged since 11:00" },
-  { key: "nudgeProteinCheck", label: "Protein check", when: "16:30 · if under 45% of target" },
-  { key: "nudgeKcalCheck", label: "Calorie check", when: "20:00 · kcal left for dinner" },
+  { key: "nudgeLunchCheck", label: "Lunch check", when: "13:30, if nothing logged since 11:00" },
+  { key: "nudgeProteinCheck", label: "Protein check", when: "16:30, if under 45% of target" },
+  { key: "nudgeKcalCheck", label: "Calorie check", when: "20:00, kcal left for dinner" },
   { key: "nudgeWater", label: "Water reminders", when: "every 2 h, 10:00–20:00" },
   { key: "nudgeBudget", label: "Protein budget alert", when: "once a month at 80% before the 24th" },
 ];
@@ -48,7 +50,7 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
       const r = await setNudgeToggle(key, next);
       if (!r.ok) {
         setState((s) => ({ ...s, [key]: !next }));
-        setError(r.error);
+        setError(`${r.error}. The switch went back; try again.`);
       }
     });
   }
@@ -58,7 +60,7 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
     start(async () => {
       const r = await saveQuietHours(String(fd.get("start")), String(fd.get("end")));
       if (r.ok) flash("hours");
-      else setError(r.error);
+      else setError(`${r.error}. Use 24-hour times like 22:30.`);
     });
   }
 
@@ -66,7 +68,7 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
     start(async () => {
       const r = await saveDailyCap(Number(value));
       if (r.ok) flash("cap");
-      else setError(r.error);
+      else setError(`${r.error}. Pick a whole number from 1 to 20.`);
     });
   }
 
@@ -80,7 +82,7 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
               <span className="block text-xs text-muted">{r.when}</span>
             </span>
             <input type="checkbox" role="switch" checked={state[r.key]} onChange={() => toggle(r.key)} aria-label={r.label} className="peer sr-only" />
-            <span className="relative h-7 w-12 shrink-0 rounded-full bg-border transition-colors peer-checked:bg-accent after:absolute after:top-0.5 after:left-0.5 after:size-6 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-5" />
+            <span className="relative h-7 w-12 shrink-0 rounded-full bg-border peer-checked:bg-accent after:absolute after:top-0.5 after:left-0.5 after:size-6 after:rounded-full after:bg-white peer-checked:after:translate-x-5" />
           </label>
         </li>
       ))}
@@ -90,14 +92,14 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
   return (
     <section className="rounded-2xl border border-border bg-surface p-4">
       <h2 className="font-semibold">Telegram reminders</h2>
-      <p className="mt-1 text-xs text-muted">Times are IST.</p>
+      <p className="mt-1 text-[13px] font-medium text-muted">Times are IST.</p>
 
       <div className="mt-2">{list(MAIN)}</div>
 
       <details className="group mt-2 border-t border-border pt-2">
         <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm font-medium text-muted [&::-webkit-details-marker]:hidden">
           More reminders, quiet hours, daily cap
-          <span className="transition-transform group-open:rotate-180">⌄</span>
+          <ChevronDown {...ICON} className="group-open:rotate-180" />
         </summary>
         {list(EXTRA)}
         <form
@@ -114,7 +116,7 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
             Quiet from
             <input name="start" type="time" defaultValue={quietStart} required className="h-12 rounded-xl border border-border bg-bg px-3 text-base text-fg" />
           </label>
-          <span className="pb-3 text-muted">→</span>
+          <span className="pb-3 text-sm text-muted">to</span>
           <label className="flex flex-col gap-1 text-xs text-muted">
             until
             <input name="end" type="time" defaultValue={quietEnd} required className="h-12 rounded-xl border border-border bg-bg px-3 text-base text-fg" />
@@ -139,13 +141,13 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
-            className="h-12 w-20 rounded-xl border border-border bg-bg text-center text-lg tabular-nums"
+            className="h-12 w-20 rounded-xl border border-border bg-bg text-center text-lg"
           />
         </label>
       </details>
 
       <p className="mt-2 h-4 text-xs" aria-live="polite">
-        {saved ? <span className="text-accent">Saved ✓</span> : null}
+        {saved ? <span className="text-done">Saved</span> : null}
         {error ? <span className="text-danger">{error}</span> : null}
       </p>
     </section>

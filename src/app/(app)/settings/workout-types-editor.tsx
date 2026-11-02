@@ -1,6 +1,8 @@
 "use client";
 
+import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import { useState, useTransition } from "react";
+import { ICON, MuscleIcon } from "@/components/icons";
 import { MUSCLE_GROUPS, type MuscleGroup } from "@/lib/routine";
 import type { ExerciseLite } from "@/lib/training";
 import {
@@ -19,7 +21,7 @@ export type WorkoutTypeView = {
 type Result = { ok: boolean; error?: string; warning?: string | null };
 type Run = (fn: () => Promise<Result>) => void;
 
-export function WorkoutTypesEditor({ types, allExercises, weeklyTarget }: { types: WorkoutTypeView[]; allExercises: ExerciseLite[]; weeklyTarget: number }) {
+export function WorkoutTypesEditor({ types, allExercises, weeklyTarget, home }: { types: WorkoutTypeView[]; allExercises: ExerciseLite[]; weeklyTarget: number; home: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
@@ -29,7 +31,7 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget }: { type
     setWarning(null);
     start(async () => {
       const r = await fn();
-      if (!r.ok) setError(r.error ?? "Failed");
+      if (!r.ok) setError(`${r.error ?? "Couldn't save"}. Nothing changed; try again.`);
       else if (r.warning) setWarning(r.warning);
     });
   };
@@ -37,7 +39,12 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget }: { type
   const archived = types.filter((t) => t.archived);
 
   return (
-    <Card title="Workout types" sub="You pick one each day. List order = rotation for “next up”. Names also work as bot commands." collapsible defaultOpen={false}>
+    <Card title="Workout types" sub="You pick one each day. The list order is the rotation for next up. Names also work as bot commands." collapsible defaultOpen={false} className="scroll-mt-4">
+      {home && active.length === 0 ? (
+        <p className="mb-4 rounded-xl border border-accent/40 px-3 py-2 text-sm">
+          <span className="font-semibold">Home plans are coming.</span> Bodyweight, dumbbell and band plans built from your equipment arrive in the next release. Until then, add a type below and pick exercises from the library.
+        </p>
+      ) : null}
       <label className="mb-4 flex items-center justify-between gap-3">
         <span>
           <span className="block font-medium">Sessions per week</span>
@@ -50,7 +57,7 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget }: { type
           max={14}
           defaultValue={weeklyTarget}
           onBlur={(e) => Number(e.target.value) !== weeklyTarget && run(() => saveWeeklySessionTarget(Number(e.target.value)))}
-          className="h-12 w-20 rounded-xl border border-border bg-bg text-center text-lg tabular-nums"
+          className="h-12 w-20 rounded-xl border border-border bg-bg text-center text-lg"
         />
       </label>
 
@@ -73,13 +80,13 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget }: { type
           });
         }}
       >
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={30} placeholder="New type, e.g. Arms" className={`${input} h-11`} />
-        <button type="submit" className={`${primary} h-11 shrink-0`}>Add</button>
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={30} placeholder="New type, for example Arms" className={`${input} h-11`} />
+        <button type="submit" className={`${primary} h-11 shrink-0 text-sm`}><Plus {...ICON} /> Add</button>
       </form>
 
       {archived.length ? (
         <div className="mt-4">
-          <h3 className="text-xs font-medium text-muted">Archived — kept for history, hidden from the picker</h3>
+          <h3 className="text-xs font-medium text-muted">Archived: kept for history, hidden from the picker</h3>
           <ul className="mt-1 divide-y divide-border">
             {archived.map((t) => (
               <li key={t.id} className="flex h-11 items-center justify-between">
@@ -93,7 +100,7 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget }: { type
         </div>
       ) : null}
 
-      {warning ? <p className="mt-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">{warning}</p> : null}
+      {warning ? <p className="mt-2 rounded-xl border border-warn/40 px-3 py-2 text-xs text-warn">{warning}</p> : null}
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
     </Card>
   );
@@ -109,8 +116,8 @@ function TypeEditor({ type, first, last, allExercises, run }: { type: WorkoutTyp
     <details className="group rounded-xl border border-border">
       <summary className="flex cursor-pointer list-none items-center gap-1 px-2 py-2 [&::-webkit-details-marker]:hidden">
         <span className="flex flex-col">
-          <button type="button" disabled={first} onClick={(e) => { e.preventDefault(); run(() => moveWorkoutType(type.id, "up")); }} aria-label={`Move ${type.label} up`} className="flex size-7 items-center justify-center text-muted disabled:opacity-25">▲</button>
-          <button type="button" disabled={last} onClick={(e) => { e.preventDefault(); run(() => moveWorkoutType(type.id, "down")); }} aria-label={`Move ${type.label} down`} className="flex size-7 items-center justify-center text-muted disabled:opacity-25">▼</button>
+          <button type="button" disabled={first} onClick={(e) => { e.preventDefault(); run(() => moveWorkoutType(type.id, "up")); }} aria-label={`Move ${type.label} up`} className="flex size-7 items-center justify-center text-muted disabled:opacity-25"><ChevronUp {...ICON} /></button>
+          <button type="button" disabled={last} onClick={(e) => { e.preventDefault(); run(() => moveWorkoutType(type.id, "down")); }} aria-label={`Move ${type.label} down`} className="flex size-7 items-center justify-center text-muted disabled:opacity-25"><ChevronDown {...ICON} /></button>
         </span>
         {renaming ? (
           <input
@@ -137,19 +144,19 @@ function TypeEditor({ type, first, last, allExercises, run }: { type: WorkoutTyp
         )}
         <button type="button" onClick={(e) => { e.preventDefault(); setRenaming(true); }} className="h-9 px-2 text-xs text-accent">Rename</button>
         <button type="button" onClick={(e) => { e.preventDefault(); run(() => setWorkoutTypeArchived(type.id, true)); }} className="h-9 px-2 text-xs text-muted">Archive</button>
-        <span className="px-1 text-muted transition-transform group-open:rotate-180">⌄</span>
+        <ChevronDown {...ICON} className="mx-1 shrink-0 text-muted group-open:rotate-180" />
       </summary>
       <ul className="divide-y divide-border border-t border-border">
         {type.exercises.map((e, i) => (
           <ExerciseRow key={e.exerciseId} dayId={dayId} e={e} first={i === 0} last={i === type.exercises.length - 1} run={run} />
         ))}
-        {type.exercises.length === 0 ? <li className="p-3 text-sm text-muted">No exercises.</li> : null}
+        {type.exercises.length === 0 ? <li className="p-3 text-sm text-muted">No exercises yet. Tap Add an exercise below.</li> : null}
       </ul>
       <div className="p-2">
         {adding ? (
           <AddToDay allExercises={allExercises.filter((x) => !inType.has(x.id))} onPick={(input) => { run(() => addRoutineExercise(dayId, input)); setAdding(false); }} onClose={() => setAdding(false)} />
         ) : (
-          <button type="button" onClick={() => setAdding(true)} className={`${btn} h-10 w-full text-xs`}>+ Exercise</button>
+          <button type="button" onClick={() => setAdding(true)} className={`${btn} h-10 w-full text-xs`}><Plus {...ICON} size={14} /> Add an exercise</button>
         )}
       </div>
     </details>
@@ -164,23 +171,23 @@ function ExerciseRow({ dayId, e, first, last, run }: { dayId: number; e: Workout
     if (Number(sets) === e.targetSets && Number(reps) === e.targetReps) return;
     run(() => setRoutineTargets(dayId, e.exerciseId, Number(sets), Number(reps)));
   };
-  const small = "h-10 w-12 rounded-lg border border-border bg-bg text-center text-sm tabular-nums";
+  const small = "h-10 w-12 rounded-lg border border-border bg-bg text-center text-sm";
 
   return (
     <li className="px-2 py-2">
       <div className="flex items-center gap-1">
         <div className="flex flex-col">
-          <button type="button" disabled={first} onClick={() => run(() => moveRoutineExercise(dayId, e.exerciseId, "up"))} aria-label="Move up" className="flex size-7 items-center justify-center text-muted disabled:opacity-25">▲</button>
-          <button type="button" disabled={last} onClick={() => run(() => moveRoutineExercise(dayId, e.exerciseId, "down"))} aria-label="Move down" className="flex size-7 items-center justify-center text-muted disabled:opacity-25">▼</button>
+          <button type="button" disabled={first} onClick={() => run(() => moveRoutineExercise(dayId, e.exerciseId, "up"))} aria-label="Move up" className="flex size-7 items-center justify-center text-muted disabled:opacity-25"><ChevronUp {...ICON} /></button>
+          <button type="button" disabled={last} onClick={() => run(() => moveRoutineExercise(dayId, e.exerciseId, "down"))} aria-label="Move down" className="flex size-7 items-center justify-center text-muted disabled:opacity-25"><ChevronDown {...ICON} /></button>
         </div>
         <button type="button" onClick={() => setCuesOpen((v) => !v)} className="min-w-0 flex-1 text-left">
-          <span className="block truncate text-sm font-medium">{e.name}</span>
-          <span className="block text-[11px] text-muted">{e.muscleGroup}{e.cues ? " · has cues" : ""}</span>
+          <span className="flex items-center gap-1.5 truncate text-sm font-medium"><MuscleIcon group={e.muscleGroup} size={14} className="shrink-0 text-muted" /> {e.name}</span>
+          <span className="block text-[11px] text-muted">{e.muscleGroup}{e.cues ? ", has cues" : ""}</span>
         </button>
         <input type="number" inputMode="numeric" min={1} max={10} value={sets} onChange={(ev) => setSets(ev.target.value)} onBlur={commit} aria-label="Target sets" className={small} />
         <span className="text-xs text-muted">×</span>
         <input type="number" inputMode="numeric" min={1} max={50} value={reps} onChange={(ev) => setReps(ev.target.value)} onBlur={commit} aria-label="Target reps" className={small} />
-        <button type="button" onClick={() => run(() => removeRoutineExercise(dayId, e.exerciseId))} aria-label={`Remove ${e.name}`} className="flex size-9 items-center justify-center text-lg text-muted">×</button>
+        <button type="button" onClick={() => run(() => removeRoutineExercise(dayId, e.exerciseId))} aria-label={`Remove ${e.name}`} className="flex size-9 items-center justify-center text-muted"><X {...ICON} /></button>
       </div>
       {cuesOpen ? (
         <div className="mt-2 pl-8">

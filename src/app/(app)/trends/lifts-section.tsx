@@ -23,7 +23,7 @@ export function LiftsSection({ lifts }: { lifts: Lift[] }) {
   if (!lift) {
     return (
       <Section title="Lifts">
-        <p className="text-sm text-muted">Charts appear once an exercise has two logged sessions.</p>
+        <p className="text-sm text-muted">Charts appear once an exercise has two logged sessions. Log a workout on Train to start one.</p>
       </Section>
     );
   }
@@ -61,7 +61,7 @@ export function LiftsSection({ lifts }: { lifts: Lift[] }) {
         ]}
       />
       <p className="mt-1 text-xs text-muted">
-        Best set e1RM (Epley) per session. {lift.stall.stalled ? <span className="text-warn">Stalled ×{lift.stall.count} — amber points are the stall run.</span> : null}
+        Best set e1RM (Epley) per session. {lift.stall.stalled ? <span className="text-warn">Stalled for {lift.stall.count} sessions; the amber points are the stall run.</span> : null}
       </p>
 
       <table className="mt-3 w-full text-sm">
@@ -70,8 +70,8 @@ export function LiftsSection({ lifts }: { lifts: Lift[] }) {
             <th className="pb-2 font-medium">Exercise</th>
             <th className="pb-2 text-right font-medium">First</th>
             <th className="pb-2 text-right font-medium">Latest</th>
-            <th className="pb-2 text-right font-medium">Δ</th>
-            <th className="pb-2 text-right font-medium">Sess.</th>
+            <th className="pb-2 text-right font-medium">Change</th>
+            <th className="pb-2 text-right font-medium">Sessions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -79,11 +79,11 @@ export function LiftsSection({ lifts }: { lifts: Lift[] }) {
             <tr key={l.exerciseId} className={`h-10 ${l.exerciseId === lift.exerciseId ? "font-medium" : ""}`}>
               <td className="pr-2">
                 <span className="line-clamp-1">{l.name}</span>
-                {l.stall.stalled ? <span className="rounded-full bg-warn/15 px-1.5 text-[10px] font-medium text-warn">Stalled ×{l.stall.count}</span> : null}
+                {l.stall.stalled ? <span className="rounded-full border border-warn/40 px-1.5 text-[10px] font-medium text-warn">Stalled, {l.stall.count} sessions</span> : null}
               </td>
               <td className="text-right tabular-nums">{Math.round(l.first)}</td>
               <td className="text-right tabular-nums">{Math.round(l.latest)}</td>
-              <td className={`text-right tabular-nums ${l.deltaPct > 0 ? "text-accent" : l.deltaPct < 0 ? "text-danger" : "text-muted"}`}>
+              <td className={`text-right tabular-nums ${l.deltaPct > 0 ? "text-done" : l.deltaPct < 0 ? "text-danger" : "text-muted"}`}>
                 {l.deltaPct > 0 ? "+" : ""}{l.deltaPct}%
               </td>
               <td className="text-right tabular-nums text-muted">{l.points.length}</td>

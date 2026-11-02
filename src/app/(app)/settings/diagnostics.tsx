@@ -1,6 +1,8 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useState, useTransition } from "react";
+import { ICON } from "@/components/icons";
 import { readClientLog } from "@/lib/diag/client-log";
 import { renderDiagText, type DiagReport, type DiagSection } from "@/lib/diag/text";
 import { loadDiagnostics, runTickDry } from "./diag-actions";
@@ -87,7 +89,7 @@ export function Diagnostics() {
         <button type="button" className={`${btn} shrink-0`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); copy(); }}>
           {copied === "done" ? "Copied ✓" : "Copy"}
         </button>
-        <span className="text-muted transition-transform group-open:rotate-180">⌄</span>
+        <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180" />
       </summary>
       <div className="flex flex-col gap-3 px-4 pb-4">
         {error ? <p className="text-xs text-danger">{error}</p> : null}

@@ -23,7 +23,7 @@ export function NavelSection({ measurements, settings, today }: { measurements: 
 
   const status =
     gap === null ? { text: "No navel measurement yet", tone: "text-muted" }
-    : gap <= 0.25 ? { text: "On track", tone: "text-accent" }
+    : gap <= 0.25 ? { text: "On track", tone: "text-done" }
     : { text: `Behind by ${gap.toFixed(1)} cm`, tone: "text-danger" };
 
   return (
@@ -46,8 +46,8 @@ export function NavelSection({ measurements, settings, today }: { measurements: 
         ]}
       />
       <p className="mt-2 text-xs text-muted">
-        {startNavel} cm → {settings.navelGoalMinCm}–{settings.navelGoalMaxCm} cm by {settings.goalDate}. Goal line today: {goalToday.toFixed(1)} cm
-        {latest ? ` · latest ${latest.navelCm} cm` : ""}.
+        From {startNavel} cm to {settings.navelGoalMinCm}–{settings.navelGoalMaxCm} cm by {settings.goalDate}. The goal line is at {goalToday.toFixed(1)} cm today
+        {latest ? `, your latest is ${latest.navelCm} cm` : ""}.
       </p>
     </Section>
   );

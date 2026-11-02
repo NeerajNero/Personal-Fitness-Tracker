@@ -29,11 +29,11 @@ export function GoalCard({ settings, measurements, today }: { settings: NavelSet
   const fmtRate = (r: number) => `${r <= 0 ? "" : "+"}${r.toFixed(2)} cm/week`;
 
   return (
-    <Section title={`Goal · ${new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", month: "short", year: "numeric" }).format(new Date(`${settings.goalDate}T00:00:00Z`))}`} aside={<span className="text-sm font-medium text-muted">{Math.floor(weeksLeft)} weeks left</span>}>
+    <Section title={`Goal by ${new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", month: "short", year: "numeric" }).format(new Date(`${settings.goalDate}T00:00:00Z`))}`} aside={<span className="text-sm font-medium text-muted">{Math.floor(weeksLeft)} weeks left</span>}>
       <div className="flex items-baseline justify-between text-sm">
         <span className="text-xl font-semibold tabular-nums">{pct}%</span>
         <span className="text-muted">
-          {start} → {latest ? latest.navelCm : "?"} → {settings.navelGoalMinCm}–{settings.navelGoalMaxCm} cm
+          {start} cm, now {latest ? latest.navelCm : "?"}, goal {settings.navelGoalMinCm}–{settings.navelGoalMaxCm} cm
         </span>
       </div>
       <div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-border">
@@ -48,7 +48,7 @@ export function GoalCard({ settings, measurements, today }: { settings: NavelSet
         </div>
         <div>
           <dt className="text-[11px] text-muted">Actual, last 8 weeks</dt>
-          <dd className={`font-medium tabular-nums ${actualRate === null ? "text-muted" : requiredRate !== null && actualRate <= -requiredRate ? "text-accent" : "text-warn"}`}>
+          <dd className={`font-medium tabular-nums ${actualRate === null ? "text-muted" : requiredRate !== null && actualRate <= -requiredRate ? "text-done" : "text-warn"}`}>
             {actualRate === null ? "not enough data" : fmtRate(actualRate)}
           </dd>
         </div>

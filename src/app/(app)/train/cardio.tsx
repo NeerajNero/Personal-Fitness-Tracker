@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
+import { CardioIcon, RepeatIcon } from "@/components/icons";
+import { btn, Empty, ErrorLine, Heading, primary } from "@/components/ui";
 import { CARDIO_TYPE_KEYS, CARDIO_TYPES, EFFORTS, cardioSummary, type CardioEntry, type CardioInput, type CardioType, type Effort } from "@/lib/cardio";
 import { addCardio, editCardio, removeCardio, repeatCardio } from "./actions";
 
@@ -18,18 +20,18 @@ export function Cardio({ date, entries, last }: { date: string; entries: CardioE
     setError(null);
     start(async () => {
       const r = await fn();
-      if (!r.ok) setError(r.error ?? "Failed");
+      if (!r.ok) setError(`${r.error ?? "Couldn't save"}. Check the numbers and try again.`);
       else after?.();
     });
   };
 
   return (
     <section id="cardio" className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-muted">Cardio</h2>
+      <Heading><span className="flex items-center gap-1.5"><CardioIcon /> Cardio</span></Heading>
 
-      {last ? (
-        <button type="button" disabled={pending} onClick={() => run(() => repeatCardio(date))} className="min-h-12 rounded-xl border border-accent bg-accent/10 px-4 py-2 text-left text-sm font-medium text-accent active:opacity-70 disabled:opacity-50">
-          ↺ Same as last time: {cardioSummary(last)}
+      {last && entries.length === 0 ? (
+        <button type="button" disabled={pending} onClick={() => run(() => repeatCardio(date))} className={`${btn} h-12 justify-start border-accent text-accent`}>
+          <RepeatIcon /> <span className="truncate">Same as last time: {cardioSummary(last)}</span>
         </button>
       ) : null}
 
@@ -53,8 +55,9 @@ export function Cardio({ date, entries, last }: { date: string; entries: CardioE
         <CardioForm key={adding} type={adding} pending={pending} onCancel={() => setAdding(null)} onSubmit={(input) => run(() => addCardio(date, input), () => setAdding(null))} />
       ) : null}
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      <ErrorLine>{error}</ErrorLine>
 
+      {entries.length === 0 && !adding && !last ? <Empty>No cardio yet. Pick a type above and give it the minutes; everything else is optional.</Empty> : null}
       {entries.length ? (
         <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
           {entries.map((e) => (
@@ -146,10 +149,10 @@ function CardioForm({
           </button>
         ) : null}
         <span className="flex-1" />
-        <button type="button" onClick={onCancel} className="h-11 rounded-xl border border-border px-4 text-sm active:opacity-70">
+        <button type="button" onClick={onCancel} className={btn}>
           Cancel
         </button>
-        <button type="submit" disabled={pending} className="h-11 rounded-xl bg-accent px-5 text-sm font-medium text-accent-fg active:opacity-80 disabled:opacity-60">
+        <button type="submit" disabled={pending} className={`${primary} h-11 px-5 text-sm`}>
           {initial ? "Save" : `Add ${cfg.label.toLowerCase()}`}
         </button>
       </div>

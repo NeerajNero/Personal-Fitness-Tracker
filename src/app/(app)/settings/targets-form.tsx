@@ -21,7 +21,7 @@ export function TargetsForm({ s, phased, budgets }: { s: Settings; phased: boole
   const N = (name: keyof Settings, step = 1) => <input name={name} type="number" inputMode="numeric" step={step} defaultValue={s[name] === null ? "" : String(s[name])} required className={input} />;
 
   return (
-    <Card title="Targets" sub={`${GOALS[s.goal].label} · daily calories, protein, steps${budgets ? " and protein budget" : ""}.`}>
+    <Card title="Targets" sub={`${GOALS[s.goal].label}: daily calories, protein, steps${budgets ? " and the protein budget" : ""}.`}>
       <form action={action} className="flex flex-col gap-4">
         <div className="grid grid-cols-3 gap-2">
           <Field label="kcal min" error={fe.kcalMin}>{N("kcalMin", 5)}</Field>
@@ -51,7 +51,7 @@ export function TargetsForm({ s, phased, budgets }: { s: Settings; phased: boole
             </>
           ) : null}
         </div>
-        <button type="submit" disabled={pending} className={primary}>{pending ? "Saving…" : "Save targets"}</button>
+        <button type="submit" disabled={pending} className={primary}>{pending ? "Saving" : "Save targets"}</button>
         <Status saved={saved} error={state && !state.ok ? (state.error ?? null) : null} />
       </form>
     </Card>

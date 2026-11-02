@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
+import { primary } from "@/components/ui";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const session = await auth();
@@ -7,23 +8,25 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { error } = await searchParams;
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-8 p-6">
-      <h1 className="text-4xl font-semibold tracking-tight">Recomp</h1>
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-8 px-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <div>
+        <h1 className="text-5xl font-extrabold tracking-tight">Recomp</h1>
+        <p className="mt-3 text-lg text-muted">Eat, train, weigh. Three things a day, ticked off in seconds.</p>
+      </div>
       <form
         action={async () => {
           "use server";
           await signIn("google", { redirectTo: "/today" });
         }}
       >
-        <button
-          type="submit"
-          className="h-14 rounded-xl bg-accent px-8 text-lg font-medium text-accent-fg active:opacity-80"
-        >
+        <button type="submit" className={`${primary} h-14 w-full text-lg`}>
           Continue with Google
         </button>
       </form>
       {error ? (
-        <p className="text-sm text-danger">That Google account isn&apos;t allowed.</p>
+        <p className="text-sm text-danger" role="alert">
+          That Google account isn&apos;t on the list. Ask the owner to add it, then try again.
+        </p>
       ) : null}
     </main>
   );

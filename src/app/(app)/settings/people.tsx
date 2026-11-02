@@ -1,3 +1,5 @@
+import { ChevronDown } from "lucide-react";
+import { ICON } from "@/components/icons";
 import type { PersonRow } from "@/lib/users";
 
 /**
@@ -10,9 +12,9 @@ export function People({ rows }: { rows: PersonRow[] }) {
       <summary className="flex cursor-pointer list-none items-center justify-between p-4 [&::-webkit-details-marker]:hidden">
         <span>
           <span className="block font-semibold">People</span>
-          <span className="block text-xs text-muted">{rows.length} {rows.length === 1 ? "account" : "accounts"} · admin only, read-only</span>
+          <span className="block text-xs text-muted">{rows.length} {rows.length === 1 ? "account" : "accounts"}. Admin only, read-only.</span>
         </span>
-        <span className="text-muted transition-transform group-open:rotate-180">⌄</span>
+        <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180" />
       </summary>
       <ul className="divide-y divide-border px-4 pb-2">
         {rows.map((p) => (
@@ -20,11 +22,11 @@ export function People({ rows }: { rows: PersonRow[] }) {
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{p.email}</span>
               <span className="block truncate text-xs text-muted">
-                {p.name ?? "—"}{p.isAdmin ? " · admin" : ""}{p.allowed ? "" : " · not in ALLOWED_EMAILS"}
+                {p.name ?? "—"}{p.isAdmin ? ", admin" : ""}{p.allowed ? "" : ", not in ALLOWED_EMAILS"}
               </span>
             </span>
-            <span className={`text-xs ${p.onboarded ? "text-accent" : "text-muted"}`}>{p.onboarded ? "onboarded" : "not yet"}</span>
-            <span className={`text-xs ${p.blocked ? "text-danger" : p.linked ? "text-accent" : "text-muted"}`}>
+            <span className={`text-xs ${p.onboarded ? "text-done" : "text-muted"}`}>{p.onboarded ? "onboarded" : "not yet"}</span>
+            <span className={`text-xs ${p.blocked ? "text-danger" : p.linked ? "text-done" : "text-muted"}`}>
               {p.blocked ? "blocked" : p.linked ? "linked" : "no chat"}
             </span>
           </li>

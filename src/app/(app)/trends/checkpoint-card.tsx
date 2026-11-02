@@ -22,13 +22,13 @@ export function CheckpointCard({ summary, checkpointDate, daysToGo }: { summary:
       aside={<span className="text-sm font-medium text-muted">{frozen ? `Reviewed ${shortDate(checkpointDate)}` : daysToGo === 0 ? "Today" : `${daysToGo} days to go`}</span>}
     >
       <p className="mb-3 text-xs text-muted">
-        {shortDate(summary.from)} → {shortDate(summary.to)} · {summary.days} {summary.days === 1 ? "day" : "days"}. Gym-renewal decision — numbers only, the call is yours.
+        {shortDate(summary.from)} to {shortDate(summary.to)}, {summary.days} {summary.days === 1 ? "day" : "days"}. Gym-renewal decision: numbers only, the call is yours.
       </p>
       <div className="grid grid-cols-3 gap-x-3 gap-y-4">
-        <Stat label="Navel" value={summary.navel ? signed(summary.navel.delta, "cm") : "—"} sub={summary.navel ? `${summary.navel.first} → ${summary.navel.latest}` : "no measurements"} />
-        <Stat label="Weight (7d avg)" value={summary.weight ? signed(summary.weight.delta, "kg") : "—"} sub={summary.weight ? `${summary.weight.first} → ${summary.weight.latest}` : "no weigh-ins"} />
-        <Stat label="Lifts progressed" value={summary.lifts.tracked ? `${summary.lifts.progressed}/${summary.lifts.tracked}` : "—"} sub="≥3 sessions each" />
-        <Stat label="Sessions" value={`${summary.sessionsDone}/${summary.sessionsPlanned}`} sub="done / planned" />
+        <Stat label="Navel" value={summary.navel ? signed(summary.navel.delta, "cm") : "—"} sub={summary.navel ? `from ${summary.navel.first} to ${summary.navel.latest}` : "no measurements"} />
+        <Stat label="Weight, 7-day avg" value={summary.weight ? signed(summary.weight.delta, "kg") : "—"} sub={summary.weight ? `from ${summary.weight.first} to ${summary.weight.latest}` : "no weigh-ins"} />
+        <Stat label="Lifts progressed" value={summary.lifts.tracked ? `${summary.lifts.progressed}/${summary.lifts.tracked}` : "—"} sub="3 or more sessions each" />
+        <Stat label="Sessions" value={`${summary.sessionsDone}/${summary.sessionsPlanned}`} sub="done of planned" />
         <Stat label="kcal in range" value={summary.kcalAdherencePct === null ? "—" : `${summary.kcalAdherencePct}%`} sub={`${summary.daysLogged} days logged`} />
         <Stat label="Protein hit" value={summary.proteinHitPct === null ? "—" : `${summary.proteinHitPct}%`} sub={summary.avgProtein !== null ? `avg ${summary.avgProtein} g` : undefined} />
       </div>

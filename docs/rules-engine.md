@@ -54,7 +54,7 @@ DayState {
 ## Rules (all times IST)
 | key | when | default | condition / content |
 |---|---|---|---|
-| `morning_brief` | 07:30–08:30 | **on** | day unset → "Next up: Pull (last done 4 days ago)" + its last top sets + `plan:` buttons (each active type, ▶ on next up, Rest). Day chosen → that type / rest. Weigh-in line if no weight; smoke-free milestone line every 7 days (milestones toggle) |
+| `morning_brief` | 07:30–08:30 | **on** | day unset → "Next up: Pull (last done 4 days ago, about 45 min)" (`load.typeMinutes`: `session_minutes`, else sets × 2.5) + its last top sets + `plan:` buttons (each active type, ▶ on next up, Rest). Day chosen → that type / rest. Weigh-in line if no weight; smoke-free milestone line every 7 days (milestones toggle) |
 | `day_close` | 22:00–22:30 | **on** | summary + what's missing. Day unset → "What did you do today?" + `did:` buttons (each type = log as same as last time, Rest). Type chosen, nothing logged → "✓ Did <type>" + Rest. No cardio today and an earlier entry exists → extra button "＋ <last entry>" (`cardio:<date>:repeat`) |
 | `weekly_measure` | Sun 19:00–22:30 | **on** | prompt navel/waist if none logged this week |
 | `weekly_report` | Sun 19:00–22:30 | **on** | once a measurement exists: 7-day avg Δ, navel Δ, sessions vs target, lifts progressed, sets per muscle, cardio minutes vs last week + entries by type, adherence, verdict |

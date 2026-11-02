@@ -4,7 +4,7 @@ import { Section } from "./section";
 
 function Pct({ v }: { v: number | null }) {
   if (v === null) return <span className="text-muted">—</span>;
-  const tone = v >= 80 ? "text-accent" : v >= 50 ? "text-warn" : "text-danger";
+  const tone = v >= 80 ? "text-done" : v >= 50 ? "text-warn" : "text-danger";
   return <span className={`font-medium tabular-nums ${tone}`}>{v}%</span>;
 }
 
@@ -31,14 +31,14 @@ export function AdherenceTable({ weeks }: { weeks: WeekAdherence[] }) {
               <td className="text-right tabular-nums">{w.daysLogged}/7</td>
               <td className="text-right"><Pct v={w.kcalAdherencePct} /></td>
               <td className="text-right"><Pct v={w.proteinHitPct} /></td>
-              <td className={`text-right tabular-nums ${w.sessionsDone >= w.sessionsPlanned ? "text-accent" : ""}`}>
+              <td className={`text-right tabular-nums ${w.sessionsDone >= w.sessionsPlanned ? "text-done" : ""}`}>
                 {w.sessionsDone}/{w.sessionsPlanned}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-muted">kcal = logged days inside the range · Protein = logged days at or above the phase minimum.</p>
+      <p className="mt-2 text-xs text-muted">kcal counts logged days inside the range. Protein counts logged days at or above the minimum.</p>
     </Section>
   );
 }

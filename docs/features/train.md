@@ -3,17 +3,20 @@
 Logging a lifting session by exception: confirm what repeated, and type only what progressed.
 
 ## What the owner sees
-**Day unset:** the same "What's today?" picker as Today (a type per button, next up highlighted, days since, Rest, ⋯ Custom /
-archived). Choosing a type creates the session. **Rest:** "Walk 8,000–10,000 steps" + Change. Past dates work via `?d=`.
+**Day unset:** the same workout card as Today ([../design.md](../design.md#todays-workout-card)): the next type as the
+hero with Start, or "Something else" for the picker (other types, Rest, Custom, archived). Start creates the session.
+**Rest:** the step target with today's count and a cardio suggestion. Past dates work via `?d=`.
 
 **In a session:**
-- Picker line (collapsed): the type name as the title + **Change** (switch type, Custom or Rest).
-- Header: "n / m logged", **✓ All same as last time (k left)**, ⋯ (notes, discard). The old incline-walk checkbox is gone
+- The card collapses to "Pull, 3 of 6 done"; "Something else" still opens the picker.
+- Header (no box): **3 of 6 logged** as the section number (green with the one animated tick when the last exercise lands),
+  **Log all the same as last time (k left)**, and a ⋯ menu for notes and discard. The old incline-walk checkbox is gone
   (column and data kept; a ticked legacy session counts as one cardio entry with no minutes).
-- One line per exercise: name, a `stalled` badge, and the hint `last 45 × 10/10/9 → try 47.5` → **✓** button.
-  - ✓ copies last session's working sets for that exercise. The line then turns green: `✓ 45 kg × 10/10/9`.
-  - Tapping the name opens the set grid (kg × reps per set, placeholders from last session, ± set), the stall advice and the cues.
-- **+ Add an exercise**: search the shared library plus your own custom exercises, or create a new one (with a muscle group; it's yours only). "Also add to <type>" (off by default)
+- One row per exercise: muscle icon, name, a `Stalled` badge, the hint as a sentence ("Last 45 × 10/10/9, try 47.5 next")
+  and a tick button.
+  - The tick copies last session's working sets for that exercise. The row then reads `45 kg × 10/10/9` in green.
+  - Tapping the name opens the set grid (kg × reps per set, placeholders from last session, add / remove a set), the stall advice and the cues.
+- **Add an exercise**: search the shared library plus your own custom exercises, or create a new one (with a muscle group; it's yours only). "Also add to <type>" (off by default)
   appends it to the type's list too (3 × 8).
 - **Cardio** (below the workout, or on its own on rest/unset days): see [cardio.md](cardio.md).
 
@@ -26,7 +29,7 @@ archived). Choosing a type creates the session. **Rest:** "Walk 8,000–10,000 s
   exercises that already have sets. It's used by ✓, by ✓ All same, by the bot's `done` and by the day-close button.
 - "Last session" = the most recent session containing that exercise (any workout type), working sets only.
 - Next up = the active type after the most recently trained one (rotation = Settings order). See `docs/rules-engine.md`.
-- Hint (`hintFromSets`): every target rep hit → +2.5 kg upper body / +5 kg lower body; otherwise same weight, add reps.
+- Hint (`hintFromSets`, a sentence): every target rep hit → "try +2.5 kg next" upper body / +5 kg lower body; otherwise "same weight, add reps"; never done → "First time, aim for 3 × 8".
 - Stall = no new best e1RM (Epley) for ≥ 3 sessions → badge + "drop ~10 % and rebuild, or swap the variation".
 - Lat cues are stored on the exercise rows (`exercises.cues`) and shown collapsed.
 - `workoutLogged` (DayState) = ≥ 1 set or a legacy incline-walk tick.
@@ -34,8 +37,8 @@ archived). Choosing a type creates the session. **Rest:** "Walk 8,000–10,000 s
 ## Files
 | File | Role |
 |---|---|
-| `src/app/(app)/train/page.tsx` | `getTrainData(date)` → DayPicker (+ SessionView when a session exists) + Activities |
-| `src/components/day-picker.tsx`, `src/app/(app)/day-actions.ts` | Day picker and `chooseDay` (shared with Today) |
+| `src/app/(app)/train/page.tsx` | `getTrainData(date)` + `loadWorkoutCard` → WorkoutCard (+ SessionView when a session exists) + Cardio |
+| `src/components/workout-card.tsx`, `day-picker.tsx`, `src/lib/workout-card.ts`, `src/app/(app)/day-actions.ts` | The card, the picker, its data and `chooseDay` (shared with Today) |
 | `train/session-view.tsx` | Header, `ExerciseRow` (collapsed line + set grid), `AddExercise` |
 | `train/cardio.tsx` | Cardio section (repeat, type picker, per-type form, entries) |
 | `train/actions.ts` | `sameAsLast`, `upsertSet`, `deleteSet`, `addExerciseToSession`, `setInclineWalk`, `saveSessionNotes`, `discardSession`, `addCardio`, `editCardio`, `removeCardio`, `repeatCardio` |
