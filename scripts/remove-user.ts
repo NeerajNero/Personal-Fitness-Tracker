@@ -15,7 +15,7 @@ const email = process.argv.slice(2).find((a) => a !== "dry");
 
 const OWNED_TABLES = [
   "settings", "foods", "food_log", "daily_metrics", "measurements", "exercises", "routine_days", "routine_exercises",
-  "sessions", "session_exercises", "sets", "activities", "nudge_log", "pending_parses",
+  "sessions", "session_exercises", "sets", "activities", "nudge_log", "pending_parses", "diag_events",
 ];
 
 async function main() {

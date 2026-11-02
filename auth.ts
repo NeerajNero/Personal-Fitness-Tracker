@@ -29,8 +29,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return t;
     },
     session({ session, token }) {
-      const uid = (token as { uid?: string }).uid;
+      const { uid, iat } = token as { uid?: string; iat?: number };
       if (typeof uid === "string") session.user.id = uid;
+      // Issued-at of the JWT, shown as "session age" in Diagnostics.
+      if (typeof iat === "number") (session as typeof session & { iat?: number }).iat = iat;
       return session;
     },
   },

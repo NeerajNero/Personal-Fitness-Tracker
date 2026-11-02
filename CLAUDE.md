@@ -20,7 +20,7 @@ then open the files in its Files table. Don't explore the whole repo, and don't 
 | Today / Train / Cardio / Trends / Settings + onboarding / Telegram bot | `docs/features/<today|train|cardio|trends|settings-onboarding|telegram-bot>.md` |
 | reminders, `/api/tick`, `getDayState` | `docs/rules-engine.md` |
 | env, deploy order for migrations, webhook, tick, adding/removing a person, backups | `docs/operations.md` |
-| `pnpm test`, PGlite | `docs/testing.md` · broken things: `docs/troubleshooting.md` |
+| `pnpm test`, PGlite | `docs/testing.md` · broken things: `docs/troubleshooting.md` · Diagnostics screen, `diag`, diag_events: `docs/diagnostics.md` |
 
 **Every step, before its commit:** update the docs it touches (Files tables included), `README.md` when setup, scripts,
 operations or troubleshooting changed, and `CHANGELOG.md` under `## Unreleased` for anything user-visible. Code and docs land
@@ -28,8 +28,8 @@ in the same commit. Touch this file only if a convention, hard rule or the build
 
 ## Users (the rule that must never be broken)
 - `users` + `user_id` on every per-person table; `settings` is one row per user (PK user_id); `exercises.user_id` null = shared library.
-- App code reaches the db only through `forUser(userId)` (`src/lib/db/scope.ts`), filtering with `own()` / `visible()` and
-  stamping inserts. ESLint forbids `@/db` imports elsewhere (exceptions: `src/lib/users.ts` for sign-in / chat / admin lookups).
+- App code reaches the db only through `forUser(userId)` (`src/lib/db/scope.ts`), filtering with `own()` / `visible()` and stamping
+  inserts. ESLint forbids `@/db` imports elsewhere (exceptions: `src/lib/users.ts` for sign-in / chat / admin; `src/lib/diag/` for events).
   Every lib function that queries takes `userId: UserId` first. Server actions get it from `requireUser()`, never from the client.
 - `ALLOWED_EMAILS` (comma-separated, case-insensitive; old `ALLOWED_EMAIL` ok) is the only authority, re-checked on every request;
   a `users` row grants nothing. **First entry = owner/admin** and claims the placeholder owner row from migration 0007.
@@ -40,7 +40,7 @@ in the same commit. Touch this file only if a convention, hard rule or the build
 ## Stack (don't deviate without asking)
 Next.js 16 App Router + TypeScript strict + Tailwind v4, `src/` layout, PWA · Neon Postgres via `@neondatabase/serverless`
 + Drizzle (drizzle-kit migrations) · Auth.js v5 Google, allowlisted to `ALLOWED_EMAILS` · grammY webhook at `/api/telegram` ·
-`/api/tick` scheduler pinged every 15 min by cron-job.org · Gemini flash-lite (`@google/genai`, JSON-schema output, must
+`/api/tick` scheduler (`runTick`) pinged every 15 min by cron-job.org · Gemini flash-lite (`@google/genai`, JSON-schema output, must
 degrade gracefully) · Vercel Hobby · all rules in `Asia/Kolkata` (store UTC, compute IST) · PGlite for tests only.
 
 ## Conventions

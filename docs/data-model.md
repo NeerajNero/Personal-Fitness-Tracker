@@ -32,6 +32,7 @@ Views: `drizzle/0007_multi_user.sql` (rebuilt per user; first written in `0001_v
 | `activities` | user_id, date, name, minutes, notes, type, distance_km, speed_kmh, incline_pct, effort (`cardio_effort` enum), logged_at | **The cardio log.** `type` keys `CARDIO_TYPES` (src/lib/cardio.ts); null/unknown = sport. `name` = sport name or the type label. Speed and distance are both stored whenever one can be derived. Legacy rows (before 0006) are `sport` with `logged_at = created_at` |
 | `nudge_log` | user_id, sent_at, rule_key, date (IST), payload | Idempotency + daily cap, per user. `mark:*` rows are per-day markers, not sends (legacy `mark:no_training` rows were converted to rest days and are no longer read) |
 | `pending_parses` | id, user_id, payload jsonb, created_at | Gemini parses awaiting ✓ in Telegram; only the owner's chat can confirm one. Only the id goes in callback data; expire after 24 h |
+| `diag_events` | id, at, user_id (nullable, cascade), scope, level (`diag_level`: info/warn/error), message, meta jsonb | Operational events for Settings → Diagnostics ([diagnostics.md](diagnostics.md)); user_id null = system-wide (tick runs). Real ticks prune rows older than 7 days. Never bodies, chat ids, tokens or codes |
 
 ## Views (`drizzle/0007_multi_user.sql`)
 All four carry `user_id`; every reader filters on it.
@@ -46,7 +47,7 @@ All four carry `user_id`; every reader filters on it.
   to the generated SQL (see `0004_nudge_defaults.sql`).
 - View changes are hand-written SQL migrations. `0007_multi_user.sql` is hand-written too (nullable `user_id` → backfill onto
   the placeholder owner → NOT NULL; re-runnable) and is exercised by `pnpm test` against PGlite, as is every later one
-  (`0008_telegram_blocked.sql`: one nullable column, `IF NOT EXISTS`).
+  (`0008_telegram_blocked.sql`: one nullable column; `0009_diag_events.sql`: the events table and its enum; both `IF NOT EXISTS`).
 - `pnpm backup` before migrating (see [operations.md](operations.md#backups)).
 - `pnpm seed` is idempotent and only upserts the shared exercise library. Users, settings, foods and workout types come from
   sign-in and onboarding (gym users get Push/Pull/Legs from `src/lib/library.ts`).

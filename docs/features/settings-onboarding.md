@@ -35,6 +35,12 @@ bot. Already-onboarded users are redirected to Today, so targets are never recom
 - **People** (admins only, read-only, `people.tsx`): every account with email, "not in ALLOWED_EMAILS" when their row has
   outlived the list, onboarded yes/no, and Telegram linked / no chat / **blocked** (a send got 403; clears on their next message).
 
+**When something's off** (outside Setup, above Sign out)
+- **Diagnostics** (`diagnostics.tsx`, loads on open via `diag-actions.ts`): every user sees their account, session, Telegram
+  link (chat masked), row counts, today's DayState, device/PWA state, their last 20 events and client errors; admins also
+  get the System and People sections, 50 events across users and **Run tick (dry)**. **Copy diagnostics** = the whole thing
+  as plain text, no secrets. Details in [../diagnostics.md](../diagnostics.md).
+
 All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forUser(userId)`). Shared UI bits (Card with
 `collapsible`, Field, Status) are in `settings/ui.tsx`. Cues can only be edited on the user's own custom exercises; library cues are shared.
 
@@ -47,4 +53,5 @@ All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forU
 | `src/app/(app)/settings/page.tsx`, `actions.ts`, `ui.tsx` | Settings screen, every mutation, shared bits |
 | `settings/targets-form.tsx`, `phase-section.tsx`, `telegram-card.tsx`, `nudge-settings.tsx` | Everyday cards |
 | `settings/foods-editor.tsx`, `workout-types-editor.tsx`, `body-stats-form.tsx`, `people.tsx` | Setup cards; admin People |
+| `settings/diagnostics.tsx`, `diag-actions.ts`, `src/lib/diag/*` | Diagnostics card, `loadDiagnostics` / `runTickDry` |
 | `src/lib/targets.ts`, `src/lib/settings.ts` | Targets per goal; `hasPhases` / `hasBudgets` / `hasNavelGoal` |

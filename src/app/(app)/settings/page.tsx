@@ -10,6 +10,7 @@ import { getSettings, hasBudgets, hasPhases } from "@/lib/settings";
 import { listExercises, listRoutineExercises, listWorkoutTypes } from "@/lib/training";
 import { getUser, listPeople } from "@/lib/users";
 import { BodyStatsForm } from "./body-stats-form";
+import { Diagnostics } from "./diagnostics";
 import { FoodsEditor } from "./foods-editor";
 import { NudgeSettings } from "./nudge-settings";
 import { People } from "./people";
@@ -78,6 +79,9 @@ export default async function SettingsPage() {
       </details>
 
       {people ? <People rows={people} /> : null}
+
+      <h2 className="mt-3 text-sm font-medium text-muted">When something&apos;s off</h2>
+      <Diagnostics />
 
       <form
         action={async () => {

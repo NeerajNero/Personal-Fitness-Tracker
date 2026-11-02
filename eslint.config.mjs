@@ -15,10 +15,11 @@ const eslintConfig = defineConfig([
   ]),
   // Multi-user guard: app code reaches the database only through `forUser(userId)` (src/lib/db/scope.ts),
   // so a query on a per-person table can't be written without a user id. Exceptions: the scope itself,
-  // src/lib/users.ts (sign-in and cross-user lookups) and the db module.
+  // src/lib/users.ts (sign-in and cross-user lookups), src/lib/diag/ (system-wide events and the admin system
+  // section) and the db module.
   {
     files: ["src/**/*.{ts,tsx}", "auth.ts"],
-    ignores: ["src/db/**", "src/lib/db/**", "src/lib/users.ts"],
+    ignores: ["src/db/**", "src/lib/db/**", "src/lib/users.ts", "src/lib/diag/**"],
     rules: {
       "no-restricted-imports": [
         "error",

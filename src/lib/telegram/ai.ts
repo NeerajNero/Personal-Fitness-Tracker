@@ -7,6 +7,7 @@ import { eq, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { pendingParses, type Food } from "@/db/schema";
 import { forUser, type UserId } from "@/lib/db/scope";
+import { logEvent } from "@/lib/diag/events";
 import { foodInPhase } from "@/lib/food";
 import type { Phase } from "@/lib/metrics/phase";
 
@@ -74,11 +75,16 @@ function systemInstruction(foods: Food[]): string {
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-/** Returns null on failure or when nothing edible was found. */
-export async function parseFreeText(text: string, foods: Food[], phase: Phase): Promise<ParsedItem[] | null> {
+/** Returns null on failure or when nothing edible was found. Records the outcome and latency as a `gemini` diag event. */
+export async function parseFreeText(text: string, foods: Food[], phase: Phase, userId: UserId | null = null): Promise<ParsedItem[] | null> {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) return null;
+  if (!key) {
+    await logEvent({ userId, scope: "gemini", level: "warn", message: "no key" });
+    return null;
+  }
   const inPhase = foods.filter((f) => foodInPhase(f, phase));
+  const t0 = Date.now();
+  const ms = () => Date.now() - t0;
   try {
     const ai = new GoogleGenAI({ apiKey: key });
     const res = await ai.models.generateContent({
@@ -93,7 +99,10 @@ export async function parseFreeText(text: string, foods: Food[], phase: Phase): 
       },
     });
     const parsed = outSchema.safeParse(JSON.parse(res.text ?? ""));
-    if (!parsed.success) return null;
+    if (!parsed.success) {
+      await logEvent({ userId, scope: "gemini", level: "warn", message: "bad output", meta: { ms: ms() } });
+      return null;
+    }
     const byId = new Map(foods.map((f) => [f.id, f]));
     const items: ParsedItem[] = parsed.data.items.map((it) => {
       const food = it.food_id !== null ? byId.get(it.food_id) : undefined;
@@ -102,8 +111,12 @@ export async function parseFreeText(text: string, foods: Food[], phase: Phase): 
       }
       return { label: it.label, foodId: null, qty: 1, kcal: r1(it.kcal), proteinG: r1(it.protein_g), costInr: 0, confidence: it.confidence };
     });
+    await logEvent({ userId, scope: "gemini", message: items.length ? "parsed" : "nothing edible", meta: { ms: ms(), items: items.length } });
     return items.length ? items : null;
-  } catch {
+  } catch (err) {
+    const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : null;
+    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    await logEvent({ userId, scope: "gemini", level: "warn", message: status === 429 ? "rate limited" : timedOut ? "timeout" : "failed", meta: { ms: ms(), status, error: err instanceof Error ? err.name : "Error" } });
     return null;
   }
 }

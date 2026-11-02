@@ -1,6 +1,6 @@
 # Testing
 
-One test file, no mocks: `pnpm test` runs `tests/multi-user.test.ts` (three tests) with `node --test` against **PGlite**,
+One test file, no mocks: `pnpm test` runs `tests/multi-user.test.ts` (four tests) with `node --test` against **PGlite**,
 a real Postgres compiled to WebAssembly that runs in memory. It needs no `DATABASE_URL` and no network.
 
 ## How the database is swapped
@@ -34,6 +34,14 @@ row, and `listPeople` reports `allowed: false` (that's what `auth.ts` asks at si
 `markChatBlocked`, `listLinkedUsers` leaves that chat out while `userIdByChat` still resolves it (so their next message
 can clear it); `clearChatBlocked` puts them back.
 
+## The diagnostics test
+The real grammY bot (`getBot()`) with an API transformer (`bot.api.config.use`) that answers every Telegram call locally and
+captures reply texts, so `bot.handleUpdate(...)` runs the gate, the handlers and the diag middleware end to end. A weigh-in
+from one chat writes a `bot · command` event for that user only; `runTick({ dry: true, force: "morning_brief" })` writes a
+`due` event per linked user and a system `run` event; `diag` answers five lines (seven for the admin, through the same
+transformer for `getWebhookInfo`); and the admin report rendered by `renderDiagText` contains neither chat id, token nor
+link code while still naming env variables, the migration and the DayState block.
+
 ## Adding a test
 - Add a `test("…", async () => { … })` to `tests/multi-user.test.ts` (it shares the migrated database and the two users),
   or create `tests/<name>.test.ts` with the same preamble (PGlite → `globalThis.__recompTestDb` → `await import`), and add it
@@ -41,8 +49,9 @@ can clear it); `clearChatBlocked` puts them back.
 - Use the lib functions, not raw SQL, for the behaviour under test; raw SQL is fine for seeding or inspecting.
 - Anything that calls `auth()`, `redirect()` or `revalidatePath` (server actions, pages) isn't testable this way; test the
   lib function it calls.
-- Gemini and Telegram are never called: `parseFreeText` needs `GEMINI_API_KEY` (unset in tests → null) and
-  `sendMessage` isn't exercised (`describeSendError` is, with constructed grammY errors).
+- Gemini and Telegram are never called: `parseFreeText` needs `GEMINI_API_KEY` (unset in tests → null, which also writes
+  a `gemini · no key` event), `sendMessage` isn't exercised (`describeSendError` is, with constructed grammY errors) and
+  the bot's API calls are answered by the transformer above.
 - `scripts/backup.ts` can be smoke-tested the same way: a preload module that builds a PGlite db, runs the migrations and
   sets `globalThis.__recompTestDb`, passed as a second `--import` before the script; delete `backups/` afterwards.
 

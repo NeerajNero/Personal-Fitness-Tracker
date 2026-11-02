@@ -21,6 +21,7 @@ export const HELP = [
   "<code>done</code> — log today's workout, same as last time",
   "<code>today</code> — where you stand",
   "<code>undo</code> — remove today's last entry (food or cardio)",
+  "<code>diag</code> — is everything working? (build, db, your link, last reminder run, today)",
   "Anything else — I'll try to parse it as a meal and ask you to confirm.",
 ].join("\n");
 

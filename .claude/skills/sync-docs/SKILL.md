@@ -22,6 +22,7 @@ Keep this cheap: work from the diff, not from re-reading the repo.
    | `src/db/schema.ts`, `drizzle/*.sql`, `scripts/seed.ts` | `docs/data-model.md` (+ `docs/product.md` for seed/targets) |
    | new top-level module, moved responsibility, client/server boundary | `docs/architecture.md` |
    | `package.json` scripts, `.env.example`, `scripts/**`, deploy/config | `docs/operations.md` + the README (setup checklist, scripts table) |
+   | `src/lib/diag/**`, `src/app/(app)/settings/diag*`, `src/components/client-log.tsx`, `public/sw.js` | `docs/diagnostics.md` |
    | a new failure mode or diagnostic | `docs/troubleshooting.md` + the README table |
 3. Read the relevant hunks (`git diff HEAD -- <path>`), then edit each doc so it describes the **current** behaviour:
    what the owner sees, behaviour rules, and the Files table. Remove anything that's no longer true. No history in docs.

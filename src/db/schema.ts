@@ -407,6 +407,30 @@ export const pendingParses = pgTable("pending_parses", {
   createdAt: createdAt(),
 });
 
+/* ----------------------------- diagnostics ----------------------- */
+
+export const diagLevelEnum = pgEnum("diag_level", ["info", "warn", "error"]);
+
+/**
+ * Operational events for Settings → Diagnostics: bot commands and parse results, tick outcomes, Gemini failures, server
+ * action errors. `user_id` null = system-wide (a tick run). Pruned to 7 days by the tick. Never holds message bodies,
+ * chat ids, tokens or link codes.
+ */
+export const diagEvents = pgTable(
+  "diag_events",
+  {
+    id: serial("id").primaryKey(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    /** bot · tick · send · gemini · action */
+    scope: text("scope").notNull(),
+    level: diagLevelEnum("level").notNull().default("info"),
+    message: text("message").notNull(),
+    meta: jsonb("meta"),
+  },
+  (t) => [index("diag_events_user_at_idx").on(t.userId, t.at), index("diag_events_at_idx").on(t.at)],
+);
+
 /* ------------------------------ types ---------------------------- */
 
 export type User = typeof users.$inferSelect;
@@ -426,6 +450,8 @@ export type WorkoutSet = typeof sets.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type NudgeLog = typeof nudgeLog.$inferSelect;
 export type PendingParse = typeof pendingParses.$inferSelect;
+export type DiagEvent = typeof diagEvents.$inferSelect;
+export type DiagLevel = DiagEvent["level"];
 
 /** Tables with a user_id column that the export route may serve. */
 export type ExportableTable =

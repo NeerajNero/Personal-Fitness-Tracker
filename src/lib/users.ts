@@ -104,7 +104,7 @@ export async function listLinkedUsers(): Promise<{ userId: UserId; chatId: strin
 /* -------------------------------- admin -------------------------------- */
 
 export type PersonRow = {
-  email: string; name: string | null; isAdmin: boolean; onboarded: boolean; linked: boolean;
+  id: string; email: string; name: string | null; isAdmin: boolean; onboarded: boolean; linked: boolean;
   /** Linked but they blocked the bot (a send got 403); no reminders until they write again. */
   blocked: boolean;
   /** Still in ALLOWED_EMAILS. False = can't sign in any more; run remove-user to delete their data. */
@@ -115,12 +115,12 @@ export type PersonRow = {
 /** Read-only list for Settings → People (admins only). */
 export async function listPeople(): Promise<PersonRow[]> {
   const rows = await db
-    .select({ email: users.email, name: users.name, isAdmin: users.isAdmin, onboardedAt: users.onboardedAt, chatId: settings.telegramChatId, blockedAt: settings.telegramBlockedAt, createdAt: users.createdAt })
+    .select({ id: users.id, email: users.email, name: users.name, isAdmin: users.isAdmin, onboardedAt: users.onboardedAt, chatId: settings.telegramChatId, blockedAt: settings.telegramBlockedAt, createdAt: users.createdAt })
     .from(users)
     .leftJoin(settings, eq(settings.userId, users.id))
     .orderBy(asc(users.createdAt));
   return rows.map((r) => ({
-    email: r.email, name: r.name, isAdmin: r.isAdmin, onboarded: r.onboardedAt !== null, linked: r.chatId !== null,
+    id: r.id, email: r.email, name: r.name, isAdmin: r.isAdmin, onboarded: r.onboardedAt !== null, linked: r.chatId !== null,
     blocked: r.chatId !== null && r.blockedAt !== null, allowed: isAllowedEmail(r.email) || r.email === OWNER_PLACEHOLDER_EMAIL, createdAt: r.createdAt,
   }));
 }

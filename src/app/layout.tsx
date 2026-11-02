@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ClientLog } from "@/components/client-log";
 import { SwRegister } from "@/components/sw-register";
 import "./globals.css";
 
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-dvh bg-bg font-sans text-fg">
         {children}
         <SwRegister />
+        <ClientLog />
       </body>
     </html>
   );

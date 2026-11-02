@@ -18,7 +18,8 @@ you can open those directly instead of searching the repo.
 | Reminders, `/api/tick`, `getDayState` | [rules-engine.md](rules-engine.md) |
 | Env, deploy order for migrations, webhook, tick by hand, adding/removing a person, backups | [operations.md](operations.md) |
 | `pnpm test`, PGlite, adding a test | [testing.md](testing.md) |
-| Something's broken | [troubleshooting.md](troubleshooting.md) |
+| Something's broken | [troubleshooting.md](troubleshooting.md), starting with Settings → Diagnostics |
+| What each Diagnostics line means, `diag`, diag_events | [diagnostics.md](diagnostics.md) |
 | What changed and when | [../CHANGELOG.md](../CHANGELOG.md) |
 | First-time setup from zero | [../README.md](../README.md) |
 

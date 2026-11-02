@@ -17,7 +17,8 @@ Read this before touching sign-in, onboarding, targets, anything that reads `set
 
 ## Scoping rule
 - `forUser(userId)` (`src/lib/db/scope.ts`) is the only door to the database from app code. ESLint (`eslint.config.mjs`)
-  rejects `@/db` imports anywhere except the scope, `src/lib/users.ts` and `src/db/`.
+  rejects `@/db` imports anywhere except the scope, `src/lib/users.ts`, `src/lib/diag/` (system-wide events, admin probes)
+  and `src/db/`.
 - Reads filter with `own(table, …)` (`user_id = me AND …`) or `visible(…)` for exercises (library + own); inserts go through
   `stamp(values)`; raw SQL uses `uid`. A foreign id is simply not found.
 - Every function in `src/lib/` that queries takes `userId: UserId` first (`UserId` is a branded string). Server actions get

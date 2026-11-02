@@ -118,6 +118,8 @@ There is no soft delete; the undo is the backup file or a Neon restore (see Cost
   cron-job.org sees only the tick's HTTP status and the JSON of rule keys, skip reasons and the first 8 characters of
   user ids. Vercel keeps request logs (paths, status codes) and the app's `console.error` lines, which carry the error
   class and message only, never message bodies, chat ids or tokens. Neon holds the data.
+- **Diagnostics** (Settings → Diagnostics, bot `diag`) shows env variables by name only, chat ids masked to the last 3
+  digits, link codes and tokens as present/none. Admins see every account's email and link state, never their data.
 - **Exports** (Settings → Export) are per user and never include `settings` or `users` (chat ids, emails). `pnpm backup`
   is for whoever holds the database URL: every table, with chat ids and link codes nulled unless `--full`.
 
@@ -155,6 +157,7 @@ There is no soft delete; the undo is the backup file or a Neon restore (see Cost
 
 | Symptom | First check |
 |---|---|
+| Anything at all | Settings → Diagnostics → **Copy diagnostics** (or `diag` to the bot): build, env by name, database, webhook, last tick, link state, today's state, recent events. No secrets in it, so it can be pasted anywhere. [docs/diagnostics.md](docs/diagnostics.md) |
 | Bot never answers | `pnpm bot:webhook-info`: URL must be `https://<app>/api/telegram`, pending updates should be 0, last error empty. Re-run `pnpm bot:set-webhook <url>` |
 | `/api/telegram` or `/api/tick` returns 401 | Secret mismatch: the webhook secret in Vercel vs the one `bot:set-webhook` sent (re-run it), or cron-job.org's `x-tick-secret` header vs `TICK_SECRET` |
 | No morning brief / reminders | cron-job.org job history (is it running, 200s?), then `pnpm tick:dry` with `TICK_URL` set: look at the skip reason per rule (`disabled`, `quiet_hours`, `already_sent`, `daily_cap`, `not_linked`) |

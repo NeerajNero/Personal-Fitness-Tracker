@@ -1,6 +1,9 @@
 # Troubleshooting
 
-Each entry: what you see → where to look → what fixes it. The short table is in the [README](../README.md#troubleshooting).
+**Start with Settings → Diagnostics → Copy** and read (or send) that text: build, env by name, database, webhook, the
+last tick, the person's link state, today's DayState and the last events are all in it ([diagnostics.md](diagnostics.md)
+says what each line means). In Telegram, `diag` gives the five-line version. Then use the entries below. The short table
+is in the [README](../README.md#troubleshooting).
 
 ## The bot never answers
 - `pnpm bot:webhook-info`. The URL must be `https://<app>/api/telegram`; "pending updates" growing means deliveries fail;
@@ -82,7 +85,8 @@ After a Neon password reset, update `DATABASE_URL` in Vercel and `.env`.
 ## Files
 | File | Role |
 |---|---|
-| `scripts/bot-webhook.ts`, `scripts/tick.ts` | The two diagnostics |
+| `src/app/(app)/settings/diagnostics.tsx`, `src/lib/diag/*` | Settings → Diagnostics and the bot's `diag` |
+| `scripts/bot-webhook.ts`, `scripts/tick.ts` | The two command-line diagnostics |
 | `src/lib/telegram/bot.ts` | The gate (`userIdByChat`, `linkChatByCode`) and `bot.catch` logging |
 | `src/lib/rules/engine.ts`, `src/app/api/tick/route.ts` | Skip reasons; per-user try/catch and the blocked mark |
 | `src/lib/users.ts` | `isAllowedEmail`, `ensureUser` claim logic, blocked flag |

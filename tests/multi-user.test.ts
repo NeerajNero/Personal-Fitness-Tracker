@@ -4,7 +4,9 @@
  *   2. two users each log a food, a weigh-in and a set; Today state, Trends data, export and bot resolution
  *      contain only their own rows;
  *   3. ALLOWED_EMAILS is the authority (a users row grants nothing) and a blocked chat drops out of the tick's list
- *      until that person writes to the bot again.
+ *      until that person writes to the bot again;
+ *   4. diagnostics: a simulated bot message and a dry tick write diag events for the right user only, `diag` answers,
+ *      and the copied text carries no chat id, token or link code.
  * Run: pnpm test   (node --conditions=react-server so `server-only` resolves)
  */
 import assert from "node:assert/strict";
@@ -216,4 +218,81 @@ test("the allowlist is the authority; blocked chats are skipped until they write
   await clearChatBlocked(B);
   assert.deepEqual((await listLinkedUsers()).map((x) => x.chatId).sort(), ["111", "222"]);
   assert.deepEqual((await listPeople()).map((p) => p.blocked), [false, false]);
+});
+
+test("diagnostics: events land on the right user and the copied text holds no secrets", async () => {
+  const { getBot } = await import("@/lib/telegram/bot");
+  const { runTick } = await import("@/lib/rules/tick");
+  const { recentEvents, lastTickRun } = await import("@/lib/diag/events");
+  const { collectMe, meSections } = await import("@/lib/diag/me");
+  const { collectSystem, systemSections } = await import("@/lib/diag/system");
+  const { renderDiagText } = await import("@/lib/diag/text");
+  const { userIdByChat, findUserByEmail } = await import("@/lib/users");
+  const { asUserId } = await import("@/lib/db/scope");
+
+  const TOKEN = "123456:TESTTOKENXYZ";
+  const CHAT_A = "5551234111";
+  const CHAT_B = "5559876222";
+  process.env.TELEGRAM_BOT_TOKEN = TOKEN;
+  process.env.NEXT_PUBLIC_APP_URL = "https://recomp.test";
+  await db.execute(sql`update settings set telegram_chat_id = ${CHAT_A} where telegram_chat_id = '111'`);
+  await db.execute(sql`update settings set telegram_chat_id = ${CHAT_B} where telegram_chat_id = '222'`);
+  const A = asUserId((await findUserByEmail("owner@example.com"))!.id);
+  const B = (await userIdByChat(CHAT_B))!;
+
+  // Every Telegram API call is answered locally; replies are captured by method + text.
+  const bot = getBot();
+  const sent: string[] = [];
+  bot.api.config.use(async (_prev, method, payload) => {
+    if (method === "sendMessage") sent.push(String((payload as { text?: string }).text ?? ""));
+    const result =
+      method === "getMe" ? { id: 1, is_bot: true, first_name: "t", username: "recomp_test_bot", can_join_groups: true, can_read_all_group_messages: false, supports_inline_queries: false }
+      : method === "getWebhookInfo" ? { url: "https://recomp.test/api/telegram", has_custom_certificate: false, pending_update_count: 0 }
+      : { message_id: 1, date: 0, chat: { id: 1, type: "private" } };
+    return { ok: true, result } as never;
+  });
+  await bot.init();
+  const update = (chat: string, text: string, id: number) => ({
+    update_id: id, message: { message_id: id, date: Math.floor(Date.now() / 1000), chat: { id: Number(chat), type: "private" as const, first_name: "x" }, from: { id: Number(chat), is_bot: false, first_name: "x" }, text },
+  });
+
+  await bot.handleUpdate(update(CHAT_B, "w 61.5", 1));
+  assert.match(sent.at(-1) ?? "", /61\.5/, "the bot answered the weigh-in");
+  const mine = await recentEvents({ userId: B });
+  assert.ok(mine.some((e) => e.scope === "bot" && e.message === "command" && (e.meta as { kind: string }).kind === "weight"), "B has the bot event");
+  assert.ok(!(await recentEvents({ userId: A })).some((e) => e.scope === "bot"), "A has none of B's bot events");
+
+  // A dry tick with a forced rule: a `due` event per linked user and one system `run` event.
+  const tick = await runTick({ dry: true, force: "morning_brief" });
+  assert.deepEqual(tick.users.map((u) => u.ok), [true, true]);
+  for (const id of [A, B]) {
+    const ev = (await recentEvents({ userId: id })).find((e) => e.scope === "tick");
+    assert.ok(ev && ev.message === "due" && (ev.meta as { dry: boolean }).dry === true, "dry tick event per user");
+  }
+  const run = await lastTickRun();
+  assert.ok(run && run.userId === null && (run.meta as { users: unknown[] }).users.length === 2);
+
+  // `diag`: five lines for a user, seven for the admin; neither leaks the chat id or token.
+  await bot.handleUpdate(update(CHAT_B, "diag", 2));
+  const diagB = sent.at(-1)!;
+  assert.equal(diagB.split("\n").length, 5, diagB);
+  assert.ok(diagB.includes("…222") && !diagB.includes(CHAT_B) && !diagB.includes(TOKEN));
+  await bot.handleUpdate(update(CHAT_A, "diag", 3));
+  const diagA = sent.at(-1)!;
+  assert.equal(diagA.split("\n").length, 7, diagA);
+  assert.ok(diagA.includes("webhook ok") && diagA.includes("(dry)"));
+
+  // The copied text (what Settings → Diagnostics → Copy produces for the admin).
+  const [me, system, events] = await Promise.all([collectMe(A, { iat: Math.floor(Date.now() / 1000) - 3600 }), collectSystem({ host: "recomp.test", api: bot.api }), recentEvents({ all: true, limit: 50 })]);
+  const text = renderDiagText({
+    header: { build: system.build.sha, time: system.time.utc, user: me.email },
+    sections: [...meSections(me), ...systemSections(system), { title: "Events", items: events.map((e) => `${e.email ?? "system"} · ${e.scope} · ${e.message} ${JSON.stringify(e.meta ?? {})}`) }],
+  });
+  for (const secret of [CHAT_A, CHAT_B, TOKEN, "BEEF1234", "beef1234"]) assert.ok(!text.includes(secret), `copied text contains ${secret}`);
+  assert.ok(text.includes("chat …111") && text.includes("link code") && !/link code [A-Z0-9]{8}/.test(text));
+  assert.ok(text.includes("Env missing") && text.includes("DATABASE_URL"), "env by name only");
+  assert.ok(text.includes("migration 0009_diag_events") || text.includes("no migrations table"));
+  assert.ok(text.includes("ana@example.com · allowed · onboarded · linked"));
+  assert.ok(text.includes('"dayPlan"'), "DayState block present");
+  assert.ok(text.includes("tick · due"), "events listed");
 });

@@ -5,6 +5,8 @@
  */
 import { Bot, InlineKeyboard, type Context } from "grammy";
 import { nowTimeIST, todayIST } from "@/lib/dates";
+import { diagReply } from "@/lib/diag/bot";
+import { logEvent } from "@/lib/diag/events";
 import { entryFromFood, insertFoodEntries, listFoods } from "@/lib/food";
 import { n0, n1 } from "@/lib/format";
 import { getDayState } from "@/lib/rules/dayState";
@@ -44,6 +46,15 @@ export function getBot(): Bot<BotContext> {
     if (!m) return; // unlinked chat — silent
     const linked = await linkChatByCode(m[1], chat);
     if (linked !== null) await ctx.reply(`Linked ✓\n\n${HELP}`, { parse_mode: "HTML" });
+  });
+
+  // One diag event per inbound update from a linked chat: the command kind only, never the text.
+  bot.use(async (ctx, next) => {
+    const data = ctx.callbackQuery?.data;
+    const text = ctx.message?.text;
+    const kind = data ? `callback:${data.split(":")[0]}` : text ? (parseCommand(text)?.type ?? "free_text") : "other";
+    await logEvent({ userId: ctx.who.userId, scope: "bot", message: "command", meta: { kind } });
+    return next();
   });
 
   bot.command("start", (ctx) => ctx.reply("Already linked.", { parse_mode: "HTML" }));
@@ -140,6 +151,7 @@ export function getBot(): Bot<BotContext> {
         case "today": return void (await reply(await opToday(who, date)));
         case "undo": return void (await reply(await opUndo(who, date)));
         case "help": return void (await reply(HELP));
+        case "diag": return void (await reply(await diagReply(who, ctx.api)));
         case "copy": return void (await reply(await opCopy(who, date)));
         case "cardio": return void (await reply(await opCardio(who, date, cmd.input)));
         case "cardioRepeat": return void (await reply(await opCardioRepeat(who, date)));
@@ -158,7 +170,7 @@ export function getBot(): Bot<BotContext> {
     // Free text → Gemini → confirm.
     const foods = await listFoods(who.userId);
     const state = await getDayState(who.userId, date, { settings: who.settings });
-    const items = await parseFreeText(text, foods, state.targets.phase);
+    const items = await parseFreeText(text, foods, state.targets.phase, who.userId);
     if (!items) return void (await reply(PARSE_FAIL));
     await expirePending(who.userId);
     const totals = { kcal: items.reduce((a, i) => a + i.kcal, 0), proteinG: items.reduce((a, i) => a + i.proteinG, 0) };
@@ -176,10 +188,12 @@ export function getBot(): Bot<BotContext> {
     });
   });
 
-  bot.catch((err) => {
-    // No bodies, no ids — just the error class and description.
+  bot.catch(async (err) => {
+    // No bodies, no ids — just the error class and description (console and a diag event for the user if resolved).
     const e = err.error;
-    console.error("telegram handler failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
+    const message = e instanceof Error ? `${e.name}: ${e.message}` : "unknown error";
+    console.error("telegram handler failed:", message);
+    await logEvent({ userId: err.ctx.who?.userId ?? null, scope: "bot", level: "error", message });
   });
 
   return bot;

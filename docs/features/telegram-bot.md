@@ -20,6 +20,7 @@ The primary daily interface. grammY in webhook mode at `/api/telegram`. Proactiv
 | `navel 88.5` · `waist 85` | measurement, upserted by date |
 | `water` | +1 glass (only when the water toggle is on) |
 | `help` / `/start` | help text (`HELP` in `messages.ts`); `/start <code>` from an unlinked chat links it to the code's owner |
+| `diag` | five lines: build, db, your link state, last tick result for you, today in one line; admins get the webhook and per-user tick lines too (`src/lib/diag/bot.ts`, [../diagnostics.md](../diagnostics.md)) |
 
 Order matters in `parseCommand`: keywords → `w` → `s` → navel/waist → **cardio** (`parseCardio`, so `walk 30 5` isn't a meal) →
 `name kcal protein` → `name [n]`. Cardio validation errors reply with the reason instead of falling through to AI.
@@ -40,7 +41,10 @@ On any failure (network, 429, bad JSON) the bot replies "couldn't parse that —
 - **Blocked chats.** When a proactive send gets 403 the tick sets `settings.telegram_blocked_at` and stops sending to that
   chat; it stays linked. Any message from it (Telegram sends `/start` when they tap Restart) clears the flag in the gate
   middleware, so reminders resume by themselves. People shows "blocked" meanwhile.
-- Never log message bodies, tokens or chat ids (`bot.catch` logs the error class only).
+- Never log message bodies, tokens or chat ids (`bot.catch` logs the error class only, to the console and as a `bot` diag event).
+- **Diag events:** a middleware after the gate writes one `bot · command` event per inbound update with the parsed command
+  kind (or `free_text` / `callback:<prefix>`), never the text; `parseFreeText` writes a `gemini` event with the outcome and
+  latency. Seen in Settings → Diagnostics.
 - Every log reply ends with the running total (`runningLine`) and the overage line if over target (`withOverage`).
 - Day buttons: `plan:<date>:<typeId|rest>` sets the day (morning brief), `did:<date>:<typeId|rest|same>` sets and logs it
   (day close, `done`, the type reply). Legacy `nudge:done` / `nudge:skip` still work. Choices that would replace a session
@@ -48,6 +52,6 @@ On any failure (network, 429, bad JSON) the bot replies "couldn't parse that —
 
 ## Files
 `src/lib/telegram/`: `bot.ts` (middleware gate, handlers, callbacks), `parse.ts` (pure: `parseCommand`, `matchPlanWord`, `matchFood`,
-`servingsFor`), `ops.ts` (one function per command, each takes `Who`), `messages.ts` (HTML templates), `ai.ts`, `send.ts`
-(`sendMessage(chatId, …)`, `describeSendError`), `env.ts`. Chat ↔ user lookups: `src/lib/users.ts`.
+`servingsFor`), `ops.ts` (one function per command, each takes `Who`), `messages.ts` (HTML templates), `ai.ts` (`parseFreeText(text, foods, phase, userId)`), `send.ts`
+(`sendMessage(chatId, …)`, `describeSendError`), `env.ts`. `diag` lives in `src/lib/diag/bot.ts`. Chat ↔ user lookups: `src/lib/users.ts`.
 Webhook management: `pnpm bot:set-webhook <url>`, `pnpm bot:webhook-info`, `pnpm bot:delete-webhook`.

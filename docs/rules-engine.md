@@ -33,9 +33,11 @@ DayState {
 - The weekday no longer decides anything (`routine_days.weekday` is never read).
 
 ## Engine (`engine.ts` + `rules.ts`)
-- `GET /api/tick` (cron-job.org every 15 min, header `x-tick-secret`) loops over onboarded users with a linked chat
-  (`listLinkedUsers`) and runs `evaluate(userId, settings, now)` → `send(userId, chatId, due, now)` for each, with that user's
-  toggles, quiet hours and daily cap. Each user's run is wrapped in try/catch: a failed send (429, a blocked bot's 403, a
+- `GET /api/tick` (cron-job.org every 15 min, header `x-tick-secret`) calls `runTick` (`tick.ts`; Diagnostics → "Run tick
+  (dry)" calls it too), which loops over onboarded users with a linked chat (`listLinkedUsers`) and runs
+  `evaluate(userId, settings, now)` → `send(userId, chatId, due, now)` for each, with that user's toggles, quiet hours and
+  daily cap. Each run writes a `tick · run` diag event (dry runs flagged) and a per-user `due` / `sent` / `failed` event
+  when something was due; real runs prune diag events older than 7 days. Each user's run is wrapped in try/catch: a failed send (429, a blocked bot's 403, a
   network error) is reported for that user as `ok: false` + the error class (`describeSendError`) and the loop goes on; a
   403 also sets `settings.telegram_blocked_at`, so `listLinkedUsers` skips them until their next message to the bot clears
   it. The response lists results per user (first 8 chars of the id), never emails or chat ids.
@@ -86,7 +88,8 @@ The weekly smoke-free milestone isn't a separate rule: it's a line inside `morni
 | `src/lib/rules/engine.ts` | `evaluate(userId, settings, now)`, `send(userId, chatId, due, now)`, skip reasons |
 | `src/lib/rules/rules.ts` | `RULES`, `formatWeeklyReport`, `cheapestFix`, `onboardingDate` |
 | `src/lib/rules/loaders.ts`, `weekly.ts`, `instant.ts` | Memoised loaders, the weekly report, the overage line |
-| `src/app/api/tick/route.ts` | Loops `listLinkedUsers()` (linked, not blocked) with a try/catch per user; `?dry=1`, `?force=` |
+| `src/lib/rules/tick.ts` | `runTick({ dry, force })`: loops `listLinkedUsers()` (linked, not blocked) with a try/catch per user, diag events, pruning |
+| `src/app/api/tick/route.ts` | Secret check, `?dry=1`, `?force=` → `runTick` |
 | `src/lib/telegram/send.ts`, `messages.ts` | Delivery (`sendMessage`, `describeSendError`) and templates |
 | `src/lib/nudges.ts`, `src/app/(app)/settings/nudge-settings.tsx` | Toggle list and its UI |
 

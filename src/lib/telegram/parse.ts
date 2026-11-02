@@ -11,6 +11,7 @@ export type Command =
   | { type: "today" }
   | { type: "undo" }
   | { type: "help" }
+  | { type: "diag" }
   | { type: "navel"; cm: number }
   | { type: "waist"; cm: number }
   | { type: "copy" }
@@ -25,7 +26,7 @@ const steps = z.coerce.number().int().min(0).max(100_000);
 const cm = z.coerce.number().min(40).max(200);
 const kcal = z.coerce.number().min(0).max(5000);
 const protein = z.coerce.number().min(0).max(500);
-const KEYWORDS: Record<string, Command["type"]> = { water: "water", done: "done", today: "today", undo: "undo", help: "help", start: "help", copy: "copy", same: "copy", cardio: "cardioRepeat" };
+const KEYWORDS: Record<string, Command["type"]> = { water: "water", done: "done", today: "today", undo: "undo", help: "help", start: "help", diag: "diag", copy: "copy", same: "copy", cardio: "cardioRepeat" };
 
 export function parseCommand(raw: string): Command | null {
   const text = raw.trim().replace(/\s+/g, " ");

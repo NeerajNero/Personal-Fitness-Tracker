@@ -62,8 +62,9 @@ snapshot, then edit the SQL. Keep the statement breakpoints. 0007 is re-runnable
 (first 8 chars of the id) `ok: true` with the due keys, what was sent and a skip reason per rule, or `ok: false` with the
 error class and code when that user's run threw (a 403 also sets `blocked: true` and marks their chat blocked); one
 user's failure never stops the others. Never message bodies, emails or chat ids.
-Production is driven by cron-job.org every 15 minutes with the `x-tick-secret` header; its job history is the first
-place to look when a reminder didn't arrive.
+Production is driven by cron-job.org every 15 minutes with the `x-tick-secret` header. Settings → Diagnostics shows the
+last run and, for admins, **Run tick (dry)** without leaving the phone ([diagnostics.md](diagnostics.md)); cron-job.org's
+job history is the next place to look when a reminder didn't arrive.
 
 ## Adding a person
 1. Append the email to `ALLOWED_EMAILS` in Vercel (owner stays first) and add them as a Google test user. Redeploy.
@@ -102,4 +103,5 @@ in Settings stays for users who want their own data, and never includes `setting
 | `scripts/seed.ts`, `scripts/choose-your-day.ts`, `scripts/remove-user.ts`, `scripts/backup.ts` | Library seed; one-off data step; delete a person; JSON dump of every table |
 | `drizzle/`, `drizzle.config.ts` | Migrations and snapshots |
 | `src/app/api/tick/route.ts`, `src/app/api/telegram/route.ts`, `src/app/api/export/[table]/route.ts` | The three route handlers |
+| `next.config.ts` | `NEXT_PUBLIC_BUILD_SHA` / `NEXT_PUBLIC_BUILD_TIME` (Vercel commit, build time) for Diagnostics |
 | `vercel.json` | Absent on purpose: no `crons` |
