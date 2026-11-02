@@ -15,7 +15,7 @@ import { appUrl, botToken } from "@/lib/telegram/env";
 import { listPeople } from "@/lib/users";
 import type { TickRunUser } from "@/lib/rules/tick";
 import { lastTickRun, recentEvents, userEventStats, type EventRow } from "./events";
-import { fmtUtc, type DiagSection } from "./text";
+import { errorLine, fmtUtc, type DiagLine, type DiagSection } from "./text";
 
 export const REQUIRED_ENV = [
   "DATABASE_URL", "AUTH_SECRET", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "ALLOWED_EMAILS", "TELEGRAM_BOT_TOKEN",
@@ -23,7 +23,10 @@ export const REQUIRED_ENV = [
 ] as const;
 
 export type BuildInfo = { sha: string; builtAt: string | null; next: string };
-export type DbInfo = { ok: boolean; ms: number; migration: string | null; users: number | null; error: string | null };
+/** `pending` = journal entries newer than the latest applied one; null when the migrations table itself is missing. */
+export type DbInfo = { ok: boolean; ms: number; migration: string | null; pending: number | null; users: number | null; error: string | null };
+/** A probe that may fail on its own without taking the section down. */
+export type Probe<T> = { ok: true; value: T } | { ok: false; error: string };
 export type WebhookInfo = { ok: boolean; url: string | null; matches: boolean | null; pending: number | null; lastError: string | null; lastErrorAt: string | null; error: string | null };
 export type TickInfo = { at: Date; dry: boolean; users: TickRunUser[] } | null;
 export type GeminiInfo = { key: boolean; model: string; pending: number | null; last: EventRow | null };
@@ -35,12 +38,19 @@ export type SystemDiag = {
   url: { configured: string | null; host: string | null; matches: boolean | null };
   db: DbInfo;
   webhook: WebhookInfo | null;
-  tick: TickInfo;
-  gemini: GeminiInfo;
-  people: PersonDiag[];
+  tick: Probe<TickInfo>;
+  gemini: Probe<GeminiInfo>;
 };
 
 const errName = (e: unknown) => (e instanceof Error ? e.name : "Error");
+
+export async function probe<T>(fn: () => Promise<T>): Promise<Probe<T>> {
+  try {
+    return { ok: true, value: await fn() };
+  } catch (e) {
+    return { ok: false, error: errorLine(e) };
+  }
+}
 
 export function buildInfo(): BuildInfo {
   return { sha: process.env.NEXT_PUBLIC_BUILD_SHA || "dev", builtAt: process.env.NEXT_PUBLIC_BUILD_TIME || null, next: nextPkg.version };
@@ -56,24 +66,26 @@ export function envStatus(): { present: string[]; missing: string[] } {
   return { present, missing };
 }
 
-/** A timed `select 1`, the latest applied migration (by the journal's `when`), and the users count. */
+/** A timed `select 1`, the latest applied migration (by the journal's `when`) with how many are still pending, and the users count. */
 export async function dbCheck(): Promise<DbInfo> {
   const t0 = Date.now();
   try {
     await db.execute(sql`select 1`);
     const ms = Date.now() - t0;
     let migration: string | null = null;
+    let pending: number | null = null;
     try {
       const { rows } = await db.execute<{ created_at: string }>(sql`select created_at from drizzle.__drizzle_migrations order by created_at desc limit 1`);
-      const when = rows[0] ? Number(rows[0].created_at) : null;
-      migration = when === null ? "none recorded" : (journal.entries.find((e) => e.when === when)?.tag ?? `unknown (${when})`);
+      const when = rows[0] ? Number(rows[0].created_at) : 0;
+      migration = when === 0 ? "none recorded" : (journal.entries.find((e) => e.when === when)?.tag ?? `unknown (${when})`);
+      pending = journal.entries.filter((e) => e.when > when).length;
     } catch {
       migration = "no migrations table";
     }
     const [{ n }] = await db.select({ n: count() }).from(users);
-    return { ok: true, ms, migration, users: n, error: null };
+    return { ok: true, ms, migration, pending, users: n, error: null };
   } catch (e) {
-    return { ok: false, ms: Date.now() - t0, migration: null, users: null, error: errName(e) };
+    return { ok: false, ms: Date.now() - t0, migration: null, pending: null, users: null, error: errName(e) };
   }
 }
 
@@ -116,28 +128,43 @@ export async function peopleStatus(): Promise<PersonDiag[]> {
   });
 }
 
+/** Every probe settles on its own: a failing one becomes an error line, the others still report. */
 export async function collectSystem(opts: { host?: string | null; webhook?: boolean; api?: Api } = {}): Promise<SystemDiag> {
   const configured = appUrl() || null;
   const host = opts.host ?? null;
-  const [dbInfo, webhook, tick, gemini, people] = await Promise.all([
-    dbCheck(), opts.webhook === false ? Promise.resolve(null) : webhookStatus(opts.api), tickStatus(), geminiStatus(), peopleStatus(),
+  const [dbInfo, webhook, tick, gemini] = await Promise.all([
+    dbCheck(), opts.webhook === false ? Promise.resolve(null) : webhookStatus(opts.api), probe(tickStatus), probe(geminiStatus),
   ]);
   return {
     build: buildInfo(),
     time: { utc: fmtUtc(new Date()), ist: `${todayIST()} ${nowTimeIST()} IST` },
     env: envStatus(),
     url: { configured, host, matches: configured && host ? new URL(configured).host === host : null },
-    db: dbInfo, webhook, tick, gemini, people,
+    db: dbInfo, webhook, tick, gemini,
   };
+}
+
+/** The line that goes first in System when the database is behind `drizzle/`. */
+export function migrationsPendingLine(db: DbInfo): string | null {
+  if (!db.ok) return null;
+  if (db.pending === null) return "migrations table missing — run pnpm db:migrate";
+  if (db.pending > 0) return `${db.pending} migration${db.pending === 1 ? "" : "s"} pending — run pnpm db:migrate`;
+  return null;
 }
 
 export const tickUserLine = (u: TickRunUser) => (u.ok ? `${u.user} ok${u.rules.length ? ` sent ${u.rules.join(", ")}` : " nothing due"}` : `${u.user} failed ${u.error}${u.code ? ` ${u.code}` : ""}`);
 
-export function systemSections(s: SystemDiag): DiagSection[] {
-  const sections: DiagSection[] = [];
-  sections.push({
+export function systemSection(s: SystemDiag): DiagSection {
+  const pending = migrationsPendingLine(s.db);
+  const tickLine = !s.tick.ok ? `check failed (${s.tick.error})` : !s.tick.value ? "no run recorded"
+    : `${fmtUtc(s.tick.value.at)}${s.tick.value.dry ? " (dry)" : ""} · ${s.tick.value.users.length ? s.tick.value.users.map(tickUserLine).join(" · ") : "no linked users"}`;
+  const g = s.gemini;
+  const geminiLine = !g.ok ? `check failed (${g.error})`
+    : `key ${g.value.key ? "present" : "MISSING"} · ${g.value.model} · ${g.value.pending ?? "?"} pending parses · last ${g.value.last ? `${g.value.last.message} ${JSON.stringify(g.value.last.meta ?? {})} at ${fmtUtc(g.value.last.at)}` : "none"}`;
+  return {
     title: "System",
     lines: [
+      ...(pending ? [["Migrations", pending] as DiagLine] : []),
       ["Build", `${s.build.sha} · built ${s.build.builtAt ? fmtUtc(s.build.builtAt) : "unknown"} · Next ${s.build.next}`],
       ["Server time", `${s.time.utc} · ${s.time.ist}`],
       ["Env present", s.env.present.join(", ") || "none"],
@@ -147,14 +174,16 @@ export function systemSections(s: SystemDiag): DiagSection[] {
       ["Webhook", !s.webhook ? "not checked" : s.webhook.ok
         ? `${s.webhook.url ?? "not set"} · ${s.webhook.matches === null ? "not compared" : s.webhook.matches ? "matches app URL" : "DOES NOT match app URL"} · ${s.webhook.pending} pending · last error ${s.webhook.lastError ? `${s.webhook.lastError} at ${s.webhook.lastErrorAt}` : "none"}`
         : `getWebhookInfo failed (${s.webhook.error})`],
-      ["Last tick", s.tick ? `${fmtUtc(s.tick.at)}${s.tick.dry ? " (dry)" : ""} · ${s.tick.users.length ? s.tick.users.map(tickUserLine).join(" · ") : "no linked users"}` : "no run recorded"],
-      ["Gemini", `key ${s.gemini.key ? "present" : "MISSING"} · ${s.gemini.model} · ${s.gemini.pending ?? "?"} pending parses · last ${s.gemini.last ? `${s.gemini.last.message} ${JSON.stringify(s.gemini.last.meta ?? {})} at ${fmtUtc(s.gemini.last.at)}` : "none"}`],
+      ["Last tick", tickLine],
+      ["Gemini", geminiLine],
     ],
-  });
-  sections.push({
+  };
+}
+
+export function peopleSection(people: PersonDiag[]): DiagSection {
+  return {
     title: "People",
-    items: s.people.map((p) =>
+    items: people.map((p) =>
       `${p.email} · ${p.allowed ? "allowed" : "NOT in ALLOWED_EMAILS"} · ${p.onboarded ? "onboarded" : "not onboarded"} · ${p.blocked ? "BLOCKED" : p.linked ? "linked" : "no chat"} · in ${fmtUtc(p.lastInbound)} · out ${fmtUtc(p.lastOutbound)} · send error ${p.lastSendError ?? "none"}`),
-  });
-  return sections;
+  };
 }

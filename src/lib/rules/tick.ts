@@ -47,6 +47,6 @@ export async function runTick(opts: { dry?: boolean; force?: string } = {}): Pro
 
   const summary: TickRunUser[] = users.map((u) => (u.ok ? { user: u.user, ok: true, rules: dry ? u.due : u.sent } : { user: u.user, ok: false, rules: [], error: u.error, code: u.code }));
   await logEvent({ scope: "tick", message: "run", meta: { dry, force, users: summary } });
-  const pruned = dry ? 0 : await pruneEvents(7);
+  const pruned = dry ? 0 : await pruneEvents(7).catch((e) => (console.error("diag prune failed:", e instanceof Error ? e.name : "error"), 0));
   return { now: { date: now.date, time: now.time }, dry, force, users, pruned };
 }

@@ -10,7 +10,13 @@ The row sits at the bottom of Settings, under "When something's off", outside th
 (`loadDiagnostics`, a server action), because the admin probes include a network call to Telegram. **Me** and **Events**
 are for every user; **System** and **People** only for admins. **The gate is server-side**: `buildDiagnostics` and
 `runTickDryAs` (`src/lib/diag/load.ts`) read `users.is_admin` themselves and never compute the admin sections or run the
-dry tick for anyone else; the UI only decides what to draw. `pnpm test` (test 5) asserts this. The phone adds **Device**, **PWA** and
+dry tick for anyone else; the UI only decides what to draw. `pnpm test` (test 5) asserts this.
+
+**Every section loads on its own** (`buildDiagnostics` runs one collector per section): a failing one renders a red
+`⚠ ErrorClass: first line of the message` under its heading (never the SQL or a stack), the others still render, and the
+copied text repeats those under a final `## Errors` heading. Inside System, each probe (database, webhook, last tick,
+Gemini) settles separately too, so "Last tick: check failed (…)" sits next to a healthy database line. **Copy** lives in
+the card's heading and always works: before the load it copies a one-line status, afterwards the whole report. The phone adds **Device**, **PWA** and
 **Client errors** on the client. **Copy diagnostics** puts every visible line on the clipboard as plain text with a header
 (`Recomp diagnostics · build <sha> · <UTC time> · <email>`); when the clipboard API refuses (http, old WebView), a
 selectable textarea appears instead. ↻ reloads. Admins also get **Run tick (dry)**, which runs `runTick({ dry: true })`
@@ -30,13 +36,14 @@ and shows the JSON inline.
 ## System (admin)
 | Line | Means | If it looks wrong |
 |---|---|---|
+| Migrations (only when behind) | `N migrations pending — run pnpm db:migrate`, or `migrations table missing` | the database is behind `drizzle/`: the code expects columns or tables that aren't there → [migrations pending](troubleshooting.md#diagnostics-says-migrations-pending) |
 | Build | `NEXT_PUBLIC_BUILD_SHA` (Vercel commit, `dev` locally), build time, Next version | sha older than the last push → the deploy didn't happen or failed |
 | Server time | UTC and IST now | |
 | Env present / missing | the required variables, by name only | anything missing → Vercel env + redeploy ([operations](operations.md#environment-env-never-envlocal-template-in-envexample)) |
 | App URL | `NEXT_PUBLIC_APP_URL` vs the request host | MISMATCH → links in bot messages point elsewhere; fix the variable |
-| Database | timed `select 1`, latest applied migration (journal tag), users count | FAILED → [everything errors](troubleshooting.md#everything-errors-at-once); migration behind `drizzle/` → `pnpm db:migrate` |
+| Database | timed `select 1`, latest applied migration (journal tag), users count | FAILED → [everything errors](troubleshooting.md#everything-errors-at-once) |
 | Webhook | `getWebhookInfo`: url, whether it matches the app URL, pending updates, last error + time | wrong/empty url, growing pending, 401 last error → [bot never answers](troubleshooting.md#the-bot-never-answers) |
-| Last tick | time of the last `tick / run` event (dry runs flagged) and each user's outcome | none or old → cron-job.org; a user `failed GrammyError 403` → they blocked the bot |
+| Last tick | time of the last `tick / run` event (dry runs flagged) and each user's outcome | none or old → cron-job.org; a user `failed GrammyError 403` → they blocked the bot; `check failed (…)` → the events table is missing (migrations pending) |
 | Gemini | key present, model, pending parses, last gemini event with latency | "rate limited" / "timeout" → [Gemini](troubleshooting.md#gemini-never-parses-free-text) |
 
 ## People (admin)
@@ -75,12 +82,12 @@ Env values, tokens, the webhook secret, full chat ids, link codes, other people'
 | File | Role |
 |---|---|
 | `src/lib/diag/events.ts` | `logEvent`, `recentEvents`, `pruneEvents`, `lastTickRun`, `userEventStats` (raw db: the ESLint exception) |
-| `src/lib/diag/system.ts` | `buildInfo`, `envStatus`, `dbCheck`, `webhookStatus`, `tickStatus`, `geminiStatus`, `peopleStatus`, `collectSystem`, `systemSections` |
-| `src/lib/diag/me.ts` | `collectMe`, `meSections`, `dayStateLine`, `dayStateJson` |
+| `src/lib/diag/system.ts` | `buildInfo`, `envStatus`, `dbCheck` (+ pending count), `migrationsPendingLine`, `webhookStatus`, `tickStatus`, `geminiStatus`, `peopleStatus`, `probe`, `collectSystem`, `systemSection`, `peopleSection` |
+| `src/lib/diag/me.ts` | `collectMe`, `collectDayState`, `meSection`, `dayStateSection`, `dayStateLine`, `dayStateJson` |
 | `src/lib/diag/bot.ts` | `diagReply` (the `diag` command) |
-| `src/lib/diag/text.ts`, `src/lib/diag/client-log.ts` | Client-safe: report shape + `renderDiagText`, `maskChatId`; the in-memory client error log |
+| `src/lib/diag/text.ts`, `src/lib/diag/client-log.ts` | Client-safe: report shape + `renderDiagText` (incl. `## Errors`), `errorLine`, `maskChatId`; the in-memory client error log |
 | `src/lib/diag/report.ts`, `src/lib/action-result.ts` | Server-action error boundary (`reportActionError` via `fail`) |
-| `src/lib/diag/load.ts` | `buildDiagnostics(userId, …)`, `runTickDryAs(userId)`, `isAdmin`: the server-side gate |
+| `src/lib/diag/load.ts` | `buildDiagnostics(userId, …)` (one collector per section, each caught), `runTickDryAs(userId)`, `isAdmin`: the server-side gate |
 | `src/app/(app)/settings/diagnostics.tsx`, `diag-actions.ts` | The card (client sections, copy, fallback textarea, Run tick) and the thin `loadDiagnostics` / `runTickDry` actions |
 | `src/components/client-log.tsx`, `public/sw.js` | Installs the client log; `SW_VERSION` + the version message |
 | `src/lib/rules/tick.ts` | `runTick` (events, pruning) |

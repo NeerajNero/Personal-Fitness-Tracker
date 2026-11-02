@@ -63,7 +63,10 @@ export function Diagnostics() {
       setAdmin(r.admin);
     });
 
-  const text = report ? renderDiagText(report) : "";
+  // Always copyable: before/while loading the text says so, and a section that failed shows up under "Errors".
+  const text = renderDiagText(
+    report ?? { header: { build: "?", time: new Date().toISOString(), user: "?" }, sections: [{ title: "Status", error: error ? `load failed: ${error}` : pending ? "still loading" : "not loaded yet — open the card" }] },
+  );
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
@@ -75,11 +78,15 @@ export function Diagnostics() {
 
   return (
     <details className="group rounded-2xl border border-border bg-surface" onToggle={(e) => { if (e.currentTarget.open && !report && !pending) load(); }}>
-      <summary className="flex cursor-pointer list-none items-center justify-between p-4 [&::-webkit-details-marker]:hidden">
-        <span>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-4 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
           <span className="block font-semibold">Diagnostics</span>
           <span className="block text-xs text-muted">Is everything working? Copy and send this when something&apos;s off. No secrets.</span>
         </span>
+        {/* Inside the summary on purpose: copy without toggling the card (preventDefault stops the toggle). */}
+        <button type="button" className={`${btn} shrink-0`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); copy(); }}>
+          {copied === "done" ? "Copied ✓" : "Copy"}
+        </button>
         <span className="text-muted transition-transform group-open:rotate-180">⌄</span>
       </summary>
       <div className="flex flex-col gap-3 px-4 pb-4">
@@ -88,8 +95,7 @@ export function Diagnostics() {
         {report ? (
           <>
             <div className="flex gap-2">
-              <button type="button" onClick={copy} className={`${btn} flex-1`}>{copied === "done" ? "Copied ✓" : "Copy diagnostics"}</button>
-              <button type="button" onClick={load} disabled={pending} className={btn}>↻</button>
+              <button type="button" onClick={load} disabled={pending} className={btn}>↻ Reload</button>
               {admin ? (
                 <button type="button" disabled={pending} className={btn} onClick={() => start(async () => { const r = await runTickDry(); setTick(r.ok ? JSON.stringify(r.result, null, 2) : r.error); })}>
                   Run tick (dry)
@@ -104,6 +110,7 @@ export function Diagnostics() {
             {report.sections.map((s) => (
               <section key={s.title}>
                 <h3 className="text-sm font-semibold">{s.title}</h3>
+                {s.error ? <p className="mt-1 break-words text-xs text-danger">⚠ {s.error}</p> : null}
                 {s.lines ? (
                   <dl className="mt-1 text-xs">
                     {s.lines.map(([k, v]) => (

@@ -6,20 +6,22 @@ import { todayIST } from "@/lib/dates";
 import type { Who } from "@/lib/telegram/ops";
 import { getUser } from "@/lib/users";
 import { dayStateLine } from "./me";
-import { buildInfo, dbCheck, tickStatus, tickUserLine, webhookStatus } from "./system";
+import { buildInfo, dbCheck, migrationsPendingLine, probe, tickStatus, tickUserLine, webhookStatus } from "./system";
 import { fmtUtc, maskChatId } from "./text";
 
 export async function diagReply(who: Who, api?: Api): Promise<string> {
-  const [user, db, tick, state] = await Promise.all([getUser(who.userId), dbCheck(), tickStatus(), getDayState(who.userId, todayIST(), { settings: who.settings })]);
+  const [user, db, tickProbe, state] = await Promise.all([getUser(who.userId), dbCheck(), probe(tickStatus), probe(() => getDayState(who.userId, todayIST(), { settings: who.settings }))]);
   const build = buildInfo();
   const s = who.settings;
+  const tick = tickProbe.ok ? tickProbe.value : null;
   const me = tick?.users.find((u) => u.user === who.userId.slice(0, 8));
+  const pending = migrationsPendingLine(db);
   const lines = [
     `🔧 build ${esc(build.sha)} · Next ${esc(build.next)}`,
-    `🗄 db ${db.ok ? `ok ${db.ms} ms · ${esc(db.migration ?? "?")}` : `<b>FAILED</b> ${esc(db.error ?? "")}`}`,
+    `🗄 db ${db.ok ? `ok ${db.ms} ms · ${esc(db.migration ?? "?")}${pending ? ` · <b>${esc(pending)}</b>` : ""}` : `<b>FAILED</b> ${esc(db.error ?? "")}`}`,
     `🔗 ${s.telegramChatId ? `linked (chat ${esc(maskChatId(s.telegramChatId))})` : "not linked"}${s.telegramBlockedAt ? " · <b>blocked</b>" : ""}`,
-    `⏰ tick ${tick ? `${esc(fmtUtc(tick.at))}${tick.dry ? " (dry)" : ""} · ${me ? esc(tickUserLine(me).replace(/^\S+ /, "")) : "not in that run"}` : "no run recorded"}`,
-    `📅 ${esc(dayStateLine(state))}`,
+    `⏰ tick ${!tickProbe.ok ? `<b>check failed</b> ${esc(tickProbe.error)}` : tick ? `${esc(fmtUtc(tick.at))}${tick.dry ? " (dry)" : ""} · ${me ? esc(tickUserLine(me).replace(/^\S+ /, "")) : "not in that run"}` : "no run recorded"}`,
+    `📅 ${state.ok ? esc(dayStateLine(state.value)) : `<b>day state failed</b> ${esc(state.error)}`}`,
   ];
   if (user?.isAdmin) {
     const w = await webhookStatus(api);

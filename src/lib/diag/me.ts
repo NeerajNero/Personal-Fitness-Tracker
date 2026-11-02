@@ -6,7 +6,7 @@ import { todayIST } from "@/lib/dates";
 import { getSettings } from "@/lib/settings";
 import { getUser, isAllowedEmail } from "@/lib/users";
 import { n0 } from "@/lib/format";
-import { fmtUtc, maskChatId, type DiagSection } from "./text";
+import { errorLine, fmtUtc, maskChatId, type DiagSection } from "./text";
 
 const MY_TABLES = [
   "foods", "food_log", "daily_metrics", "measurements", "exercises", "routine_days", "routine_exercises", "sessions",
@@ -17,8 +17,8 @@ export type MeDiag = {
   email: string; userId: string; admin: boolean; allowed: boolean; onboardedAt: Date | null;
   session: { issuedAt: Date | null; age: string | null };
   telegram: { linked: boolean; chat: string; blocked: boolean; hasCode: boolean };
-  counts: [string, number][];
-  dayState: DayState;
+  /** Per-table row counts, or the error line when that query failed (e.g. a table missing before its migration). */
+  counts: [string, number][] | { error: string };
 };
 
 function age(from: Date): string {
@@ -30,21 +30,23 @@ function age(from: Date): string {
 
 export async function collectMe(userId: UserId, session: { iat?: number } = {}): Promise<MeDiag> {
   const u = forUser(userId);
-  const [user, settings, state, counts] = await Promise.all([
+  const [user, settings, counts] = await Promise.all([
     getUser(userId),
     getSettings(userId),
-    getDayState(userId, todayIST()),
-    u.db.execute<{ t: string; n: number }>(sql.join(MY_TABLES.map((t) => sql`select ${t} as t, count(*)::int as n from ${sql.identifier(t)} where user_id = ${u.uid}`), sql` union all `)),
+    u.db
+      .execute<{ t: string; n: number }>(sql.join(MY_TABLES.map((t) => sql`select ${t} as t, count(*)::int as n from ${sql.identifier(t)} where user_id = ${u.uid}`), sql` union all `))
+      .then((r) => r.rows.map((x): [string, number] => [x.t, x.n]), (e) => ({ error: errorLine(e) })),
   ]);
   const issuedAt = session.iat ? new Date(session.iat * 1000) : null;
   return {
     email: user?.email ?? "?", userId, admin: user?.isAdmin ?? false, allowed: user ? isAllowedEmail(user.email) : false, onboardedAt: user?.onboardedAt ?? null,
     session: { issuedAt, age: issuedAt ? age(issuedAt) : null },
     telegram: { linked: settings.telegramChatId !== null, chat: maskChatId(settings.telegramChatId), blocked: settings.telegramBlockedAt !== null, hasCode: settings.telegramLinkCode !== null },
-    counts: counts.rows.map((r) => [r.t, r.n]),
-    dayState: state,
+    counts,
   };
 }
+
+export const collectDayState = (userId: UserId): Promise<DayState> => getDayState(userId, todayIST());
 
 /** DayState as the chips and the bot read it; the one function field is dropped (not serialisable). */
 export function dayStateJson(state: DayState): string {
@@ -62,19 +64,21 @@ export function dayStateLine(s: DayState): string {
   return parts.join(" · ");
 }
 
-export function meSections(m: MeDiag): DiagSection[] {
-  return [
-    {
-      title: "Me",
-      lines: [
-        ["Account", `${m.email} · id ${m.userId} · ${m.admin ? "admin" : "user"} · ${m.allowed ? "in ALLOWED_EMAILS" : "NOT in ALLOWED_EMAILS"}`],
-        ["Onboarded", m.onboardedAt ? fmtUtc(m.onboardedAt) : "no"],
-        ["Session", m.session.issuedAt ? `issued ${fmtUtc(m.session.issuedAt)} · age ${m.session.age}` : "no issued-at in token"],
-        ["Telegram", `${m.telegram.linked ? `linked (chat ${m.telegram.chat})` : "not linked"}${m.telegram.blocked ? " · BLOCKED (write to the bot to resume)" : ""} · link code ${m.telegram.hasCode ? "present" : "none"}`],
-        ["My rows", m.counts.map(([t, n]) => `${t} ${n}`).join(", ")],
-        ["Today (one line)", dayStateLine(m.dayState)],
-      ],
-    },
-    { title: "Today's DayState (what the chips and the bot read)", block: dayStateJson(m.dayState) },
-  ];
+export function meSection(m: MeDiag): DiagSection {
+  return {
+    title: "Me",
+    lines: [
+      ["Account", `${m.email} · id ${m.userId} · ${m.admin ? "admin" : "user"} · ${m.allowed ? "in ALLOWED_EMAILS" : "NOT in ALLOWED_EMAILS"}`],
+      ["Onboarded", m.onboardedAt ? fmtUtc(m.onboardedAt) : "no"],
+      ["Session", m.session.issuedAt ? `issued ${fmtUtc(m.session.issuedAt)} · age ${m.session.age}` : "no issued-at in token"],
+      ["Telegram", `${m.telegram.linked ? `linked (chat ${m.telegram.chat})` : "not linked"}${m.telegram.blocked ? " · BLOCKED (write to the bot to resume)" : ""} · link code ${m.telegram.hasCode ? "present" : "none"}`],
+      ["My rows", "error" in m.counts ? `FAILED (${m.counts.error})` : m.counts.map(([t, n]) => `${t} ${n}`).join(", ")],
+    ],
+  };
+}
+
+export const DAY_STATE_TITLE = "Today's DayState (what the chips and the bot read)";
+
+export function dayStateSection(state: DayState): DiagSection {
+  return { title: DAY_STATE_TITLE, lines: [["One line", dayStateLine(state)]], block: dayStateJson(state) };
 }

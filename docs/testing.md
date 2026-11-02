@@ -39,8 +39,12 @@ The real grammY bot (`getBot()`) with an API transformer (`bot.api.config.use`) 
 captures reply texts, so `bot.handleUpdate(...)` runs the gate, the handlers and the diag middleware end to end. A weigh-in
 from one chat writes a `bot · command` event for that user only; `runTick({ dry: true, force: "morning_brief" })` writes a
 `due` event per linked user and a system `run` event; `diag` answers five lines (seven for the admin, through the same
-transformer for `getWebhookInfo`); and the admin report rendered by `renderDiagText` contains neither chat id, token nor
-link code while still naming env variables, the migration and the DayState block.
+transformer for `getWebhookInfo`); and the admin report from `buildDiagnostics` rendered by `renderDiagText` contains
+neither chat id, token nor link code while still naming env variables, the migration and the DayState block. Then a hand-
+made `drizzle.__drizzle_migrations` table one entry behind the journal yields "1 migration pending — run pnpm db:migrate",
+and with `diag_events` dropped the report still has every section: only People and Events carry an error line, "My rows"
+and "Last tick" read `FAILED (…)` / `check failed (…)`, the copied text lists both under `## Errors` with no SQL, the bot's
+`diag` still answers and a real tick still runs. 0009 is re-run to restore the table.
 
 ## The diagnostics admin-gate test
 `buildDiagnostics(B)` for a non-admin yields exactly Me, the DayState block and her own events (no System, no People, no

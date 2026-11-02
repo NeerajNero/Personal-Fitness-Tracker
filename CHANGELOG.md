@@ -13,6 +13,9 @@ Skip pure refactors and internal-only changes unless they change behaviour.
   chips and the bot read it, phone time vs IST, PWA / service worker state, recent events and client errors. **Copy
   diagnostics** puts it all on the clipboard as plain text with no secrets; admins can **Run tick (dry)** inline. Events
   (`diag_events`, migration 0009) are written by the bot, the tick, Gemini and server-action errors and kept 7 days.
+  Each section loads on its own: a failing one shows its error class, the rest still render, and the copied text lists
+  the failures under "Errors". Copy sits in the card heading and always works. System opens with "N migrations pending
+  — run pnpm db:migrate" when the database is behind the code.
 - **Multi-user.** Anyone in `ALLOWED_EMAILS` (first entry = the owner/admin) gets their own account on sign-in, with their own
   data, targets, foods, workout types and Telegram link; nothing is shared between people except the exercise library.
   Onboarding now asks for a goal (recomp / fat loss / muscle gain), gym or home (+ equipment), days per week and minutes per

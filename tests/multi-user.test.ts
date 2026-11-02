@@ -6,7 +6,8 @@
  *   3. ALLOWED_EMAILS is the authority (a users row grants nothing) and a blocked chat drops out of the tick's list
  *      until that person writes to the bot again;
  *   4. diagnostics: a simulated bot message and a dry tick write diag events for the right user only, `diag` answers,
- *      and the copied text carries no chat id, token or link code;
+ *      and the copied text carries no chat id, token or link code; with diag_events missing, every other section
+ *      still renders and the copied text lists the failure under "Errors"; a database behind the journal says so;
  *   5. the admin gate is server-side: a non-admin's report has no System / People, the dry tick is refused, and the
  *      bot's `diag` has no webhook or per-user lines.
  * Run: pnpm test   (node --conditions=react-server so `server-only` resolves)
@@ -226,8 +227,8 @@ test("diagnostics: events land on the right user and the copied text holds no se
   const { getBot } = await import("@/lib/telegram/bot");
   const { runTick } = await import("@/lib/rules/tick");
   const { recentEvents, lastTickRun } = await import("@/lib/diag/events");
-  const { collectMe, meSections } = await import("@/lib/diag/me");
-  const { collectSystem, systemSections } = await import("@/lib/diag/system");
+  const { buildDiagnostics } = await import("@/lib/diag/load");
+  const { dbCheck, migrationsPendingLine } = await import("@/lib/diag/system");
   const { renderDiagText } = await import("@/lib/diag/text");
   const { userIdByChat, findUserByEmail } = await import("@/lib/users");
   const { asUserId } = await import("@/lib/db/scope");
@@ -285,18 +286,55 @@ test("diagnostics: events land on the right user and the copied text holds no se
   assert.ok(diagA.includes("webhook ok") && diagA.includes("(dry)"));
 
   // The copied text (what Settings → Diagnostics → Copy produces for the admin).
-  const [me, system, events] = await Promise.all([collectMe(A, { iat: Math.floor(Date.now() / 1000) - 3600 }), collectSystem({ host: "recomp.test", api: bot.api }), recentEvents({ all: true, limit: 50 })]);
-  const text = renderDiagText({
-    header: { build: system.build.sha, time: system.time.utc, user: me.email },
-    sections: [...meSections(me), ...systemSections(system), { title: "Events", items: events.map((e) => `${e.email ?? "system"} · ${e.scope} · ${e.message} ${JSON.stringify(e.meta ?? {})}`) }],
-  });
+  const { report } = await buildDiagnostics(A, { host: "recomp.test", api: bot.api, iat: Math.floor(Date.now() / 1000) - 3600 });
+  const text = renderDiagText(report);
   for (const secret of [CHAT_A, CHAT_B, TOKEN, "BEEF1234", "beef1234"]) assert.ok(!text.includes(secret), `copied text contains ${secret}`);
   assert.ok(text.includes("chat …111") && text.includes("link code") && !/link code [A-Z0-9]{8}/.test(text));
   assert.ok(text.includes("Env missing") && text.includes("DATABASE_URL"), "env by name only");
-  assert.ok(text.includes("migration 0009_diag_events") || text.includes("no migrations table"));
+  assert.ok(text.includes("migrations table missing — run pnpm db:migrate"), "PGlite was migrated by hand, so the table is missing");
   assert.ok(text.includes("ana@example.com · allowed · onboarded · linked"));
   assert.ok(text.includes('"dayPlan"'), "DayState block present");
-  assert.ok(text.includes("tick · due"), "events listed");
+  assert.ok(text.includes("· tick · info · due"), "events listed");
+  assert.ok(!text.includes("## Errors") && report.sections.every((s) => !s.error), "nothing failed");
+
+  // Behind the journal: a migrations table that stops at 0008 → "1 migration pending"; at the newest → no line.
+  await db.execute(sql`create schema if not exists drizzle`);
+  await db.execute(sql`create table if not exists drizzle.__drizzle_migrations (id serial primary key, hash text not null, created_at bigint)`);
+  const journal = JSON.parse(readFileSync(join(MIGRATIONS, "meta", "_journal.json"), "utf8")) as { entries: { when: number; tag: string }[] };
+  const [prev, last] = journal.entries.slice(-2);
+  await db.execute(sql`insert into drizzle.__drizzle_migrations (hash, created_at) values ('x', ${prev.when})`);
+  let dbi = await dbCheck();
+  assert.equal(dbi.migration, prev.tag);
+  assert.equal(migrationsPendingLine(dbi), "1 migration pending — run pnpm db:migrate");
+  await db.execute(sql`insert into drizzle.__drizzle_migrations (hash, created_at) values ('y', ${last.when})`);
+  dbi = await dbCheck();
+  assert.equal(dbi.migration, last.tag);
+  assert.equal(migrationsPendingLine(dbi), null);
+  assert.ok(renderDiagText((await buildDiagnostics(A, { host: "recomp.test", api: bot.api })).report).includes(`migration ${last.tag}`));
+
+  // Resilience: without diag_events every other section still renders; the failures are error lines, listed under Errors.
+  await db.execute(sql`drop table diag_events`);
+  const broken = (await buildDiagnostics(A, { host: "recomp.test", api: bot.api })).report;
+  const titles = broken.sections.map((s) => s.title);
+  assert.deepEqual(titles, ["Me", "Today's DayState (what the chips and the bot read)", "System", "People", "Events (last 50, everyone)"]);
+  const errored = broken.sections.filter((s) => s.error).map((s) => s.title);
+  assert.deepEqual(errored, ["People", "Events (last 50, everyone)"], "only the sections that need the table");
+  const me = broken.sections[0].lines!.find(([k]) => k === "My rows")![1];
+  assert.match(me, /^FAILED \(\w+: .*diag_events/);
+  const system = broken.sections[2].lines!;
+  assert.match(system.find(([k]) => k === "Last tick")![1], /^check failed \(/);
+  assert.match(system.find(([k]) => k === "Database")![1], /^ok · select 1/);
+  const brokenText = renderDiagText(broken);
+  assert.ok(brokenText.includes("## Errors") && /^People: \w+: /m.test(brokenText) && /^Events \(last 50, everyone\): \w+: /m.test(brokenText));
+  assert.ok(!/select .* from/i.test(brokenText.split("## Errors")[1]), "no SQL in the error lines");
+  for (const secret of [CHAT_A, CHAT_B, TOKEN]) assert.ok(!brokenText.includes(secret));
+  // The bot still answers, and a real tick still runs (pruning is caught).
+  await bot.handleUpdate(update(CHAT_B, "diag", 4));
+  assert.equal(sent.at(-1)!.split("\n").length, 5);
+  assert.equal((await runTick({ dry: false })).dry, false);
+  // Restore the table (0009 is re-runnable) so the next test has it.
+  for (const f of from7.filter((f) => f.startsWith("0009"))) await runMigration(f);
+  assert.ok((await buildDiagnostics(A, { host: "recomp.test", api: bot.api })).report.sections.every((s) => !s.error));
 });
 
 test("diagnostics: the admin gate is server-side", async () => {

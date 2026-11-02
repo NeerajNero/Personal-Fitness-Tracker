@@ -64,6 +64,14 @@ ids are pending rows). Reload. Cross-user access is refused as "not found" by de
 ## "A food with that name already exists"
 Unique per user on `lower(name)`. Archive or rename the existing one (Settings → Foods shows archived rows at the end).
 
+## Diagnostics says "migrations pending"
+The System section's first line (`N migrations pending — run pnpm db:migrate`, or `migrations table missing`) means the
+deployed code is newer than the database: a column or table the code expects isn't there yet, so some screens, bot
+commands or the tick fail with `relation … does not exist` / `column … does not exist`, and other Diagnostics sections
+show that as their error line while the rest still render. Fix: Neon branch → `pnpm db:migrate` against production
+(see the deploy order in [operations.md](operations.md#deploying-a-schema-change-migration)). The bot's `diag` shows the
+same warning on its db line.
+
 ## Migration failed half-way
 drizzle-kit runs each migration's statements in order and records it only at the end, so a failure leaves the schema
 partly changed. Restore the Neon branch (or point-in-time restore) taken before `pnpm db:migrate`, fix the SQL, re-run.
