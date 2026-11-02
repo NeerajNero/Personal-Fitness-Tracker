@@ -84,7 +84,7 @@ The weekly smoke-free milestone isn't a separate rule: it's a line inside `morni
 ## Files
 | File | Role |
 |---|---|
-| `src/lib/rules/dayState.ts` | `getDayState(userId, date)`, `nextUpFrom`, `loadTypeHistory`; the home plan's weekly next-up (`isHomePlan`, `homeNextName`) |
+| `src/lib/rules/dayState.ts` | `getDayState(userId, date)`, `nextUpFrom`, `loadTypeHistory` |
 | `src/lib/rules/engine.ts` | `evaluate(userId, settings, now)`, `send(userId, chatId, due, now)`, skip reasons |
 | `src/lib/rules/rules.ts` | `RULES`, `formatWeeklyReport`, `cheapestFix`, `onboardingDate` |
 | `src/lib/rules/loaders.ts`, `weekly.ts`, `instant.ts` | Memoised loaders, the weekly report, the overage line |

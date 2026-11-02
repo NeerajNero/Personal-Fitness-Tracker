@@ -43,17 +43,25 @@ Rep range 8–15; holds 20–45 s. From the last three sessions **on this rung**
 No history on the rung → "First time, aim for 3 × 8–15". ✓ and "Log all the same as last time" copy sets unchanged.
 
 ## The plan (`createHomePlan` in `src/lib/home-program.ts`)
-One tap from the "Set up your home plan" card after one question, push-ups in a row: 0 → Wall, 1–5 → Incline, 6–15 →
-Knee, 16+ → Push-up. **Every other ladder starts at rung 2.** Three types, 3 sets each, target = the bottom of the range:
+One tap from the "Set up your home plan" card after one question, push-ups in a row. **If any ladder is missing from the
+library, the tap seeds it first** (the same idempotent upsert as `pnpm seed`), and refuses with "Exercise library missing,
+run pnpm seed" rather than creating a day with no exercises; so the seed is no longer a deploy step for the plan. Starting
+rungs (`startingRung`):
+| Push-ups in a row | push_up | row | squat, hinge, lunge, pike | plank, side_plank, core, wall_sit, calves |
+|---|---|---|---|---|
+| 0 | 1 Wall | 1 | 1 | 1 |
+| 1–5 | 2 Incline | 1 | 1 | 1 |
+| 6–15 | 3 Knee | 1 | 2 | 1 |
+| 16+ | 4 Push-up | 2 | 2 | 1 |
+Three types, 3 sets each, target = the bottom of the range:
 | Type | Subtitle (on the card) | Slots |
 |---|---|---|
 | Day A | push and squat | push_up, squat, hinge, plank, finisher (Jumping jacks) |
 | Day B | pull and hinge | row, lunge, hinge one rung above Day A's (else the same), side_plank, core |
 | Day C | shoulders, legs and conditioning | pike, lunge on the step-up branch (one rung above Day B's), wall_sit, calves, core, finisher (High knees) |
-Idempotent: a user with a Day A keeps what they have. Rotation follows `days_per_week` by the ISO week (3 → A B C,
-4 → A B C A, 5 → A B C A B): `getDayState` counts sessions with sets earlier this week and picks the pattern's next
-entry, only when the active types are exactly Day A, B, C (`isHomePlan`). Estimated minutes = 2 per bodyweight set + 10
-for a finisher, regardless of `session_minutes`. Rest-day card for home users: "A brisk 20–30 minute walk"; the steps
+Idempotent: a user with a Day A keeps what they have. Rotation is the same rule as every other type: the one after the
+last one trained (`nextUpFrom`); `days_per_week` only sets the weekly target. Estimated minutes = 2 per bodyweight set +
+10 for a finisher, regardless of `session_minutes`. Rest-day card for home users: "A brisk 20–30 minute walk"; the steps
 target stays.
 
 ## The finisher (`src/app/(app)/train/finisher.tsx`)
@@ -74,7 +82,8 @@ Day A / Day B / Day C work as type names; `done` logs the same as last time. The
 morning brief prints "Knee push-up: 3 × 12/12/11 last time, aim for 13s" for bodyweight rows (loaders `typeTopSets`).
 
 ## Editing the ladders
-Change `LADDERS` / `CONDITIONING` in `src/lib/library.ts` and run `pnpm seed` (idempotent by name). Inserting a rung
+Change `LADDERS` / `CONDITIONING` in `src/lib/library.ts` and run `pnpm seed` (idempotent by name; the plan seeds a
+missing ladder by itself, but changed cues or new rungs need the script). Inserting a rung
 in the middle means renumbering `ladderLevel` for the rungs after it; existing users' routine rows keep pointing at the
 exercise ids they had, so nobody is moved. Renaming a rung creates a new row (the upsert key is the name): archive
 instead, or keep names stable. Ranges live in `BW_RANGE` (`src/lib/routine.ts`).
@@ -85,9 +94,9 @@ instead, or keep names stable. Ranges live in `BW_RANGE` (`src/lib/routine.ts`).
 | `src/lib/library.ts`, `src/lib/library-seed.ts`, `scripts/seed.ts` | Ladders, conditioning, gym rows with pattern/equipment; the idempotent upsert; the script |
 | `src/lib/metrics/strength.ts` | `bodyweightHint`, `loadRecentSessionSets`, `bodyweightProgress`, `isBodyweight`, `RungInfo` |
 | `src/lib/training.ts` | `loadLadders`, `rungInfo`, `advanceLadders`, `setRoutineRung`, `logFinisher`, the bodyweight fields on `ExerciseCard` / `ExerciseLite` |
-| `src/lib/home-program.ts` | `createHomePlan`, `HOME_PLAN`, the push-up answers, `trainedThisWeek`, `FINISHER_MINUTES` |
-| `src/lib/routine.ts` | `HOME_DAYS`, `isHomePlan`, `weeklyPattern`, `homeNextName`, `BW_RANGE` |
-| `src/lib/rules/dayState.ts`, `src/lib/workout-card.ts` | Weekly next-up; minutes, subtitle and rest suggestion on the card |
+| `src/lib/home-program.ts` | `createHomePlan` (seeds the library when a ladder is missing), `startingRung`, `HOME_PLAN`, `FINISHER_MINUTES` |
+| `src/lib/routine.ts` | `HOME_DAYS`, `homeDaySubtitle`, the push-up answers, `BW_RANGE` |
+| `src/lib/workout-card.ts` | Minutes, subtitle and rest suggestion on the card |
 | `src/components/workout-card.tsx`, `src/app/(app)/day-actions.ts` | The push-up question and `createHomePlanAction` |
 | `src/app/(app)/train/session-view.tsx`, `finisher.tsx`, `train/actions.ts` | Reps/seconds rows, the timer, `logFinisher`, equipment filter (`fitsEquipment`) |
 | `src/app/(app)/settings/workout-types-editor.tsx`, `settings/actions.ts` | Rung controls, `setRoutineRung` |

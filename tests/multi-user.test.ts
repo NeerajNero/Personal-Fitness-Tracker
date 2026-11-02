@@ -11,7 +11,8 @@
  *   5. the admin gate is server-side: a non-admin's report has no System / People, the dry tick is refused, and the
  *      bot's `diag` has no webhook or per-user lines;
  *   6. the home program: ladder rules (up at 3 × 15, down after two sessions under 8, stall at three flat sessions),
- *      the plan is created once, a rung advances on the next Start, a hold logs seconds.
+ *      the plan is created once with the right starting rungs (and seeds the library if it has to), a rung advances on
+ *      the next Start, a hold logs seconds.
  * Run: pnpm test   (node --conditions=react-server so `server-only` resolves)
  */
 import assert from "node:assert/strict";
@@ -376,7 +377,7 @@ test("diagnostics: the admin gate is server-side", async () => {
 
 test("home program: ladders, the plan, rung advance and seconds", async () => {
   const { bodyweightHint } = await import("@/lib/metrics/strength");
-  const { createHomePlan } = await import("@/lib/home-program");
+  const { createHomePlan, startingRung } = await import("@/lib/home-program");
   const { copyLastSets, getSessionDetail, listRoutineExercises, listWorkoutTypes, setDayPlan } = await import("@/lib/training");
   const { estimateTypeMinutes } = await import("@/lib/workout-card");
   const { getDayState } = await import("@/lib/rules/dayState");
@@ -405,9 +406,19 @@ test("home program: ladders, the plan, rung advance and seconds", async () => {
   assert.equal(bodyweightHint([sets([30])], "seconds", 3, rung).text, "30 s last time, aim for 35 s");
   assert.equal(bodyweightHint([], "seconds", 3, rung).text, "First time, aim for 3 × 20–45 s");
 
+  // Starting rungs per answer: holds and calves always 1; the rest follow the push-up answer.
+  assert.deepEqual(["push_up", "row", "squat", "plank", "calves"].map((l) => startingRung(l, "0")), [1, 1, 1, 1, 1]);
+  assert.deepEqual(["push_up", "row", "squat", "plank", "calves"].map((l) => startingRung(l, "1-5")), [2, 1, 1, 1, 1]);
+  assert.deepEqual(["push_up", "row", "squat", "plank", "calves"].map((l) => startingRung(l, "6-15")), [3, 1, 2, 1, 1]);
+  assert.deepEqual(["push_up", "row", "squat", "plank", "calves"].map((l) => startingRung(l, "16+")), [4, 2, 2, 1, 1]);
+
   // The plan: once, from the push-up answer; the empty "Home" type from the isolation test is archived first.
+  // The library is wiped first to prove "Create my plan" seeds it itself (rows nobody has used yet delete cleanly).
   await uB.db.update(schema.routineDays).set({ archived: true }).where(uB.own(schema.routineDays, eq(schema.routineDays.name, "Home")));
+  await db.execute(sql`delete from exercises where ladder is not null and not exists (select 1 from sets st where st.exercise_id = exercises.id)`);
+  assert.equal((await db.execute<{ n: number }>(sql`select count(*)::int as n from exercises where ladder is not null`)).rows[0].n, 0);
   const first = await createHomePlan(B, "6-15");
+  assert.ok((await db.execute<{ n: number }>(sql`select count(*)::int as n from exercises where ladder is not null`)).rows[0].n > 40, "the plan seeded the ladders first");
   assert.equal(first.created, true);
   assert.equal(first.ids.length, 3);
   const again = await createHomePlan(B, "0");
@@ -417,32 +428,32 @@ test("home program: ladders, the plan, rung advance and seconds", async () => {
   assert.deepEqual(types.map((t) => t.name), ["Day A", "Day B", "Day C"]);
   const re = await listRoutineExercises(B);
   const names = (typeName: string) => re.filter((r) => r.routineDayId === types.find((t) => t.name === typeName)!.id).map((r) => r.name);
-  assert.deepEqual(names("Day A"), ["Knee push-up", "Bodyweight squat", "Single-leg glute bridge", "Plank", "Jumping jacks"]);
-  assert.deepEqual(names("Day B"), ["Table row, legs straight", "Walking lunge (bodyweight)", "Single-leg RDL", "Side plank", "Hollow hold"]);
-  assert.deepEqual(names("Day C"), ["Pike push-up", "Step-up (chair)", "Single-leg wall sit", "Single-leg calf raise", "Hollow hold", "High knees"]);
+  assert.deepEqual(names("Day A"), ["Knee push-up", "Bodyweight squat", "Single-leg glute bridge", "Knee plank", "Jumping jacks"]);
+  assert.deepEqual(names("Day B"), ["Table row, knees bent", "Walking lunge (bodyweight)", "Single-leg RDL", "Knee side plank", "Dead bug"]);
+  assert.deepEqual(names("Day C"), ["Pike push-up", "Step-up (chair)", "Wall sit", "Calf raise on a step", "Dead bug", "High knees"]);
   const row = (name: string) => re.find((r) => r.name === name)!;
-  assert.equal(row("Plank").targetReps, 20, "holds target the bottom of 20–45 s");
+  assert.equal(row("Knee plank").targetReps, 20, "holds target the bottom of 20–45 s");
   assert.equal(row("Knee push-up").targetReps, 8);
   assert.deepEqual([row("Jumping jacks").targetSets, row("Jumping jacks").targetReps], [1, 10], "the finisher is one 10-minute block");
   const settingsB = (await uB.db.select().from(schema.settings).where(uB.own(schema.settings)))[0];
   assert.equal(await estimateTypeMinutes(B, types[0].id, settingsB), 4 * 3 * 2 + 10, "2 min a bodyweight set plus the finisher");
 
-  // Weekly rotation (3 days a week → A B C), a rung that advances on the next Start, and a hold logged in seconds.
+  // Rotation (the type after the last one trained), a rung that advances on the next Start, and a hold logged in seconds.
   const mon = "2026-11-09";
   const tue = "2026-11-10";
-  assert.equal((await getDayState(B, mon)).nextUp?.typeName, "Day A");
+  assert.equal((await getDayState(B, mon)).nextUp?.typeName, "Day A", "nothing trained yet → the first type");
   const dayA = types[0].id;
   const planMon = await setDayPlan(B, mon, { kind: "workout", typeId: dayA });
   assert.ok(planMon.ok && planMon.sessionId);
   const knee = row("Knee push-up").exerciseId;
-  const plank = row("Plank").exerciseId;
+  const plank = row("Knee plank").exerciseId;
   await uB.db.insert(schema.sets).values([15, 15, 15].map((reps, i) => uB.stamp({ sessionId: planMon.sessionId!, exerciseId: knee, setNo: i + 1, weightKg: 0, reps })));
   await uB.db.insert(schema.sets).values(uB.stamp({ sessionId: planMon.sessionId!, exerciseId: plank, setNo: 1, weightKg: 0, reps: 30 }));
   const monDetail = (await getSessionDetail(B, planMon.sessionId!))!;
   const plankCard = monDetail.exercises.find((e) => e.exerciseId === plank)!;
-  assert.deepEqual([plankCard.bodyweight, plankCard.measure, plankCard.rung?.level, plankCard.rung?.max, plankCard.sets[0].reps], [true, "seconds", 2, 4, 30]);
+  assert.deepEqual([plankCard.bodyweight, plankCard.measure, plankCard.rung?.level, plankCard.rung?.max, plankCard.sets[0].reps], [true, "seconds", 1, 4, 30]);
 
-  assert.equal((await getDayState(B, tue)).nextUp?.typeName, "Day B", "one session this week → Day B next");
+  assert.equal((await getDayState(B, tue)).nextUp?.typeName, "Day B", "Day A was trained last → Day B next");
   const planTue = await setDayPlan(B, tue, { kind: "workout", typeId: dayA });
   assert.ok(planTue.ok && planTue.sessionId);
   const after = await listRoutineExercises(B);

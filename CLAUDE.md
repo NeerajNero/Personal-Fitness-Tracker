@@ -74,7 +74,7 @@ pnpm test         # migrations + two-user isolation on PGlite; no DATABASE_URL n
 Screens sit behind Google login, so say so when a UI change wasn't seen running.
 
 ## Build order
-10–11. **Multi-user**, **Home program** — done (accounts, scoping, one bot, per-user export, People; ladders, Day A/B/C, the finisher, weekly rotation).
+10–11. **Multi-user**, **Home program** — done (accounts, scoping, one bot, per-user export, People; ladders, Day A/B/C, the finisher).
 12. **Exercise suggestions** — suggest swaps/additions per muscle group from the library (stalls, missing groups).
 
 ## Context hygiene (save tokens)

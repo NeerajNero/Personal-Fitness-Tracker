@@ -14,9 +14,11 @@ Skip pure refactors and internal-only changes unless they change behaviour.
   suggest the rung below; three flat sessions suggest a slower lowering or an extra set. Train shows reps or seconds
   only for bodyweight rows, a 10-minute 30 s on / 30 s off finisher timer (vibration, no audio) that logs a cardio entry,
   and "rung n of m" with up / down in Settings → Workout types. "Add an exercise" filters by your equipment. Rotation
-  follows days per week (3 → A B C, 4 → A B C A). Trends → Lifts lists bodyweight rungs and best sets. The bot accepts
-  `day a` / `day b` / `day c` and the morning brief prints the bodyweight hints. Run `pnpm seed` after deploying
-  migration 0010.
+  is the same as for every type: the one after the last one trained. Trends → Lifts lists bodyweight rungs and best
+  sets. The bot accepts `day a` / `day b` / `day c` and the morning brief prints the bodyweight hints. "Create my plan"
+  seeds the exercise library itself when a ladder is missing, so `pnpm seed` is only needed for changed cues or new rungs.
+  Starting rungs: holds and calves start at rung 1; push-ups and the rest follow the push-up answer (0 → everything at 1;
+  1–5 → push-ups at 2; 6–15 → push-ups at 3, rows at 1, the rest at 2; 16+ → push-ups at 4, the rest at 2).
 - **Today's workout card** at the top of Today and Train: the next type in rotation with its icon, exercise count,
   estimated minutes (your session length, or sets × 2.5 min), when it was last done and the last top set of its first
   two lifts, one Start button, and "Something else" for the full picker. Once started it shows "Pull, 3 of 6 done".

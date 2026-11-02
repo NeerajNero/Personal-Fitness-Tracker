@@ -30,27 +30,9 @@ export const HOME_DAYS = [
   { name: "Day B", subtitle: "pull and hinge" },
   { name: "Day C", subtitle: "shoulders, legs and conditioning" },
 ] as const;
-export const HOME_DAY_NAMES = HOME_DAYS.map((d) => d.name) as readonly string[];
 
 export function homeDaySubtitle(name: string): string | null {
   return HOME_DAYS.find((d) => d.name.toLowerCase() === name.toLowerCase())?.subtitle ?? null;
-}
-
-/** True when the active types are exactly Day A, Day B, Day C in order: the weekly pattern decides "next up". */
-export function isHomePlan(activeNames: string[]): boolean {
-  return activeNames.length === 3 && activeNames.every((n, i) => n.toLowerCase() === HOME_DAY_NAMES[i].toLowerCase());
-}
-
-/** A week of home days for `daysPerWeek` sessions: 3 → A B C, 4 → A B C A, 5 → A B C A B. */
-export function weeklyPattern(daysPerWeek: number): string[] {
-  const n = Math.min(7, Math.max(1, daysPerWeek || 3));
-  return Array.from({ length: n }, (_, i) => HOME_DAY_NAMES[i % 3]);
-}
-
-/** Which home day comes next given how many sessions were trained earlier this ISO week. */
-export function homeNextName(trainedThisWeek: number, daysPerWeek: number): string {
-  const p = weeklyPattern(daysPerWeek);
-  return p[trainedThisWeek % p.length];
 }
 
 /** The one onboarding question for the home plan: push-ups in a row → the starting push-up rung. */

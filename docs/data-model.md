@@ -48,7 +48,8 @@ All four carry `user_id`; every reader filters on it.
 - View changes are hand-written SQL migrations. `0007_multi_user.sql` is hand-written too (nullable `user_id` → backfill onto
   the placeholder owner → NOT NULL; re-runnable) and is exercised by `pnpm test` against PGlite, as is every later one
   (`0008_telegram_blocked.sql`: one nullable column; `0009_diag_events.sql`: the events table and its enum; `0010_home_program.sql`:
-  the exercise columns, two enums and the rebuilt e1RM view; all `IF NOT EXISTS`). After 0010, run `pnpm seed`.
+  the exercise columns, two enums and the rebuilt e1RM view; all `IF NOT EXISTS`). After 0010 the library fills itself the first time a
+  home plan is created; `pnpm seed` is for changed cues or new rungs.
 - `pnpm backup` before migrating (see [operations.md](operations.md#backups)).
 - `pnpm seed` is idempotent and only upserts the shared exercise library. Users, settings, foods and workout types come from
   sign-in and onboarding (gym users get Push/Pull/Legs from `src/lib/library.ts`).
