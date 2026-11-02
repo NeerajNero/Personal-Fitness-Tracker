@@ -2,6 +2,7 @@
 import type { Settings } from "@/db/schema";
 import { cardioByWeek } from "@/lib/activities";
 import { addDays } from "@/lib/dates";
+import type { UserId } from "@/lib/db/scope";
 import { loadAllHistory, weeklySetsByMuscle } from "@/lib/metrics/strength";
 import {
   adherenceFrom, loadDailyTotals, loadLoggedSessionDates, loadMeasurements, loadWeightSeries, weeklyRateFrom, weeklyVerdictFrom,
@@ -24,16 +25,16 @@ export type WeeklyReport = {
   verdict: WeeklyVerdict;
 };
 
-export async function buildWeeklyReport(weekStart: string, settings: Settings): Promise<WeeklyReport> {
+export async function buildWeeklyReport(userId: UserId, weekStart: string, settings: Settings): Promise<WeeklyReport> {
   const weekEnd = addDays(weekStart, 6);
   const [series, measurements, totals, sessionDates, history, volume, cardioWeeks] = await Promise.all([
-    loadWeightSeries(),
-    loadMeasurements(),
-    loadDailyTotals(addDays(weekStart, -1), weekEnd),
-    loadLoggedSessionDates(weekStart, weekEnd),
-    loadAllHistory(),
-    weeklySetsByMuscle(1, weekEnd),
-    cardioByWeek(2, weekEnd),
+    loadWeightSeries(userId),
+    loadMeasurements(userId),
+    loadDailyTotals(userId, addDays(weekStart, -1), weekEnd),
+    loadLoggedSessionDates(userId, weekStart, weekEnd),
+    loadAllHistory(userId),
+    weeklySetsByMuscle(userId, 1, weekEnd),
+    cardioByWeek(userId, 2, weekEnd),
   ]);
 
   const navels = measurements.filter((m) => m.navelCm !== null);
@@ -56,7 +57,7 @@ export async function buildWeeklyReport(weekStart: string, settings: Settings): 
   return {
     weekStart,
     weekEnd,
-    rate: weeklyRateFrom(seriesToWeekEnd),
+    rate: weeklyRateFrom(seriesToWeekEnd, 14, settings.goal),
     navel,
     lifts: { progressed, tracked },
     sessionsDone: sessionDates.length,
@@ -64,6 +65,6 @@ export async function buildWeeklyReport(weekStart: string, settings: Settings): 
     setsByMuscle: volume[0]?.sets ?? {},
     cardio: { minutes: cardioWeeks[0].minutes, prevMinutes: cardioWeeks[1].minutes, byType: cardioWeeks[0].byType },
     adherence: adherenceFrom(totals, settings, weekStart, weekEnd),
-    verdict: weeklyVerdictFrom({ series: seriesToWeekEnd, measurements, totals, today: weekEnd }),
+    verdict: weeklyVerdictFrom({ series: seriesToWeekEnd, measurements, totals, today: weekEnd, goal: settings.goal }),
   };
 }

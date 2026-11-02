@@ -6,17 +6,17 @@
  * a DayState to a client component.
  */
 import { desc, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
 import { activities, dailyMetrics, foodLog, routineDays, sessions, type Settings } from "@/db/schema";
 import { lastCardio } from "@/lib/activities";
 import type { CardioEntry } from "@/lib/cardio";
 import { daysBetween } from "@/lib/dates";
+import { forUser, type UserId } from "@/lib/db/scope";
 import { getTargets, type Targets } from "@/lib/metrics/phase";
 import { typeLabel } from "@/lib/routine";
 import { getSettings } from "@/lib/settings";
 
 /**
- * What the owner chose for the date. Precedence: rest flag → session with a type (workout) → session without one (custom) → unset.
+ * What the user chose for the date. Precedence: rest flag → session with a type (workout) → session without one (custom) → unset.
  * `typeName` is the display label.
  */
 export type DayPlan = { kind: "unset" | "rest" | "workout" | "custom"; typeId: number | null; typeName: string | null };
@@ -40,13 +40,15 @@ export function nextUpFrom(active: TypeHistory[]): TypeRef | null {
 }
 
 /** Every workout type (active + archived) with the last date it was trained before `date`. */
-export async function loadTypeHistory(date: string): Promise<(TypeHistory & { archived: boolean })[]> {
-  const res = await db.execute<{ id: number; name: string; archived: boolean; last_date: string | null }>(sql`
+export async function loadTypeHistory(userId: UserId, date: string): Promise<(TypeHistory & { archived: boolean })[]> {
+  const u = forUser(userId);
+  const res = await u.db.execute<{ id: number; name: string; archived: boolean; last_date: string | null }>(sql`
     select rd.id, rd.name, rd.archived,
       (select max(s.date)::text from sessions s
         where s.routine_day_id = rd.id and s.date < ${date}
           and exists (select 1 from sets st where st.session_id = s.id)) as last_date
     from routine_days rd
+    where rd.user_id = ${u.uid}
     order by rd.sort_order, rd.id`);
   return res.rows.map((r) => ({ typeId: r.id, typeName: typeLabel(r.name), archived: r.archived, lastDate: r.last_date }));
 }
@@ -86,10 +88,11 @@ export type DayState = {
   smokeFreeDays: number | null;
 };
 
-export async function getDayState(date: string, opts: { settings?: Settings } = {}): Promise<DayState> {
+export async function getDayState(userId: UserId, date: string, opts: { settings?: Settings } = {}): Promise<DayState> {
+  const u = forUser(userId);
   const [s, totals, metrics, types, session, cardioAgg, lastEntry] = await Promise.all([
-    opts.settings ? Promise.resolve(opts.settings) : getSettings(),
-    db
+    opts.settings ? Promise.resolve(opts.settings) : getSettings(userId),
+    u.db
       .select({
         kcal: sql<number>`coalesce(sum(${foodLog.kcal}), 0)::float`,
         protein: sql<number>`coalesce(sum(${foodLog.proteinG}), 0)::float`,
@@ -98,15 +101,15 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
         lastFoodAt: sql<string | null>`max(${foodLog.time})::text`,
       })
       .from(foodLog)
-      .where(eq(foodLog.date, date))
+      .where(u.own(foodLog, eq(foodLog.date, date)))
       .then((r) => r[0]),
-    db
+    u.db
       .select()
       .from(dailyMetrics)
-      .where(eq(dailyMetrics.date, date))
+      .where(u.own(dailyMetrics, eq(dailyMetrics.date, date)))
       .then((r) => r[0] ?? null),
-    loadTypeHistory(date),
-    db
+    loadTypeHistory(userId, date),
+    u.db
       .select({
         id: sessions.id,
         typeId: sessions.routineDayId,
@@ -117,16 +120,16 @@ export async function getDayState(date: string, opts: { settings?: Settings } = 
       })
       .from(sessions)
       .leftJoin(routineDays, eq(routineDays.id, sessions.routineDayId))
-      .where(eq(sessions.date, date))
+      .where(u.own(sessions, eq(sessions.date, date)))
       .orderBy(desc(sessions.id))
       .limit(1)
       .then((r) => r[0] ?? null),
-    db
+    u.db
       .select({ minutes: sql<number>`coalesce(sum(${activities.minutes}), 0)::int`, entries: sql<number>`count(*)::int` })
       .from(activities)
-      .where(eq(activities.date, date))
+      .where(u.own(activities, eq(activities.date, date)))
       .then((r) => r[0]),
-    lastCardio(date),
+    lastCardio(userId, date),
   ]);
 
   const targets = getTargets(date, s);

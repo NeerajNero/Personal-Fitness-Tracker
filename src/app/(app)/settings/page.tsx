@@ -1,17 +1,18 @@
-import { asc, eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { signOut } from "@/auth";
-import { db } from "@/db";
-import { exercises, foods, routineExercises } from "@/db/schema";
 import { todayIST } from "@/lib/dates";
 import { EXPORT_TABLES } from "@/lib/export-tables";
+import { listAllFoods } from "@/lib/food";
 import { getPhase } from "@/lib/metrics/phase";
 import { NUDGE_TOGGLES } from "@/lib/nudges";
-import { getSettings } from "@/lib/settings";
-import { listExercises, listWorkoutTypes } from "@/lib/training";
+import { requireUser } from "@/lib/session";
+import { getSettings, hasBudgets, hasPhases } from "@/lib/settings";
+import { listExercises, listRoutineExercises, listWorkoutTypes } from "@/lib/training";
+import { getUser, listPeople } from "@/lib/users";
 import { BodyStatsForm } from "./body-stats-form";
 import { FoodsEditor } from "./foods-editor";
 import { NudgeSettings } from "./nudge-settings";
+import { People } from "./people";
 import { PhaseSection } from "./phase-section";
 import { WorkoutTypesEditor, type WorkoutTypeView } from "./workout-types-editor";
 import { TargetsForm } from "./targets-form";
@@ -20,27 +21,17 @@ import { TelegramCard } from "./telegram-card";
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
+  const userId = await requireUser();
   const today = todayIST();
-  const [s, allFoods, allExercises, days, re] = await Promise.all([
-    getSettings(),
-    db.select().from(foods).orderBy(asc(foods.archived), asc(foods.name)),
-    listExercises(),
-    listWorkoutTypes({ includeArchived: true }),
-    db
-      .select({
-        routineDayId: routineExercises.routineDayId,
-        exerciseId: routineExercises.exerciseId,
-        sortOrder: routineExercises.sortOrder,
-        targetSets: routineExercises.targetSets,
-        targetReps: routineExercises.targetReps,
-        name: exercises.name,
-        muscleGroup: exercises.muscleGroup,
-        cues: exercises.cues,
-      })
-      .from(routineExercises)
-      .innerJoin(exercises, eq(exercises.id, routineExercises.exerciseId))
-      .orderBy(asc(routineExercises.routineDayId), asc(routineExercises.sortOrder)),
+  const [s, user, allFoods, allExercises, days, re] = await Promise.all([
+    getSettings(userId),
+    getUser(userId),
+    listAllFoods(userId),
+    listExercises(userId),
+    listWorkoutTypes(userId, { includeArchived: true }),
+    listRoutineExercises(userId),
   ]);
+  const people = user?.isAdmin ? await listPeople() : null;
 
   const types: WorkoutTypeView[] = days.map((d) => ({
     id: d.id,
@@ -50,13 +41,14 @@ export default async function SettingsPage() {
   }));
   const toggles = Object.fromEntries(NUDGE_TOGGLES.map((k) => [k, s[k]])) as Record<(typeof NUDGE_TOGGLES)[number], boolean>;
   const bot = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, "") ?? null;
+  const phased = hasPhases(s);
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-5">
       <h1 className="text-2xl font-semibold">Settings</h1>
 
-      <TargetsForm s={s} />
-      <PhaseSection s={s} phaseToday={getPhase(today, s)} />
+      <TargetsForm s={s} phased={phased} budgets={hasBudgets(s)} />
+      {phased ? <PhaseSection s={s} phaseToday={getPhase(today, s)} /> : null}
       <TelegramCard linked={s.telegramChatId !== null} code={s.telegramLinkCode} bot={bot} />
       <NudgeSettings toggles={toggles} quietStart={s.quietHoursStart.slice(0, 5)} quietEnd={s.quietHoursEnd.slice(0, 5)} dailyCap={s.nudgeDailyCap} />
 
@@ -69,7 +61,7 @@ export default async function SettingsPage() {
         <summary className="flex cursor-pointer list-none items-center justify-between p-4 [&::-webkit-details-marker]:hidden">
           <span>
             <span className="block font-semibold">Export data</span>
-            <span className="block text-xs text-muted">One CSV per table. Settings is not exported.</span>
+            <span className="block text-xs text-muted">One CSV per table, your rows only. Settings is not exported.</span>
           </span>
           <span className="text-muted transition-transform group-open:rotate-180">⌄</span>
         </summary>
@@ -84,6 +76,8 @@ export default async function SettingsPage() {
           ))}
         </ul>
       </details>
+
+      {people ? <People rows={people} /> : null}
 
       <form
         action={async () => {

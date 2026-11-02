@@ -50,6 +50,13 @@
       "when": 1792223595027,
       "tag": "0006_cardio_log",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793631489593,
+      "tag": "0007_multi_user",
+      "breakpoints": true
     }
   ]
 }

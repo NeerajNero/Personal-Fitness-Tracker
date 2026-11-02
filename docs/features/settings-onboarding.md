@@ -1,18 +1,26 @@
 # Settings (`/settings`), onboarding, auth
 
 ## Sign-in & gate
-- `/login` → Google via Auth.js. Only emails in `ALLOWED_EMAIL` (comma-separated) are accepted, and an unset value rejects everyone.
-- `src/app/(app)/layout.tsx` redirects to `/login` without a session and to `/onboarding` until `settings.onboarded_at` is set.
-- Server Actions call `requireSession()` themselves. The export route checks `auth()`.
+- `/login` → Google via Auth.js. Accepted: an email in `ALLOWED_EMAILS` (comma-separated, case-insensitive; the older
+  `ALLOWED_EMAIL` still works) or one that already has a `users` row. Unset = everyone rejected. The first allowed sign-in
+  creates the users row (`ensureUser`); the **first list entry claims the placeholder owner** created by migration 0007 and is admin.
+- The user id travels in the JWT (`session.user.id`). `src/app/(app)/layout.tsx` redirects to `/login` without a session and
+  to `/onboarding` until `users.onboarded_at` is set.
+- Server Actions call `requireUser()` and pass that id into every lib call; nothing identity-related comes from the client.
 
 ## Onboarding (`/onboarding` → `/onboarding/confirm`)
-Weight, height, age, sex → saved to `settings` → confirm targets → link Telegram by sending `/start <code>` to the bot
-(`settings.telegram_link_code`). The bot stores the chat id on the first matching `/start` and ignores every other chat.
+One form: weight, height, age, sex, **goal** (recomp / fat loss / muscle gain), **gym or home** (home shows an equipment
+picker: bodyweight only, dumbbells, bands, pull-up bar), days per week, minutes per session. `completeOnboarding` computes the
+targets (`src/lib/targets.ts`: Mifflin-St Jeor × activity factor → kcal ± 25, protein g/kg range), writes the user's
+`settings` row (single protein range; owner-only columns stay null), creates Push/Pull/Legs for gym users (home users get an
+empty workout-type list for now), marks `users.onboarded_at` and shows the confirm page: targets + `/start <code>` for the
+bot. Already-onboarded users are redirected to Today, so targets are never recomputed behind someone's back.
 
 ## Settings layout
 **Everyday**
-- **Targets**: kcal target/range, protein per phase, steps, budgets (`targets-form.tsx`)
-- **Protein phase**: auto by date, or an override (`phase-section.tsx`)
+- **Targets**: kcal target/range, protein (per phase for the owner, one range for everyone else), steps, budgets only when the
+  user has them (`targets-form.tsx`)
+- **Protein phase**: auto by date, or an override (`phase-section.tsx`); only shown to users with phases (the owner)
 - **Telegram**: link status / code (`telegram-card.tsx`)
 - **Telegram reminders**: 4 main toggles. "More reminders, quiet hours, daily cap" folds the rest (`nudge-settings.tsx`)
 
@@ -22,6 +30,9 @@ Weight, height, age, sex → saved to `settings` → confirm targets → link Te
   Archive; expand for its exercises: order, sets × reps, cues, + Exercise) · Add type · Archived list with Restore.
   Names are bot commands: a reserved bot word (`BOT_COMMAND_WORDS`, incl. the cardio words walk/run/…) or a duplicate is refused; a food with the same name only warns.
 - **Body & habits**: onboarding stats + smoke-free date (`body-stats-form.tsx`)
-- **Export data**: one CSV per table (`/api/export/<table>`). `settings` is never exported because it holds the chat id.
+- **Export data**: one CSV per table (`/api/export/<table>`), the signed-in user's rows only (exercises: library + own).
+  `settings` and `users` are never exported.
+- **People** (admins only, read-only, `people.tsx`): every account with email, onboarded yes/no, Telegram linked yes/no.
 
-All mutations are in `src/app/(app)/settings/actions.ts`. Shared UI bits (Card with `collapsible`, Field, Status) are in `settings/ui.tsx`.
+All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forUser(userId)`). Shared UI bits (Card with
+`collapsible`, Field, Status) are in `settings/ui.tsx`. Cues can only be edited on the user's own custom exercises; library cues are shared.

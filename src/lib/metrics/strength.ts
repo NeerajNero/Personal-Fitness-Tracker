@@ -4,9 +4,9 @@
  * concern for every exercise) instead of calling the per-exercise functions in a loop.
  */
 import { eq, sql } from "drizzle-orm";
-import { db } from "@/db";
 import { exercises } from "@/db/schema";
 import { addDays, isoWeekday, todayIST } from "@/lib/dates";
+import { forUser, type UserId } from "@/lib/db/scope";
 
 /** Epley estimated 1RM, 1 dp. Bodyweight-only sets (0 kg) return 0. */
 export function e1rm(weightKg: number, reps: number): number {
@@ -35,13 +35,14 @@ function idList(ids: number[]) {
 }
 
 /** Best working set per session (from v_e1rm_by_exercise), oldest first, per exercise. */
-export async function loadHistory(exerciseIds: number[], excludeSessionId?: number): Promise<Map<number, HistoryPoint[]>> {
+export async function loadHistory(userId: UserId, exerciseIds: number[], excludeSessionId?: number): Promise<Map<number, HistoryPoint[]>> {
   const out = new Map<number, HistoryPoint[]>();
   if (exerciseIds.length === 0) return out;
-  const res = await db.execute<{ exercise_id: number; session_id: number; date: string; weight_kg: number; reps: number; e1rm: number }>(sql`
+  const u = forUser(userId);
+  const res = await u.db.execute<{ exercise_id: number; session_id: number; date: string; weight_kg: number; reps: number; e1rm: number }>(sql`
     select exercise_id, session_id, date::text as date, weight_kg::float as weight_kg, reps, e1rm::float as e1rm
     from v_e1rm_by_exercise
-    where exercise_id in (${idList(exerciseIds)})
+    where user_id = ${u.uid} and exercise_id in (${idList(exerciseIds)})
       ${excludeSessionId !== undefined ? sql`and session_id <> ${excludeSessionId}` : sql``}
     order by exercise_id, date, session_id`);
   for (const r of res.rows) {
@@ -53,15 +54,16 @@ export async function loadHistory(exerciseIds: number[], excludeSessionId?: numb
 }
 
 /** Working sets from the most recent session (any routine day) that contains each exercise. */
-export async function loadLastSessionSets(exerciseIds: number[], excludeSessionId?: number): Promise<Map<number, LastSession>> {
+export async function loadLastSessionSets(userId: UserId, exerciseIds: number[], excludeSessionId?: number): Promise<Map<number, LastSession>> {
   const out = new Map<number, LastSession>();
   if (exerciseIds.length === 0) return out;
-  const res = await db.execute<{ exercise_id: number; session_id: number; date: string; set_no: number; weight_kg: number; reps: number }>(sql`
+  const u = forUser(userId);
+  const res = await u.db.execute<{ exercise_id: number; session_id: number; date: string; set_no: number; weight_kg: number; reps: number }>(sql`
     select exercise_id, session_id, date, set_no, weight_kg, reps from (
       select st.exercise_id, st.session_id, se.date::text as date, st.set_no, st.weight_kg::float as weight_kg, st.reps,
              dense_rank() over (partition by st.exercise_id order by se.date desc, se.id desc) as rk
       from sets st join sessions se on se.id = st.session_id
-      where st.is_working and st.exercise_id in (${idList(exerciseIds)})
+      where st.is_working and se.user_id = ${u.uid} and st.exercise_id in (${idList(exerciseIds)})
         ${excludeSessionId !== undefined ? sql`and st.session_id <> ${excludeSessionId}` : sql``}
     ) x where rk = 1
     order by exercise_id, set_no`);
@@ -121,27 +123,30 @@ export function hintFromSets(last: SetLite[] | null, muscleGroup: string, target
 
 /* ------------------------- per-exercise convenience ------------------------ */
 
-export async function bestSetPerSession(exerciseId: number): Promise<HistoryPoint[]> {
-  return (await loadHistory([exerciseId])).get(exerciseId) ?? [];
+export async function bestSetPerSession(userId: UserId, exerciseId: number): Promise<HistoryPoint[]> {
+  return (await loadHistory(userId, [exerciseId])).get(exerciseId) ?? [];
 }
 
-export async function stallDetector(exerciseId: number): Promise<boolean> {
-  return stallFromHistory(await bestSetPerSession(exerciseId)).stalled;
+export async function stallDetector(userId: UserId, exerciseId: number): Promise<boolean> {
+  return stallFromHistory(await bestSetPerSession(userId, exerciseId)).stalled;
 }
 
-export async function progressionHint(exerciseId: number, targetSets: number, targetReps: number): Promise<Hint> {
-  const [ex] = await db.select({ muscleGroup: exercises.muscleGroup }).from(exercises).where(eq(exercises.id, exerciseId)).limit(1);
-  const last = (await loadLastSessionSets([exerciseId])).get(exerciseId);
+export async function progressionHint(userId: UserId, exerciseId: number, targetSets: number, targetReps: number): Promise<Hint> {
+  const u = forUser(userId);
+  const [ex] = await u.db.select({ muscleGroup: exercises.muscleGroup }).from(exercises).where(u.visible(eq(exercises.id, exerciseId))).limit(1);
+  const last = (await loadLastSessionSets(userId, [exerciseId])).get(exerciseId);
   return hintFromSets(last?.sets ?? null, ex?.muscleGroup ?? "", targetSets, targetReps);
 }
 
 export type ExerciseHistory = { exerciseId: number; name: string; muscleGroup: string; points: HistoryPoint[] };
 
 /** Every exercise's best-set-per-session history (oldest first), for the Lifts section and checkpoints. */
-export async function loadAllHistory(): Promise<ExerciseHistory[]> {
-  const res = await db.execute<{ exercise_id: number; name: string; muscle_group: string; session_id: number; date: string; weight_kg: number; reps: number; e1rm: number }>(sql`
+export async function loadAllHistory(userId: UserId): Promise<ExerciseHistory[]> {
+  const u = forUser(userId);
+  const res = await u.db.execute<{ exercise_id: number; name: string; muscle_group: string; session_id: number; date: string; weight_kg: number; reps: number; e1rm: number }>(sql`
     select v.exercise_id, e.name, e.muscle_group, v.session_id, v.date::text as date, v.weight_kg::float as weight_kg, v.reps, v.e1rm::float as e1rm
     from v_e1rm_by_exercise v join exercises e on e.id = v.exercise_id
+    where v.user_id = ${u.uid}
     order by e.name, v.date, v.session_id`);
   const map = new Map<number, ExerciseHistory>();
   for (const r of res.rows) {
@@ -174,16 +179,17 @@ export function stallIndices(history: HistoryPoint[]): Set<number> {
 export type MuscleWeek = { weekStart: string; sets: Record<string, number> };
 
 /** Working sets per exercises.muscle_group per ISO week, for the last `weeks` weeks ending with the week of `today`. Newest first; empty weeks included. */
-export async function weeklySetsByMuscle(weeks = 4, today: string = todayIST()): Promise<MuscleWeek[]> {
+export async function weeklySetsByMuscle(userId: UserId, weeks = 4, today: string = todayIST()): Promise<MuscleWeek[]> {
+  const u = forUser(userId);
   const currentMonday = addDays(today, -(isoWeekday(today) - 1));
   const from = addDays(currentMonday, -7 * (weeks - 1));
   const to = addDays(currentMonday, 6);
-  const res = await db.execute<{ week_start: string; muscle_group: string; n: number }>(sql`
+  const res = await u.db.execute<{ week_start: string; muscle_group: string; n: number }>(sql`
     select date_trunc('week', s.date)::date::text as week_start, e.muscle_group, count(*)::int as n
     from sets st
     join sessions s on s.id = st.session_id
     join exercises e on e.id = st.exercise_id
-    where st.is_working and s.date between ${from} and ${to}
+    where st.is_working and s.user_id = ${u.uid} and s.date between ${from} and ${to}
     group by 1, 2`);
   const out: MuscleWeek[] = Array.from({ length: weeks }, (_, w) => ({ weekStart: addDays(currentMonday, -7 * w), sets: {} }));
   const byWeek = new Map(out.map((w) => [w.weekStart, w]));

@@ -1,7 +1,7 @@
 # Operations: run, migrate, deploy
 
 ## Environment (`.env`, never `.env.local`; template in `.env.example`)
-`DATABASE_URL` `AUTH_SECRET` `AUTH_GOOGLE_ID` `AUTH_GOOGLE_SECRET` `ALLOWED_EMAIL` `TELEGRAM_BOT_TOKEN`
+`DATABASE_URL` `AUTH_SECRET` `AUTH_GOOGLE_ID` `AUTH_GOOGLE_SECRET` `ALLOWED_EMAILS` (first entry = owner/admin; `ALLOWED_EMAIL` still accepted) `TELEGRAM_BOT_TOKEN`
 `TELEGRAM_BOT_USERNAME` `TELEGRAM_WEBHOOK_SECRET` `TICK_SECRET` `GEMINI_API_KEY` `GEMINI_MODEL` (optional) `NEXT_PUBLIC_APP_URL`
 
 Next.js and drizzle-kit load `.env` automatically. Standalone scripts use `node --env-file=.env` (already wired into
@@ -12,7 +12,7 @@ because `src/db/index.ts` imports `server-only`, which throws under plain Node. 
 ```bash
 pnpm install
 pnpm db:migrate        # apply drizzle/ migrations to DATABASE_URL
-pnpm seed              # idempotent (Push/Pull/Legs + exercise library on a fresh db)
+pnpm seed              # idempotent: the shared exercise library only (users/settings/types come from sign-in + onboarding)
 pnpm dev
 ```
 
@@ -21,8 +21,9 @@ pnpm dev
 pnpm exec next typegen && pnpm exec tsc --noEmit   # typegen first: PageProps/LayoutProps live in .next/types
 pnpm lint
 pnpm build             # when routes, config or server/client boundaries changed
+pnpm test              # migrations + two-user isolation against PGlite (in-memory Postgres); needs no DATABASE_URL
 ```
-There is no test suite. For pure logic (e.g. `parseCommand`), a throwaway `node --import=tsx` script in a scratch dir works.
+For pure logic (e.g. `parseCommand`), a throwaway `node --import=tsx` script in a scratch dir works.
 
 ## Deploy (Vercel Hobby)
 1. Push → Vercel builds. Set every env var in Vercel.
@@ -33,7 +34,14 @@ There is no test suite. For pure logic (e.g. `parseCommand`), a throwaway `node 
 
 ## Data scripts (owner runs them)
 `pnpm choose-day:dry` → review → `pnpm choose-day` (after migration 0005): Push/Pull/Legs, archive Upper/Lower,
-"no training" marks → rest days. Idempotent; it prints any exercise name it couldn't match.
+"no training" marks → rest days. Idempotent; it prints any exercise name it couldn't match. Scoped to the admin user since 0007.
+
+## Multi-user migration (0007)
+1. Set `ALLOWED_EMAILS` in Vercel with the owner's email **first**, then the other people. Deploy.
+2. `pnpm db:migrate`. 0007 creates `users` with a placeholder owner (`owner@recomp.local`, admin, onboarded), stamps every
+   existing row with it, makes `user_id` NOT NULL and rebuilds the views. Re-runnable.
+3. The owner signs in: the placeholder row takes their email and name (nothing else changes; the bot keeps working throughout).
+4. Others sign in → onboarding → `/start <code>` to the same bot. Settings → People (admin) shows who has arrived.
 
 ## Debugging reminders
 `pnpm tick:dry` (evaluate only) · `pnpm tick force=<rule key>` (send now, still logged). Uses `TICK_URL`

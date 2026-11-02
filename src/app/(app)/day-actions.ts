@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
-import { requireSession } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import { setDayPlan } from "@/lib/training";
 
 const choiceSchema = z.union([
@@ -19,9 +19,9 @@ export async function chooseDay(
   choice: { kind: "rest" } | { kind: "custom" } | { kind: "workout"; typeId: number },
   confirm = false,
 ): Promise<ActionResult<{ needsConfirm: false } | { needsConfirm: true; setCount: number }>> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    const r = await setDayPlan(z.string().regex(ISO_DATE, "Bad date").parse(date), choiceSchema.parse(choice), { confirm: z.boolean().parse(confirm) });
+    const r = await setDayPlan(userId, z.string().regex(ISO_DATE, "Bad date").parse(date), choiceSchema.parse(choice), { confirm: z.boolean().parse(confirm) });
     if (!r.ok) return { ok: true, needsConfirm: true, setCount: r.setCount };
     revalidatePath("/today");
     revalidatePath("/train");

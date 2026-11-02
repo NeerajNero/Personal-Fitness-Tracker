@@ -10,7 +10,7 @@ type Mode = "auto" | "veg" | "nonveg";
 
 export function PhaseSection({ s, phaseToday }: { s: Settings; phaseToday: Phase }) {
   const [mode, setMode] = useState<Mode>(s.phaseOverride ?? "auto");
-  const [switchDate, setSwitchDate] = useState(s.phaseSwitchDate);
+  const [switchDate, setSwitchDate] = useState(s.phaseSwitchDate ?? "");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();

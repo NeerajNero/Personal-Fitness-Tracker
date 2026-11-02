@@ -7,6 +7,14 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 ## Unreleased
 
 ### Added
+- **Multi-user.** Anyone in `ALLOWED_EMAILS` (first entry = the owner/admin) gets their own account on sign-in, with their own
+  data, targets, foods, workout types and Telegram link; nothing is shared between people except the exercise library.
+  Onboarding now asks for a goal (recomp / fat loss / muscle gain), gym or home (+ equipment), days per week and minutes per
+  session, and derives calorie and protein targets from them. Gym users start with Push/Pull/Legs; home users start with an
+  empty workout-type list. Verdicts and the maintenance suggestion follow the goal (fat loss: > 1 %/week → eat more, flat 2
+  weeks → eat less). One bot for everyone: `/start <code>` links a chat to its owner; reminders run per user with each
+  person's own cap. Export is per user. Settings → People (admin only) lists accounts, onboarding and link status.
+- `pnpm test`: migrations + two-user isolation test on an in-memory Postgres (PGlite).
 - **Cardio log:** incline walk, walk, run, cycle, cross-trainer, swim, stairs and sport, each showing only its fields
   (speed, distance, incline, name), plus effort and a note. Every field but minutes is optional (`walk 30` is fine);
   give speed or distance and the other is derived, and pace is shown for walks/runs.
@@ -27,6 +35,10 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 - `/sync-docs` project skill (`.claude/skills/sync-docs`): maps a diff to the docs it affects, updates them and the changelog.
 
 ### Changed
+- Owner-only settings (protein phases, budgets, navel goal, checkpoint dates, smoke-free date) are optional: Trends hides
+  "Navel vs goal", the goal card, the spend section and the checkpoint card when they are unset, and the Protein phase card
+  only shows for users with phases. The checkpoint card is titled by its date instead of "Dec 10".
+- `pnpm seed` now seeds only the exercise library (foods and workout types are per user).
 - The incline-walk checkbox is gone from the workout; old ticks still count as a cardio session (no minutes).
 - Session adherence, the weekly report and the Dec 10 checkpoint measure sessions against the weekly target (default 4)
   instead of the fixed weekday plan.
@@ -45,6 +57,10 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 - Train **✓ same as last time** per exercise and **✓ All same as last time** for the whole session.
 
 ### Changed
+- Owner-only settings (protein phases, budgets, navel goal, checkpoint dates, smoke-free date) are optional: Trends hides
+  "Navel vs goal", the goal card, the spend section and the checkpoint card when they are unset, and the Protein phase card
+  only shows for users with phases. The checkpoint card is titled by its date instead of "Dec 10".
+- `pnpm seed` now seeds only the exercise library (foods and workout types are per user).
 - The incline-walk checkbox is gone from the workout; old ticks still count as a cardio session (no minutes).
 - Today: manual entry (name, kcal, protein) is always open; chips merged into the progress card's status line;
   ₹ removed from logging; meal rows use tap → −/+/Delete instead of long-press.

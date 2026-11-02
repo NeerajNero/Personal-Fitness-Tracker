@@ -4,7 +4,8 @@ import { Section } from "./section";
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export function SpendSection({ spend }: { spend: MonthSpend }) {
-  const pct = spend.pctOfBudget;
+  const pct = spend.pctOfBudget ?? 0;
+  const budget = spend.budget ?? 0;
   const tone = pct >= 100 ? "danger" : pct >= 80 ? "warn" : "accent";
   const bar = { danger: "bg-danger", warn: "bg-warn", accent: "bg-accent" }[tone];
   const text = { danger: "text-danger", warn: "text-warn", accent: "text-fg" }[tone];
@@ -14,14 +15,14 @@ export function SpendSection({ spend }: { spend: MonthSpend }) {
     <Section title="Protein spend" aside={<span className="text-xs text-muted">{monthName} · day {spend.dayOfMonth}/{spend.daysInMonth}</span>}>
       <div className="flex items-baseline justify-between text-sm">
         <span className={`text-xl font-semibold tabular-nums ${text}`}>{inr(spend.spent)}</span>
-        <span className="text-muted">of {inr(spend.budget)} · {pct}%</span>
+        <span className="text-muted">of {inr(budget)} · {pct}%</span>
       </div>
       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-border">
         <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
-      <p className={`mt-2 text-xs ${spend.projectedMonthEnd > spend.budget ? "text-danger" : "text-muted"}`}>
+      <p className={`mt-2 text-xs ${spend.projectedMonthEnd > budget ? "text-danger" : "text-muted"}`}>
         Projected month end {inr(spend.projectedMonthEnd)} at the current rate
-        {spend.projectedMonthEnd > spend.budget ? ` — ${inr(spend.projectedMonthEnd - spend.budget)} over budget` : ""}.
+        {spend.projectedMonthEnd > budget ? ` — ${inr(spend.projectedMonthEnd - budget)} over budget` : ""}.
       </p>
 
       {spend.foodsRanked.length ? (

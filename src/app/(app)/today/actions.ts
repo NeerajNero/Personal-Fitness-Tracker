@@ -3,13 +3,13 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/db";
-import { foodLog, foods } from "@/db/schema";
+import { foodLog } from "@/db/schema";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { upsertDailyMetrics } from "@/lib/daily";
 import { addDays, ISO_DATE, nowTimeIST } from "@/lib/dates";
-import { copyFoodLog, entryFromFood, insertFoodEntries, listFoodLog, saveMeal } from "@/lib/food";
-import { requireSession } from "@/lib/session";
+import { forUser } from "@/lib/db/scope";
+import { copyFoodLog, entryFromFood, getFood, getFoodEntry, insertFoodEntries, listFoodLog, saveMeal } from "@/lib/food";
+import { requireUser } from "@/lib/session";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const qtySchema = z.coerce.number().positive("Qty must be > 0").max(50, "Qty too large");
@@ -28,11 +28,11 @@ const stepsSchema = z.union([
 ]);
 
 export async function saveWeight(date: string, raw: string): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
     const weightKg = weightSchema.parse(raw.trim());
-    await upsertDailyMetrics(d, { weightKg });
+    await upsertDailyMetrics(userId, d, { weightKg });
     revalidatePath("/today");
     return { ok: true };
   } catch (e) {
@@ -41,11 +41,11 @@ export async function saveWeight(date: string, raw: string): Promise<ActionResul
 }
 
 export async function saveSteps(date: string, raw: string): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
     const steps = stepsSchema.parse(raw.trim());
-    await upsertDailyMetrics(d, { steps });
+    await upsertDailyMetrics(userId, d, { steps });
     revalidatePath("/today");
     return { ok: true };
   } catch (e) {
@@ -57,13 +57,13 @@ export async function saveSteps(date: string, raw: string): Promise<ActionResult
 
 /** Add `qty` servings of a catalogue food. */
 export async function addFoodLog(date: string, foodId: number, qty: number): Promise<ActionResult<{ id: number }>> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
     const q = qtySchema.parse(qty);
-    const [food] = await db.select().from(foods).where(eq(foods.id, z.number().int().parse(foodId))).limit(1);
+    const food = await getFood(userId, z.number().int().parse(foodId));
     if (!food) return { ok: false, error: "Food not found" };
-    const [id] = await insertFoodEntries([entryFromFood(food, q, d, "app")]);
+    const [id] = await insertFoodEntries(userId, [entryFromFood(food, q, d, "app")]);
     revalidatePath("/today");
     return { ok: true, id };
   } catch (e) {
@@ -86,19 +86,19 @@ export async function quickAddFoodLog(
   date: string,
   input: { label: string; kcal: string; proteinG: string; saveAsMeal: boolean },
 ): Promise<ActionResult<{ id: number }>> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
     const v = quickAddSchema.parse(input);
     if (v.saveAsMeal) {
-      const meal = await saveMeal({ label: v.label, kcal: v.kcal, proteinG: v.proteinG });
+      const meal = await saveMeal(userId, { label: v.label, kcal: v.kcal, proteinG: v.proteinG });
       if ("error" in meal) return { ok: false, error: meal.error };
-      const [id] = await insertFoodEntries([entryFromFood(meal, 1, d, "app")]);
+      const [id] = await insertFoodEntries(userId, [entryFromFood(meal, 1, d, "app")]);
       revalidatePath("/today");
       revalidatePath("/settings");
       return { ok: true, id };
     }
-    const [id] = await insertFoodEntries([
+    const [id] = await insertFoodEntries(userId, [
       { date: d, time: nowTimeIST(), foodId: null, label: v.label, qty: 1, kcal: round(v.kcal, 1), proteinG: round(v.proteinG, 1), costInr: 0, source: "app" },
     ]);
     revalidatePath("/today");
@@ -110,11 +110,11 @@ export async function quickAddFoodLog(
 
 /** Copy the previous day's food log onto `date`. Only allowed while `date` is empty, so a double tap can't duplicate. */
 export async function copyPreviousDay(date: string): Promise<ActionResult<{ count: number }>> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
-    if ((await listFoodLog(d)).length > 0) return { ok: false, error: "Already has entries" };
-    const count = await copyFoodLog(addDays(d, -1), d, "app");
+    if ((await listFoodLog(userId, d)).length > 0) return { ok: false, error: "Already has entries" };
+    const count = await copyFoodLog(userId, addDays(d, -1), d, "app");
     if (count === 0) return { ok: false, error: "Nothing logged the day before" };
     revalidatePath("/today");
     return { ok: true, count };
@@ -125,21 +125,22 @@ export async function copyPreviousDay(date: string): Promise<ActionResult<{ coun
 
 /** Change servings. Catalogue rows recompute from the food; quick-adds scale proportionally. */
 export async function updateFoodLogQty(id: number, qty: number): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const q = qtySchema.parse(qty);
-    const [row] = await db.select().from(foodLog).where(eq(foodLog.id, z.number().int().parse(id))).limit(1);
+    const row = await getFoodEntry(userId, z.number().int().parse(id));
     if (!row) return { ok: false, error: "Entry not found" };
 
     let per = { kcal: row.kcal / row.qty, proteinG: row.proteinG / row.qty, costInr: row.costInr / row.qty };
     if (row.foodId !== null) {
-      const [food] = await db.select().from(foods).where(eq(foods.id, row.foodId)).limit(1);
+      const food = await getFood(userId, row.foodId);
       if (food) per = { kcal: food.kcal, proteinG: food.proteinG, costInr: food.costInr };
     }
-    await db
+    const u = forUser(userId);
+    await u.db
       .update(foodLog)
       .set({ qty: q, kcal: round(per.kcal * q, 1), proteinG: round(per.proteinG * q, 1), costInr: round(per.costInr * q, 2) })
-      .where(eq(foodLog.id, row.id));
+      .where(u.own(foodLog, eq(foodLog.id, row.id)));
     revalidatePath("/today");
     return { ok: true };
   } catch (e) {
@@ -148,9 +149,10 @@ export async function updateFoodLogQty(id: number, qty: number): Promise<ActionR
 }
 
 export async function deleteFoodLog(id: number): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    await db.delete(foodLog).where(eq(foodLog.id, z.number().int().parse(id)));
+    const u = forUser(userId);
+    await u.db.delete(foodLog).where(u.own(foodLog, eq(foodLog.id, z.number().int().parse(id))));
     revalidatePath("/today");
     return { ok: true };
   } catch (e) {

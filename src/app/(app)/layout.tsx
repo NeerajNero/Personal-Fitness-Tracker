@@ -2,18 +2,19 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { TabBar } from "@/components/tab-bar";
-import { getSettings, isOnboarded } from "@/lib/settings";
+import { asUserId } from "@/lib/db/scope";
+import { getUser } from "@/lib/users";
 
 /**
- * Gate for every screen under (app): must be signed in, must be onboarded.
+ * Gate for every screen under (app): must be signed in, must be onboarded (users.onboarded_at).
  * This is the gate — there is no proxy.ts guard on top of it.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
 
-  const s = await getSettings();
-  if (!isOnboarded(s)) redirect("/onboarding");
+  const user = await getUser(asUserId(session.user.id));
+  if (!user?.onboardedAt) redirect("/onboarding");
 
   return (
     <div className="flex min-h-dvh flex-col">

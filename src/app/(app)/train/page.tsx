@@ -4,6 +4,7 @@ import { DayPicker } from "@/components/day-picker";
 import { addDays, formatDayLabel, isValidIsoDate, todayIST } from "@/lib/dates";
 import { n0 } from "@/lib/format";
 import { pickerTypes } from "@/lib/routine";
+import { requireUser } from "@/lib/session";
 import { getTrainData } from "@/lib/training";
 import { Cardio } from "./cardio";
 import { SessionView } from "./session-view";
@@ -15,7 +16,8 @@ export default async function TrainPage({ searchParams }: PageProps<"/train">) {
   const today = todayIST();
   const date = typeof d === "string" && isValidIsoDate(d) && d <= today ? d : today;
 
-  const { state, types, cardio, session, allExercises } = await getTrainData(date);
+  const userId = await requireUser();
+  const { state, types, cardio, session, allExercises } = await getTrainData(userId, date);
   const plan = state.dayPlan;
   const [lo, hi] = state.targets.stepsRange;
 

@@ -15,7 +15,9 @@ import {
   weeklyRateFrom,
   weeklyVerdictFrom,
 } from "@/lib/metrics/trends";
-import { getSettings } from "@/lib/settings";
+import { onboardingDate as profileStart } from "@/lib/rules/rules";
+import { requireUser } from "@/lib/session";
+import { getSettings, hasBudgets, hasNavelGoal } from "@/lib/settings";
 import { AdherenceTable } from "./adherence-table";
 import { CheckpointCard } from "./checkpoint-card";
 import { GoalCard } from "./goal-card";
@@ -35,34 +37,36 @@ export const metadata: Metadata = { title: "Trends" };
 const WEEKS = 12;
 
 export default async function TrendsPage() {
+  const userId = await requireUser();
   const today = todayIST();
   const from = addDays(mondayOf(today), -7 * (WEEKS - 1));
 
   const [settings, series, measurements, totals, sessionDates, history, volume, cardioWeeks, cardioEntries] = await Promise.all([
-    getSettings(),
-    loadWeightSeries(),
-    loadMeasurements(),
-    loadDailyTotals(from, today),
-    loadLoggedSessionDates(from, today),
-    loadAllHistory(),
-    weeklySetsByMuscle(4, today),
-    cardioByWeek(8, today),
-    loadCardioSince(addDays(today, -180)),
+    getSettings(userId),
+    loadWeightSeries(userId),
+    loadMeasurements(userId),
+    loadDailyTotals(userId, from, today),
+    loadLoggedSessionDates(userId, from, today),
+    loadAllHistory(userId),
+    weeklySetsByMuscle(userId, 4, today),
+    cardioByWeek(userId, 8, today),
+    loadCardioSince(userId, addDays(today, -180)),
   ]);
 
-  const onboardingDate = settings.onboardedAt ? todayIST(settings.onboardedAt) : settings.smokeFreeSince ?? today;
-  const daysToCheckpoint = daysBetween(today, settings.checkpointDate);
-  const checkpointTo = daysToCheckpoint < 0 ? settings.checkpointDate : today;
+  // Owner-only cards: the checkpoint review needs a date, spend needs budgets, the navel goal needs its numbers.
+  const checkpointDate = settings.checkpointDate;
+  const daysToCheckpoint = checkpointDate ? daysBetween(today, checkpointDate) : null;
+  const checkpointTo = checkpointDate && daysToCheckpoint !== null && daysToCheckpoint < 0 ? checkpointDate : today;
 
   const [spend, checkpoint] = await Promise.all([
-    monthSpend(today, { settings }),
-    checkpointSummary(onboardingDate, checkpointTo, { settings, series, measurements, history }),
+    hasBudgets(settings) ? monthSpend(userId, today, { settings }) : null,
+    checkpointDate ? checkpointSummary(userId, profileStart(settings, today), checkpointTo, { settings, series, measurements, history }) : null,
   ]);
 
-  const rate = weeklyRateFrom(series);
+  const rate = weeklyRateFrom(series, 14, settings.goal);
   const weeks = adherenceByWeekFrom({ settings, totals, sessionDates, weeks: WEEKS, today });
-  const verdict = weeklyVerdictFrom({ series, measurements, totals, today });
-  const maintenance = estimateMaintenanceFrom({ series, totals, today });
+  const verdict = weeklyVerdictFrom({ series, measurements, totals, today, goal: settings.goal });
+  const maintenance = estimateMaintenanceFrom({ series, totals, today, goal: settings.goal });
 
   const lifts: Lift[] = history
     .filter((h) => h.points.length >= 2)
@@ -82,10 +86,10 @@ export default async function TrendsPage() {
     });
 
   // Time-bound or actionable cards jump to the top; everything else waits under "More".
-  const checkpointSoon = daysToCheckpoint >= -7 && daysToCheckpoint <= 14;
+  const checkpointSoon = daysToCheckpoint !== null && daysToCheckpoint >= -7 && daysToCheckpoint <= 14;
   const maintenanceActionable = maintenance !== null && Math.abs(maintenance.suggestedTarget - settings.kcalTarget) >= 50;
-  const checkpointCard = <CheckpointCard summary={checkpoint} checkpointDate={settings.checkpointDate} daysToGo={daysToCheckpoint} />;
-  const maintenanceCard = maintenance ? <MaintenanceCard data={maintenance} currentTarget={settings.kcalTarget} /> : null;
+  const checkpointCard = checkpoint && checkpointDate && daysToCheckpoint !== null ? <CheckpointCard summary={checkpoint} checkpointDate={checkpointDate} daysToGo={daysToCheckpoint} /> : null;
+  const maintenanceCard = maintenance ? <MaintenanceCard data={maintenance} currentTarget={settings.kcalTarget} goal={settings.goal} /> : null;
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
@@ -93,8 +97,8 @@ export default async function TrendsPage() {
       <VerdictCard verdict={verdict} />
       {checkpointSoon ? checkpointCard : null}
       {maintenanceActionable ? maintenanceCard : null}
-      <WeightSection series={series} rate={rate} today={today} />
-      <NavelSection measurements={measurements} settings={settings} today={today} />
+      <WeightSection series={series} rate={rate} today={today} goal={settings.goal} />
+      {hasNavelGoal(settings) ? <NavelSection measurements={measurements} settings={settings} today={today} /> : null}
       <Measurements items={measurements} today={today} />
 
       <details className="group">
@@ -104,14 +108,14 @@ export default async function TrendsPage() {
           <span aria-hidden className="transition-transform group-open:rotate-180">▾</span>
         </summary>
         <div className="mt-4 flex flex-col gap-4">
-          <GoalCard settings={settings} measurements={measurements} today={today} />
+          {hasNavelGoal(settings) ? <GoalCard settings={settings} measurements={measurements} today={today} /> : null}
           <LiftsSection lifts={lifts} />
           <MuscleVolume weeks={volume} />
           <CardioSection weeks={cardioWeeks.map(({ weekStart, minutes }) => ({ weekStart, minutes }))} entries={cardioEntries} />
           <AdherenceTable weeks={weeks} />
           {!maintenanceActionable ? maintenanceCard : null}
           {!checkpointSoon ? checkpointCard : null}
-          <SpendSection spend={spend} />
+          {spend ? <SpendSection spend={spend} /> : null}
           <p className="pb-2 text-center text-sm">
             <Link href="/settings#export" className="text-accent">
               Export data (CSV)

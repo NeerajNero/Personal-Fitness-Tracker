@@ -8,11 +8,11 @@
  * 2. Archive Upper A/B and Lower A/B (history stays; they move after the active types).
  * 3. Convert "No training today" marks (nudge_log `mark:no_training`) into rest days
  *    (daily_metrics.rest_day), except dates whose session has sets — those are reported, not changed.
- * Prints names only, never secrets.
+ * Prints names only, never secrets. Since multi-user (0007) everything is scoped to the admin (owner) user.
  */
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { dailyMetrics, exercises, routineDays, routineExercises } from "../src/db/schema";
+import { dailyMetrics, exercises, routineDays, routineExercises, users } from "../src/db/schema";
 
 const DRY = process.argv.includes("dry");
 
@@ -27,9 +27,13 @@ const NO_TRAINING_MARK = "mark:no_training";
 async function main() {
   console.log(DRY ? "DRY RUN — nothing will be written\n" : "APPLYING\n");
 
-  const exRows = await db.select({ id: exercises.id, name: exercises.name }).from(exercises);
+  const [owner] = await db.select({ id: users.id }).from(users).where(eq(users.isAdmin, true)).orderBy(users.createdAt).limit(1);
+  if (!owner) throw new Error("no admin user — run migration 0007 first");
+  const userId = owner.id;
+
+  const exRows = await db.select({ id: exercises.id, name: exercises.name }).from(exercises).where(or(isNull(exercises.userId), eq(exercises.userId, userId)));
   const exByName = new Map(exRows.map((e) => [e.name.toLowerCase(), e.id]));
-  const typeRows = await db.select({ id: routineDays.id, name: routineDays.name, archived: routineDays.archived }).from(routineDays);
+  const typeRows = await db.select({ id: routineDays.id, name: routineDays.name, archived: routineDays.archived }).from(routineDays).where(eq(routineDays.userId, userId));
   const typeByName = new Map(typeRows.map((t) => [t.name.toLowerCase(), t]));
   const unmatched: string[] = [];
 
@@ -43,7 +47,7 @@ async function main() {
     let typeId = typeByName.get(t.name.toLowerCase())?.id;
     if (typeId === undefined) {
       console.log(`+ create ${t.name} (rotation ${i + 1})`);
-      if (!DRY) [{ id: typeId }] = await db.insert(routineDays).values({ name: t.name, sortOrder: i + 1, weekday: null }).returning({ id: routineDays.id });
+      if (!DRY) [{ id: typeId }] = await db.insert(routineDays).values({ userId, name: t.name, sortOrder: i + 1, weekday: null }).returning({ id: routineDays.id });
     } else {
       console.log(`= ${t.name} exists — left as is`);
     }
@@ -53,7 +57,7 @@ async function main() {
     } else {
       console.log(`  + ${ids.length} exercises, 3 × 8`);
       if (!DRY && typeId !== undefined && ids.length) {
-        await db.insert(routineExercises).values(ids.map((exerciseId, k) => ({ routineDayId: typeId!, exerciseId, sortOrder: k + 1, targetSets: 3, targetReps: 8 }))).onConflictDoNothing();
+        await db.insert(routineExercises).values(ids.map((exerciseId, k) => ({ userId, routineDayId: typeId!, exerciseId, sortOrder: k + 1, targetSets: 3, targetReps: 8 }))).onConflictDoNothing();
       }
     }
   }
@@ -62,15 +66,15 @@ async function main() {
   const toArchive = typeRows.filter((t) => LEGACY.includes(t.name) && !t.archived);
   console.log(`\n${toArchive.length ? `~ archive ${toArchive.map((t) => t.name).join(", ")}` : "= legacy types already archived (or absent)"}`);
   if (!DRY && toArchive.length) {
-    await db.update(routineDays).set({ archived: true, sortOrder: sql`${routineDays.sortOrder} + 100` }).where(inArray(routineDays.id, toArchive.map((t) => t.id)));
+    await db.update(routineDays).set({ archived: true, sortOrder: sql`${routineDays.sortOrder} + 100` }).where(and(eq(routineDays.userId, userId), inArray(routineDays.id, toArchive.map((t) => t.id))));
   }
 
   // 3. "No training today" marks → rest days.
   const marks = await db.execute<{ date: string; set_count: number; rest_day: boolean | null }>(sql`
     select m.date::text as date,
-      (select count(*) from sets st join sessions s on s.id = st.session_id where s.date = m.date)::int as set_count,
-      (select dm.rest_day from daily_metrics dm where dm.date = m.date) as rest_day
-    from (select distinct date from nudge_log where rule_key = ${NO_TRAINING_MARK}) m
+      (select count(*) from sets st join sessions s on s.id = st.session_id where s.date = m.date and s.user_id = ${userId})::int as set_count,
+      (select dm.rest_day from daily_metrics dm where dm.date = m.date and dm.user_id = ${userId}) as rest_day
+    from (select distinct date from nudge_log where rule_key = ${NO_TRAINING_MARK} and user_id = ${userId}) m
     order by m.date`);
   const convert = marks.rows.filter((m) => m.set_count === 0 && m.rest_day !== true);
   const conflicts = marks.rows.filter((m) => m.set_count > 0);
@@ -78,7 +82,7 @@ async function main() {
   for (const c of conflicts) console.log(`  ! ${c.date} has a "no training" mark but ${c.set_count} sets — left as a workout day`);
   if (!DRY) {
     for (const m of convert) {
-      await db.insert(dailyMetrics).values({ date: m.date, restDay: true }).onConflictDoUpdate({ target: dailyMetrics.date, set: { restDay: true, updatedAt: new Date() } });
+      await db.insert(dailyMetrics).values({ userId, date: m.date, restDay: true }).onConflictDoUpdate({ target: [dailyMetrics.userId, dailyMetrics.date], set: { restDay: true, updatedAt: new Date() } });
     }
   }
   // Marks are kept (no deletes); nothing reads them any more.

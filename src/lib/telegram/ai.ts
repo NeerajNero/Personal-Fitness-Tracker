@@ -5,8 +5,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { eq, lt, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/db";
 import { pendingParses, type Food } from "@/db/schema";
+import { forUser, type UserId } from "@/lib/db/scope";
 import { foodInPhase } from "@/lib/food";
 import type { Phase } from "@/lib/metrics/phase";
 
@@ -110,19 +110,22 @@ export async function parseFreeText(text: string, foods: Food[], phase: Phase): 
 
 /* ------------------------------ pending store ------------------------------ */
 
-export async function createPending(payload: PendingPayload): Promise<number> {
-  const [row] = await db.insert(pendingParses).values({ payload }).returning({ id: pendingParses.id });
+export async function createPending(userId: UserId, payload: PendingPayload): Promise<number> {
+  const u = forUser(userId);
+  const [row] = await u.db.insert(pendingParses).values(u.stamp({ payload })).returning({ id: pendingParses.id });
   return row.id;
 }
 
-/** Fetch and delete in one go; null when missing or expired. */
-export async function takePending(id: number): Promise<PendingPayload | null> {
-  const [row] = await db.delete(pendingParses).where(eq(pendingParses.id, id)).returning({ payload: pendingParses.payload, createdAt: pendingParses.createdAt });
+/** Fetch and delete in one go; null when missing, another user's, or expired. */
+export async function takePending(userId: UserId, id: number): Promise<PendingPayload | null> {
+  const u = forUser(userId);
+  const [row] = await u.db.delete(pendingParses).where(u.own(pendingParses, eq(pendingParses.id, id))).returning({ payload: pendingParses.payload, createdAt: pendingParses.createdAt });
   if (!row) return null;
   if (Date.now() - row.createdAt.getTime() > 24 * 3600 * 1000) return null;
   return row.payload as PendingPayload;
 }
 
-export async function expirePending(): Promise<void> {
-  await db.delete(pendingParses).where(lt(pendingParses.createdAt, sql`now() - interval '24 hours'`));
+export async function expirePending(userId: UserId): Promise<void> {
+  const u = forUser(userId);
+  await u.db.delete(pendingParses).where(u.own(pendingParses, lt(pendingParses.createdAt, sql`now() - interval '24 hours'`)));
 }

@@ -1,8 +1,11 @@
 import type { Measurement, Settings } from "@/db/schema";
+
+/** Rendered only when the owner-style navel goal is set (see `hasNavelGoal`). */
+type NavelSettings = Settings & { navelStartCm: number; navelGoalMinCm: number; navelGoalMaxCm: number; goalDate: string };
 import { daysBetween } from "@/lib/dates";
 import { Section } from "./section";
 
-export function GoalCard({ settings, measurements, today }: { settings: Settings; measurements: Measurement[]; today: string }) {
+export function GoalCard({ settings, measurements, today }: { settings: NavelSettings; measurements: Measurement[]; today: string }) {
   const navels = measurements.filter((m): m is Measurement & { navelCm: number } => m.navelCm !== null);
   const latest = navels[navels.length - 1] ?? null;
   const start = settings.navelStartCm;
@@ -26,7 +29,7 @@ export function GoalCard({ settings, measurements, today }: { settings: Settings
   const fmtRate = (r: number) => `${r <= 0 ? "" : "+"}${r.toFixed(2)} cm/week`;
 
   return (
-    <Section title="Goal · Oct 2027" aside={<span className="text-sm font-medium text-muted">{Math.floor(weeksLeft)} weeks left</span>}>
+    <Section title={`Goal · ${new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", month: "short", year: "numeric" }).format(new Date(`${settings.goalDate}T00:00:00Z`))}`} aside={<span className="text-sm font-medium text-muted">{Math.floor(weeksLeft)} weeks left</span>}>
       <div className="flex items-baseline justify-between text-sm">
         <span className="text-xl font-semibold tabular-nums">{pct}%</span>
         <span className="text-muted">

@@ -3,9 +3,12 @@
 Read this when a change touches targets, phases, verdict logic, seed data, or "should we build X?".
 
 ## Goal
-1-year body recomposition, Oct 2026 → **2027-10-11**. Lose belly fat, build a V-taper back.
+The app serves a few people, each with their own account, data and targets (see `## Users` in `CLAUDE.md`). Onboarding
+collects weight / height / age / sex, a goal (recomp, fat loss, muscle gain), gym or home (+ equipment), days per week and
+minutes per session, and derives the targets (`src/lib/targets.ts`).
+
+The owner's own goal: 1-year body recomposition, Oct 2026 → **2027-10-11**. Lose belly fat, build a V-taper back.
 Navel 90 cm → 76–78 cm. Starting waist 86 cm, est. body fat 22–25 %.
-Weight / height / age / sex are collected in onboarding.
 
 ## Design principles (these decide every feature)
 1. **Minimise daily tracking time.** A feature has to reduce friction, or it doesn't ship.
@@ -19,20 +22,35 @@ Weight / height / age / sex are collected in onboarding.
 7. **Kcal + protein only.** No fat or carbs. Cost (₹) is still stored, but it isn't asked for or shown on logging
    screens. The owner will decide on cost later.
 
-## Targets (seeded into `settings`; editable in Settings)
+## Targets per goal (computed at onboarding, editable in Settings)
+Maintenance = Mifflin-St Jeor × activity factor (1.2 / 1.375 / 1.55 / 1.725 / 1.9 for 0 / 1–2 / 3–4 / 5–6 / 7 days a week).
+kcal range = target ± 25. Steps 8,000–10,000 on rest days for everyone.
+
+| Goal | Calories | Protein | Verdict rules |
+|---|---|---|---|
+| recomp | maintenance − 225 | 1.8–2.0 g/kg | as below (the owner's rules) |
+| fat_loss | maintenance − 500, floor 1,400 kcal (female) / 1,600 (male) | 2.0–2.2 g/kg | loss > 1.0 %/week → eat more · flat ±0.2 kg for 2+ weeks → eat less · < 5 logged days → tighten logging · maintenance card suggests tdee − 500 |
+| muscle_gain | maintenance + 250 | 1.8–2.0 g/kg | recomp rules for now; maintenance card suggests tdee + 250 |
+
+Protein phases, budgets, the navel goal and the checkpoint dates are **owner-only** (null for other users, and Trends /
+reminders hide what needs them). Everyone else has a single protein range (`settings.protein_min/max`).
+
+## Owner profile (user 1 seed values)
+These are the owner's stored `settings` values (kept by migration 0007; never recomputed). Owner-only values are marked.
 | What | Value |
 |---|---|
 | Calories | 1,925 kcal/day (range 1,900–1,950), mild deficit |
-| Protein, `veg` phase (until 2026-11-30) | 85–100 g/day, budget ₹4,800/month |
-| Protein, `nonveg` phase (from 2026-12-01) | 115–130 g/day, budget ₹5,000/month |
+| Protein, `veg` phase (until 2026-11-30) · owner-only | 85–100 g/day, budget ₹4,800/month |
+| Protein, `nonveg` phase (from 2026-12-01) · owner-only | 115–130 g/day, budget ₹5,000/month |
 | Steps (rest days) | 8,000–10,000 |
 | Training | **Choose the day**, no weekday schedule. Workout types Push → Pull → Legs (rotation suggests "next up"); target 4 sessions/week (`settings.weekly_session_target`) |
 | Cardio | 15–20 min incline walk after lifting (checkbox per session) |
-| Smoke-free since | 2026-09-27 (editable) |
-| Checkpoints | 2026-12-10 gym-renewal decision (8-week review) · 2027-10-11 end goal |
+| Smoke-free since · owner-only | 2026-09-27 (editable; empty for others until set) |
+| Navel goal · owner-only | 90 → 76–78 cm by 2027-10-11 |
+| Checkpoints · owner-only | 2026-12-10 gym-renewal decision (8-week review) · 2027-10-11 end goal |
 
-The phase is chosen automatically by date (`settings.phase_switch_date`) unless `phase_override` is set.
-See `getTargets()` in `src/lib/metrics/phase.ts`.
+The phase is chosen automatically by date (`settings.phase_switch_date`) unless `phase_override` is set; users without
+phases see every food. See `getTargets()` in `src/lib/metrics/phase.ts`.
 
 ## Coaching rules
 - **Adaptive target:** once ≥ 21 days of weight + intake exist, estimate maintenance as
@@ -43,8 +61,10 @@ See `getTargets()` in `src/lib/metrics/phase.ts`.
 - **Logging gate:** fewer than 5 of the last 7 days logged → "tighten logging" (the numbers can't be trusted).
 - Code: `weeklyVerdictFrom` and `estimateMaintenanceFrom` in `src/lib/metrics/trends.ts`.
 
-## Seed data (`scripts/seed.ts`)
-Foods (approximate; the owner edits them in the app):
+## Seed data (`scripts/seed.ts`, `src/lib/library.ts`)
+A fresh database gets only the shared exercise library. Users are created on first sign-in; gym users get Push/Pull/Legs
+at onboarding, home users start with no workout types. Foods are per user and start empty (the owner's catalogue below
+was seeded before multi-user):
 
 | name | serving | kcal | protein g | ₹ | phase |
 |---|---|---|---|---|---|
@@ -80,4 +100,4 @@ Note shown with the cues: upper-trap or forearm pain during pulls = shrugging + 
 
 ## Non-goals (don't build unless asked)
 Food-database search, photo/AI calorie estimation in the app, fat/carb tracking, calorie-burn estimates, sleep, mood,
-multi-user, social features, a native app.
+social features, a native app.

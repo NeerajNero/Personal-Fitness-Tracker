@@ -1,38 +1,34 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { todayIST } from "@/lib/dates";
 import { getTargets } from "@/lib/metrics/phase";
-import { getSettings, isOnboarded } from "@/lib/settings";
+import { requireUser } from "@/lib/session";
+import { findSettings, hasNavelGoal, hasPhases } from "@/lib/settings";
+import { GOALS } from "@/lib/targets";
 
 export const metadata: Metadata = { title: "Your targets" };
 
 export default async function ConfirmPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-  const s = await getSettings();
-  if (!isOnboarded(s)) redirect("/onboarding");
+  const userId = await requireUser();
+  const s = await findSettings(userId);
+  if (!s) redirect("/onboarding");
 
   const t = getTargets(todayIST(), s);
-  const phase = t.phase;
-  const protein = { min: t.proteinMin, max: t.proteinMax };
-  const phaseNote =
-    s.phaseOverride ? "set manually in settings"
-    : phase === "veg" ? `until ${s.phaseSwitchDate}`
-    : `from ${s.phaseSwitchDate}`;
+  const phaseNote = !hasPhases(s) ? null : s.phaseOverride ? "set manually in settings" : t.phase === "veg" ? `until ${s.phaseSwitchDate}` : `from ${s.phaseSwitchDate}`;
   const bot = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, "");
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       <h1 className="text-3xl font-semibold tracking-tight">Your targets</h1>
-      <p className="mt-1 mb-6 text-muted">Editable any time in Settings.</p>
+      <p className="mt-1 mb-6 text-muted">{GOALS[s.goal].label}. Editable any time in Settings.</p>
 
       <dl className="divide-y divide-border rounded-2xl border border-border bg-surface">
         <Row label="Calories" value={`${s.kcalTarget} kcal`} sub={`${s.kcalMin}–${s.kcalMax} range`} />
-        <Row label="Protein" value={`${protein.min}–${protein.max} g`} sub={`${phase} phase · ${phaseNote}`} />
+        <Row label="Protein" value={`${t.proteinMin}–${t.proteinMax} g`} sub={phaseNote ? `${t.phase} phase · ${phaseNote}` : "per day"} />
         <Row label="Steps (rest days)" value={`${s.stepsMin.toLocaleString("en-IN")}–${s.stepsMax.toLocaleString("en-IN")}`} />
-        <Row label="Navel goal" value={`${s.navelGoalMinCm}–${s.navelGoalMaxCm} cm`} sub={`from ${s.navelStartCm} cm by ${s.goalDate}`} />
+        <Row label="Training" value={`${s.weeklySessionTarget} × / week`} sub={s.trainingLocation === "gym" ? "Push / Pull / Legs to start" : "home — add workout types in Settings"} />
+        {hasNavelGoal(s) ? <Row label="Navel goal" value={`${s.navelGoalMinCm}–${s.navelGoalMaxCm} cm`} sub={`from ${s.navelStartCm} cm by ${s.goalDate}`} /> : null}
       </dl>
 
       <section className="mt-6 rounded-2xl border border-border bg-surface p-4">

@@ -1,5 +1,6 @@
-/** Window summary for the Dec 10 checkpoint card and the Telegram checkpoint rule. */
+/** Window summary for the checkpoint card (shown only when settings.checkpoint_date is set) and the Telegram checkpoint rule. */
 import type { Measurement, Settings } from "@/db/schema";
+import type { UserId } from "@/lib/db/scope";
 import { loadAllHistory, type ExerciseHistory } from "@/lib/metrics/strength";
 import { adherenceFrom, loadDailyTotals, loadLoggedSessionDates, loadMeasurements, loadWeightSeries, type Adherence, type DailyTotal, type WeightPoint } from "@/lib/metrics/trends";
 import { getSettings } from "@/lib/settings";
@@ -83,17 +84,18 @@ export function checkpointSummaryFrom(input: {
 
 /** Loads whatever `pre` doesn't supply. Totals and session dates for the window are always loaded. */
 export async function checkpointSummary(
+  userId: UserId,
   from: string,
   to: string,
   pre: Partial<{ settings: Settings; series: WeightPoint[]; measurements: Measurement[]; history: ExerciseHistory[] }> = {},
 ): Promise<CheckpointSummary> {
   const [settings, series, measurements, history, totals, sessionDates] = await Promise.all([
-    pre.settings ?? getSettings(),
-    pre.series ?? loadWeightSeries(),
-    pre.measurements ?? loadMeasurements(),
-    pre.history ?? loadAllHistory(),
-    loadDailyTotals(from, to),
-    loadLoggedSessionDates(from, to),
+    pre.settings ?? getSettings(userId),
+    pre.series ?? loadWeightSeries(userId),
+    pre.measurements ?? loadMeasurements(userId),
+    pre.history ?? loadAllHistory(userId),
+    loadDailyTotals(userId, from, to),
+    loadLoggedSessionDates(userId, from, to),
   ]);
   return checkpointSummaryFrom({ from, to, settings, series, measurements, history, totals, sessionDates });
 }

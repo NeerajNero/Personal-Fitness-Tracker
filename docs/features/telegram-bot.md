@@ -33,7 +33,10 @@ The parse is stored in `pending_parses`, and only its id goes in the callback da
 On any failure (network, 429, bad JSON) the bot replies "couldn't parse that — try `paneer 150` style".
 
 ## Rules
-- Only `settings.telegram_chat_id` is served. Other chats are ignored silently. Before linking, only `/start <code>` works.
+- **One bot, many users.** Every update is resolved to a user by chat id (`userIdByChat`, `settings.telegram_chat_id`,
+  unique across users); the resolved `{ userId, settings }` (`Who`) is passed to every op, so commands, type names, foods and
+  pending parses are that user's. An unlinked chat can only send `/start <code>`, which links it to whoever owns the code
+  (`linkChatByCode`); anything else from an unlinked chat is ignored silently.
 - Never log message bodies, tokens or chat ids (`bot.catch` logs the error class only).
 - Every log reply ends with the running total (`runningLine`) and the overage line if over target (`withOverage`).
 - Day buttons: `plan:<date>:<typeId|rest>` sets the day (morning brief), `did:<date>:<typeId|rest|same>` sets and logs it
@@ -42,5 +45,6 @@ On any failure (network, 429, bad JSON) the bot replies "couldn't parse that —
 
 ## Files
 `src/lib/telegram/`: `bot.ts` (middleware gate, handlers, callbacks), `parse.ts` (pure: `parseCommand`, `matchPlanWord`, `matchFood`,
-`servingsFor`), `ops.ts` (one function per command), `messages.ts` (HTML templates), `ai.ts`, `send.ts`, `env.ts`.
+`servingsFor`), `ops.ts` (one function per command, each takes `Who`), `messages.ts` (HTML templates), `ai.ts`, `send.ts`
+(`sendMessage(chatId, …)`), `env.ts`. Chat ↔ user lookups: `src/lib/users.ts`.
 Webhook management: `pnpm bot:set-webhook <url>`, `pnpm bot:webhook-info`, `pnpm bot:delete-webhook`.

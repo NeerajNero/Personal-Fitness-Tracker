@@ -4,40 +4,45 @@
  * their own data for callers like the bot and the weekly report.
  */
 import { asc, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { measurements, type Measurement, type Settings } from "@/db/schema";
+import { measurements, type Goal, type Measurement, type Settings } from "@/db/schema";
 import { addDays, daysBetween, isoWeekday, todayIST } from "@/lib/dates";
+import { forUser, type UserId } from "@/lib/db/scope";
 import { getTargets } from "@/lib/metrics/phase";
 import { getSettings } from "@/lib/settings";
+import { GOALS } from "@/lib/targets";
 
 export type WeightPoint = { date: string; weightKg: number; avg7: number; nDays: number };
 export type DailyTotal = { date: string; kcal: number; protein: number; cost: number; entries: number };
 
 /* --------------------------------- loaders --------------------------------- */
 
-export async function loadWeightSeries(): Promise<WeightPoint[]> {
-  const res = await db.execute<{ date: string; weight_kg: number; weight_7d_avg: number; n_days: number }>(sql`
+export async function loadWeightSeries(userId: UserId): Promise<WeightPoint[]> {
+  const u = forUser(userId);
+  const res = await u.db.execute<{ date: string; weight_kg: number; weight_7d_avg: number; n_days: number }>(sql`
     select date::text as date, weight_kg::float as weight_kg, weight_7d_avg::float as weight_7d_avg, n_days::int as n_days
-    from v_weight_7d order by date`);
+    from v_weight_7d where user_id = ${u.uid} order by date`);
   return res.rows.map((r) => ({ date: r.date, weightKg: r.weight_kg, avg7: r.weight_7d_avg, nDays: r.n_days }));
 }
 
-export async function loadDailyTotals(from: string, to: string): Promise<DailyTotal[]> {
-  const res = await db.execute<{ date: string; kcal: number; protein_g: number; cost_inr: number; entries: number }>(sql`
+export async function loadDailyTotals(userId: UserId, from: string, to: string): Promise<DailyTotal[]> {
+  const u = forUser(userId);
+  const res = await u.db.execute<{ date: string; kcal: number; protein_g: number; cost_inr: number; entries: number }>(sql`
     select date::text as date, kcal::float as kcal, protein_g::float as protein_g, cost_inr::float as cost_inr, entries
-    from v_daily_totals where date between ${from} and ${to} order by date`);
+    from v_daily_totals where user_id = ${u.uid} and date between ${from} and ${to} order by date`);
   return res.rows.map((r) => ({ date: r.date, kcal: r.kcal, protein: r.protein_g, cost: r.cost_inr, entries: r.entries }));
 }
 
-export function loadMeasurements(): Promise<Measurement[]> {
-  return db.select().from(measurements).orderBy(asc(measurements.date), asc(measurements.id));
+export function loadMeasurements(userId: UserId): Promise<Measurement[]> {
+  const u = forUser(userId);
+  return u.db.select().from(measurements).where(u.own(measurements)).orderBy(asc(measurements.date), asc(measurements.id));
 }
 
 /** Dates with a logged workout (≥1 set or incline walk), one entry per session. */
-export async function loadLoggedSessionDates(from: string, to: string): Promise<string[]> {
-  const res = await db.execute<{ date: string }>(sql`
+export async function loadLoggedSessionDates(userId: UserId, from: string, to: string): Promise<string[]> {
+  const u = forUser(userId);
+  const res = await u.db.execute<{ date: string }>(sql`
     select s.date::text as date from sessions s
-    where s.date between ${from} and ${to}
+    where s.user_id = ${u.uid} and s.date between ${from} and ${to}
       and (s.incline_walk or exists (select 1 from sets st where st.session_id = s.id))
     order by s.date`);
   return res.rows.map((r) => r.date);
@@ -48,14 +53,14 @@ export async function loadLoggedSessionDates(from: string, to: string): Promise<
 export type WeeklyRate = {
   kgPerWeek: number;
   pctPerWeek: number;
-  /** Losing faster than 0.5 %/week — muscle-loss risk in a recomp. */
+  /** Losing faster than the goal allows (0.5 %/week recomp, 1.0 %/week fat loss) — muscle-loss risk. */
   tooFast: boolean;
   latest: { date: string; avg7: number };
   baseline: { date: string; avg7: number };
 };
 
 /** Compare the latest 7-day average with the one ~7 days earlier (within `days` of history). */
-export function weeklyRateFrom(series: WeightPoint[], days = 14): WeeklyRate | null {
+export function weeklyRateFrom(series: WeightPoint[], days = 14, goal: Goal = "recomp"): WeeklyRate | null {
   if (series.length < 2) return null;
   const latest = series[series.length - 1];
   const cutoff = addDays(latest.date, -days);
@@ -72,14 +77,14 @@ export function weeklyRateFrom(series: WeightPoint[], days = 14): WeeklyRate | n
   return {
     kgPerWeek: round(kgPerWeek, 2),
     pctPerWeek: round(pctPerWeek, 2),
-    tooFast: kgPerWeek < 0 && Math.abs(pctPerWeek) > 0.5,
+    tooFast: kgPerWeek < 0 && Math.abs(pctPerWeek) > GOALS[goal].maxLossPctPerWeek,
     latest: { date: latest.date, avg7: latest.avg7 },
     baseline: { date: baseline.date, avg7: baseline.avg7 },
   };
 }
 
-export async function weeklyRate(days = 14): Promise<WeeklyRate | null> {
-  return weeklyRateFrom(await loadWeightSeries(), days);
+export async function weeklyRate(userId: UserId, goal: Goal, days = 14): Promise<WeeklyRate | null> {
+  return weeklyRateFrom(await loadWeightSeries(userId), days, goal);
 }
 
 /* -------------------------------- adherence -------------------------------- */
@@ -161,10 +166,10 @@ export function adherenceByWeekFrom(input: {
   return out; // newest first
 }
 
-export async function adherenceByWeek(weeks = 12): Promise<WeekAdherence[]> {
+export async function adherenceByWeek(userId: UserId, weeks = 12): Promise<WeekAdherence[]> {
   const today = todayIST();
   const from = addDays(mondayOf(today), -7 * (weeks - 1));
-  const [settings, totals, sessionDates] = await Promise.all([getSettings(), loadDailyTotals(from, today), loadLoggedSessionDates(from, today)]);
+  const [settings, totals, sessionDates] = await Promise.all([getSettings(userId), loadDailyTotals(userId, from, today), loadLoggedSessionDates(userId, from, today)]);
   return adherenceByWeekFrom({ settings, totals, sessionDates, weeks, today });
 }
 
@@ -191,14 +196,20 @@ function pointAtOrBefore(series: WeightPoint[], target: string, tolerance = 3): 
   return best && daysBetween(best.date, target) <= tolerance ? best : null;
 }
 
+/**
+ * Verdict by goal. recomp (and muscle_gain, which has no rules of its own yet): loss > 0.5 %/wk → eat more;
+ * flat 3 weeks with navel not dropping → eat less. fat_loss: loss > 1.0 %/wk → eat more; flat (±0.2 kg) for
+ * 2+ weeks → eat less. Both: under 5 logged days → tighten logging.
+ */
 export function weeklyVerdictFrom(input: {
   series: WeightPoint[];
   measurements: Measurement[];
   /** Totals covering at least the last 7 days. */
   totals: DailyTotal[];
   today?: string;
+  goal?: Goal;
 }): WeeklyVerdict {
-  const { series, measurements: ms, totals, today = todayIST() } = input;
+  const { series, measurements: ms, totals, today = todayIST(), goal = "recomp" } = input;
   const reasons: string[] = [];
 
   if (series.length < 7) {
@@ -212,17 +223,29 @@ export function weeklyVerdictFrom(input: {
   }
   reasons.push(`${loggedDays}/7 days logged.`);
 
-  const rate = weeklyRateFrom(series);
+  const rate = weeklyRateFrom(series, 14, goal);
   if (rate) {
     const dir = rate.kgPerWeek < 0 ? "down" : rate.kgPerWeek > 0 ? "up" : "flat";
     reasons.push(`7-day average ${dir} ${Math.abs(rate.kgPerWeek).toFixed(2)} kg/week (${Math.abs(rate.pctPerWeek).toFixed(2)} %).`);
     if (rate.tooFast) {
-      reasons.push("Faster than 0.5 %/week risks losing muscle in a recomp.");
+      reasons.push(goal === "fat_loss" ? "Faster than 1 %/week risks losing muscle — ease off a little." : "Faster than 0.5 %/week risks losing muscle in a recomp.");
       return { verdict: "eat_more", reasons };
     }
   }
 
   const latest = series[series.length - 1];
+  if (goal === "fat_loss") {
+    const twoWeeksAgo = pointAtOrBefore(series, addDays(latest.date, -14));
+    if (twoWeeksAgo) {
+      const delta = latest.avg7 - twoWeeksAgo.avg7;
+      if (Math.abs(delta) <= 0.2) {
+        reasons.push(`Weight flat for 2 weeks (${delta >= 0 ? "+" : ""}${delta.toFixed(1)} kg) — aim for 0.5–1 %/week.`);
+        return { verdict: "eat_less", reasons };
+      }
+    }
+    return { verdict: "hold", reasons };
+  }
+
   const threeWeeksAgo = pointAtOrBefore(series, addDays(latest.date, -21));
   if (threeWeeksAgo) {
     const delta = latest.avg7 - threeWeeksAgo.avg7;
@@ -246,10 +269,10 @@ export function weeklyVerdictFrom(input: {
   return { verdict: "hold", reasons };
 }
 
-export async function weeklyVerdict(): Promise<WeeklyVerdict> {
+export async function weeklyVerdict(userId: UserId, goal: Goal): Promise<WeeklyVerdict> {
   const today = todayIST();
-  const [series, ms, totals] = await Promise.all([loadWeightSeries(), loadMeasurements(), loadDailyTotals(addDays(today, -6), today)]);
-  return weeklyVerdictFrom({ series, measurements: ms, totals, today });
+  const [series, ms, totals] = await Promise.all([loadWeightSeries(userId), loadMeasurements(userId), loadDailyTotals(userId, addDays(today, -6), today)]);
+  return weeklyVerdictFrom({ series, measurements: ms, totals, today, goal });
 }
 
 /* ------------------------------- maintenance ------------------------------- */
@@ -260,20 +283,19 @@ export type Maintenance = {
   avgIntake: number;
   weightChangeKg: number;
   window: { from: string; to: string; days: number; daysWithBoth: number };
-  /** tdee − 225 (mild deficit). Suggestion only — never auto-applied. */
+  /** tdee plus the goal's delta (−225 recomp, −500 fat loss, +250 muscle gain). Suggestion only — never auto-applied. */
   suggestedTarget: number;
 };
 
 export const MAINTENANCE_MIN_DAYS = 21;
 export const MAINTENANCE_WINDOW_DAYS = 28;
-export const DEFICIT_KCAL = 225;
 
 /**
  * avg intake + (Δ 7-day-avg weight × 7700 / days). Needs ≥21 days in the last 28
  * that have both a weigh-in and logged intake.
  */
-export function estimateMaintenanceFrom(input: { series: WeightPoint[]; totals: DailyTotal[]; today?: string }): Maintenance | null {
-  const { series, totals, today = todayIST() } = input;
+export function estimateMaintenanceFrom(input: { series: WeightPoint[]; totals: DailyTotal[]; today?: string; goal?: Goal }): Maintenance | null {
+  const { series, totals, today = todayIST(), goal = "recomp" } = input;
   const from = addDays(today, -(MAINTENANCE_WINDOW_DAYS - 1));
   const w = series.filter((p) => p.date >= from && p.date <= today);
   const intake = totals.filter((t) => t.date >= from && t.date <= today && t.entries > 0);
@@ -293,15 +315,15 @@ export function estimateMaintenanceFrom(input: { series: WeightPoint[]; totals: 
     avgIntake: Math.round(avgIntake),
     weightChangeKg: round(weightChangeKg, 2),
     window: { from: first.date, to: last.date, days, daysWithBoth },
-    suggestedTarget: Math.round((tdee - DEFICIT_KCAL) / 5) * 5,
+    suggestedTarget: Math.round((tdee + GOALS[goal].kcalDelta) / 5) * 5,
   };
 }
 
-export async function estimateMaintenance(): Promise<Maintenance | null> {
+export async function estimateMaintenance(userId: UserId, goal: Goal): Promise<Maintenance | null> {
   const today = todayIST();
   const from = addDays(today, -(MAINTENANCE_WINDOW_DAYS - 1));
-  const [series, totals] = await Promise.all([loadWeightSeries(), loadDailyTotals(from, today)]);
-  return estimateMaintenanceFrom({ series, totals, today });
+  const [series, totals] = await Promise.all([loadWeightSeries(userId), loadDailyTotals(userId, from, today)]);
+  return estimateMaintenanceFrom({ series, totals, today, goal });
 }
 
 /* ----------------------------------- util ---------------------------------- */

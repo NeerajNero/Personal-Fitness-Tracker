@@ -1,7 +1,11 @@
-/** Bot operations. Each returns the HTML reply. All DB writes go through the same shared functions the screens use. */
+/**
+ * Bot operations. Each returns the HTML reply. All DB writes go through the same shared functions the screens use.
+ * `who` is the resolved chat owner (user id + settings); nothing here trusts anything else for identity.
+ */
 import type { Food, Settings } from "@/db/schema";
 import { incrementWater, upsertDailyMetrics } from "@/lib/daily";
 import { addDays, nowTimeIST } from "@/lib/dates";
+import type { UserId } from "@/lib/db/scope";
 import { deleteCardio, insertCardio, latestCardioOn, repeatLastCardio } from "@/lib/activities";
 import { cardioSummary, type CardioEntry, type CardioInput } from "@/lib/cardio";
 import { copyFoodLog, deleteFoodEntry, entryFromFood, insertFoodEntries, latestFoodEntry, listFoodLog, listFoods } from "@/lib/food";
@@ -14,50 +18,55 @@ import { didButtons, entryLine, runningLine, todaySummary, withOverage } from ".
 import type { InlineKeyboardButton } from "grammy/types";
 import { matchFood, servingsFor } from "./parse";
 
-export async function opWeight(date: string, kg: number): Promise<string> {
-  await upsertDailyMetrics(date, { weightKg: kg });
+/** The chat's owner, resolved by the bot middleware. */
+export type Who = { userId: UserId; settings: Settings };
+
+const dayState = (who: Who, date: string) => getDayState(who.userId, date, { settings: who.settings });
+
+export async function opWeight(who: Who, date: string, kg: number): Promise<string> {
+  await upsertDailyMetrics(who.userId, date, { weightKg: kg });
   return `⚖️ ${n1(kg)} kg saved.`;
 }
 
-export async function opSteps(date: string, n: number, settings: Settings): Promise<string> {
-  await upsertDailyMetrics(date, { steps: n });
-  const state = await getDayState(date, { settings });
+export async function opSteps(who: Who, date: string, n: number): Promise<string> {
+  await upsertDailyMetrics(who.userId, date, { steps: n });
+  const state = await dayState(who, date);
   const restish = state.dayPlan.kind === "rest" || state.dayPlan.kind === "unset";
   return `👟 ${n0(n)} steps saved${restish && n >= state.targets.steps ? " — target hit ✓" : ""}.`;
 }
 
-export async function opWater(date: string, settings: Settings): Promise<string> {
-  if (!settings.nudgeWater) return "Water tracking is off. Turn it on in Settings → Nudges to count glasses.";
-  const n = await incrementWater(date);
+export async function opWater(who: Who, date: string): Promise<string> {
+  if (!who.settings.nudgeWater) return "Water tracking is off. Turn it on in Settings → Nudges to count glasses.";
+  const n = await incrementWater(who.userId, date);
   return `💧 ${n} ${n === 1 ? "glass" : "glasses"} today.`;
 }
 
 /** Returns null when nothing in the catalogue matches (caller falls through to AI). */
-export async function opFood(date: string, query: string, n: number | null, settings: Settings, foods?: Food[]): Promise<string | null> {
-  const list = foods ?? (await listFoods());
+export async function opFood(who: Who, date: string, query: string, n: number | null, foods?: Food[]): Promise<string | null> {
+  const list = foods ?? (await listFoods(who.userId));
   const food = matchFood(query, list);
   if (!food) return null;
   const q = servingsFor(food, n);
   if ("error" in q) return q.error;
-  await insertFoodEntries([entryFromFood(food, q.qty, date, "telegram")]);
-  const state = await getDayState(date, { settings });
+  await insertFoodEntries(who.userId, [entryFromFood(food, q.qty, date, "telegram")]);
+  const state = await dayState(who, date);
   const line = entryLine(food.name, q.qty, food.servingLabel, food.kcal * q.qty, food.proteinG * q.qty);
   return withOverage(`${line}\n${runningLine(state)}`, state);
 }
 
 /** `dosa 350 12` — a one-off entry with numbers estimated elsewhere. */
-export async function opManual(date: string, label: string, kcal: number, proteinG: number, settings: Settings): Promise<string> {
-  await insertFoodEntries([{ date, time: nowTimeIST(), foodId: null, label, qty: 1, kcal, proteinG, costInr: 0, source: "telegram" }]);
-  const state = await getDayState(date, { settings });
+export async function opManual(who: Who, date: string, label: string, kcal: number, proteinG: number): Promise<string> {
+  await insertFoodEntries(who.userId, [{ date, time: nowTimeIST(), foodId: null, label, qty: 1, kcal, proteinG, costInr: 0, source: "telegram" }]);
+  const state = await dayState(who, date);
   return withOverage(`${entryLine(label, 1, null, kcal, proteinG)}\n${runningLine(state)}`, state);
 }
 
 /** `copy` — log everything from yesterday again. Only on an empty day so a repeat can't double it. */
-export async function opCopy(date: string, settings: Settings): Promise<string> {
-  if ((await listFoodLog(date)).length > 0) return "Today already has food logged — <code>undo</code> entries first if you want a clean copy.";
-  const n = await copyFoodLog(addDays(date, -1), date, "telegram");
+export async function opCopy(who: Who, date: string): Promise<string> {
+  if ((await listFoodLog(who.userId, date)).length > 0) return "Today already has food logged — <code>undo</code> entries first if you want a clean copy.";
+  const n = await copyFoodLog(who.userId, addDays(date, -1), date, "telegram");
   if (n === 0) return "Nothing was logged yesterday.";
-  const state = await getDayState(date, { settings });
+  const state = await dayState(who, date);
   return withOverage(`↺ Copied ${n} ${n === 1 ? "entry" : "entries"} from yesterday.\n${runningLine(state)}`, state);
 }
 
@@ -69,14 +78,14 @@ const confirmInApp = (date: string, setCount: number) =>
   `That day already has ${setCount} ${setCount === 1 ? "set" : "sets"} logged — ${trainLink(date, "change it in the app")} so nothing is lost.`;
 
 /** `push` / `rest` (or a morning button) — set what the day is. A type replies with its list and a ✓ All same button. */
-export async function opPlan(date: string, choice: DayChoice, settings: Settings): Promise<Reply> {
-  const r = await setDayPlan(date, choice);
+export async function opPlan(who: Who, date: string, choice: DayChoice): Promise<Reply> {
+  const r = await setDayPlan(who.userId, date, choice);
   if (!r.ok) return { text: confirmInApp(date, r.setCount) };
   if (choice.kind === "rest") {
-    const state = await getDayState(date, { settings });
+    const state = await dayState(who, date);
     return { text: `🛌 Rest day set. Steps target ${n0(state.targets.stepsRange[0])}–${n0(state.targets.stepsRange[1])}.` };
   }
-  const detail = r.sessionId ? await getSessionDetail(r.sessionId) : null;
+  const detail = r.sessionId ? await getSessionDetail(who.userId, r.sessionId) : null;
   const title = detail?.typeName ?? "Custom workout";
   const lines = detail?.exercises.map((e) => `• ${esc(e.name)} — ${esc(e.sets.length ? "logged ✓" : e.hint.text)}`) ?? [];
   return {
@@ -85,8 +94,8 @@ export async function opPlan(date: string, choice: DayChoice, settings: Settings
   };
 }
 
-async function logSame(date: string, sessionId: number, title: string, wasLogged: boolean): Promise<Reply> {
-  const filled = await copyLastSets(sessionId);
+async function logSame(who: Who, date: string, sessionId: number, title: string, wasLogged: boolean): Promise<Reply> {
+  const filled = await copyLastSets(who.userId, sessionId);
   const link = trainLink(date);
   if (filled === 0) {
     return { text: wasLogged ? `${esc(title)} already logged ✓ — ${link} to change anything.` : `🏋️ ${esc(title)} — no previous sets to copy, ${link} to enter them.` };
@@ -95,45 +104,45 @@ async function logSame(date: string, sessionId: number, title: string, wasLogged
 }
 
 /** `done` — log the chosen type as same as last time; when the day isn't set (or is rest), ask which. */
-export async function opDone(date: string, settings: Settings): Promise<Reply> {
-  const state = await getDayState(date, { settings });
+export async function opDone(who: Who, date: string): Promise<Reply> {
+  const state = await dayState(who, date);
   const plan = state.dayPlan;
   if ((plan.kind === "workout" || plan.kind === "custom") && state.flags.sessionId) {
-    return logSame(date, state.flags.sessionId, plan.typeName ?? "Custom workout", state.flags.workoutLogged);
+    return logSame(who, date, state.flags.sessionId, plan.typeName ?? "Custom workout", state.flags.workoutLogged);
   }
   if (state.daysSince.length === 0) return { text: `No workout types yet — add them in Settings, or ${trainLink(date)}.` };
   return { text: plan.kind === "rest" ? "Today is set as rest. Did you train after all?" : "What did you do today?", keyboard: didButtons({ ...state, dayPlan: { kind: "unset", typeId: null, typeName: null } }) };
 }
 
 /** Evening buttons: `did:<date>:<typeId|rest|same>` — set the day and log it as same as last time. */
-export async function opDid(date: string, value: string, settings: Settings): Promise<Reply> {
-  if (value === "rest") return opPlan(date, { kind: "rest" }, settings);
+export async function opDid(who: Who, date: string, value: string): Promise<Reply> {
+  if (value === "rest") return opPlan(who, date, { kind: "rest" });
   if (value === "same") {
-    const state = await getDayState(date, { settings });
-    if (!state.flags.sessionId) return opDone(date, settings);
-    return logSame(date, state.flags.sessionId, state.dayPlan.typeName ?? "Custom workout", state.flags.workoutLogged);
+    const state = await dayState(who, date);
+    if (!state.flags.sessionId) return opDone(who, date);
+    return logSame(who, date, state.flags.sessionId, state.dayPlan.typeName ?? "Custom workout", state.flags.workoutLogged);
   }
-  const r = await setDayPlan(date, { kind: "workout", typeId: Number(value) });
+  const r = await setDayPlan(who.userId, date, { kind: "workout", typeId: Number(value) });
   if (!r.ok) return { text: confirmInApp(date, r.setCount) };
-  const detail = r.sessionId ? await getSessionDetail(r.sessionId) : null;
-  return logSame(date, r.sessionId!, detail?.typeName ?? "Workout", false);
+  const detail = r.sessionId ? await getSessionDetail(who.userId, r.sessionId) : null;
+  return logSame(who, date, r.sessionId!, detail?.typeName ?? "Workout", false);
 }
 
-export async function opToday(date: string, settings: Settings): Promise<string> {
-  return todaySummary(await getDayState(date, { settings }));
+export async function opToday(who: Who, date: string): Promise<string> {
+  return todaySummary(await dayState(who, date));
 }
 
 /** `undo` — remove today's newest entry, food or cardio, whichever was logged last. */
-export async function opUndo(date: string, settings: Settings): Promise<string> {
-  const [food, cardio] = await Promise.all([latestFoodEntry(date), latestCardioOn(date)]);
+export async function opUndo(who: Who, date: string): Promise<string> {
+  const [food, cardio] = await Promise.all([latestFoodEntry(who.userId, date), latestCardioOn(who.userId, date)]);
   if (!food && !cardio) return "Nothing to undo today.";
   if (cardio && (!food || Date.parse(cardio.loggedAt) > food.createdAt.getTime())) {
-    await deleteCardio(cardio.id);
-    const state = await getDayState(date, { settings });
+    await deleteCardio(who.userId, cardio.id);
+    const state = await dayState(who, date);
     return `↩️ Removed <b>${esc(cardioSummary(cardio))}</b>.\n${cardioTotalLine(state.cardio.minutes)}`;
   }
-  await deleteFoodEntry(food!.id);
-  const state = await getDayState(date, { settings });
+  await deleteFoodEntry(who.userId, food!.id);
+  const state = await dayState(who, date);
   return `↩️ Removed <b>${esc(food!.label)}</b>${food!.qty !== 1 ? ` ×${qtyStr(food!.qty)}` : ""} (${n0(food!.kcal)} kcal).\n${runningLine(state)}`;
 }
 
@@ -146,21 +155,21 @@ function cardioReplyLine(e: CardioEntry): string {
 }
 
 /** `walk 30 5.5`, `incline 20 4.5 6%`, `sport badminton 45` … */
-export async function opCardio(date: string, input: CardioInput, settings: Settings): Promise<string> {
-  const e = await insertCardio(date, input);
-  const state = await getDayState(date, { settings });
+export async function opCardio(who: Who, date: string, input: CardioInput): Promise<string> {
+  const e = await insertCardio(who.userId, date, input);
+  const state = await dayState(who, date);
   return `${cardioReplyLine(e)}\n${cardioTotalLine(state.cardio.minutes)}`;
 }
 
 /** `cardio` / the day-close button — copy the most recent entry onto `date`. */
-export async function opCardioRepeat(date: string, settings: Settings): Promise<string> {
-  const e = await repeatLastCardio(date);
+export async function opCardioRepeat(who: Who, date: string): Promise<string> {
+  const e = await repeatLastCardio(who.userId, date);
   if (!e) return "No cardio logged yet. Try <code>incline 20 4.5 6%</code> or <code>walk 30 5</code>.";
-  const state = await getDayState(date, { settings });
+  const state = await dayState(who, date);
   return `${cardioReplyLine(e)} (same as last time)\n${cardioTotalLine(state.cardio.minutes)}`;
 }
 
-export async function opMeasure(date: string, kind: "navel" | "waist", cm: number): Promise<string> {
-  await upsertMeasurementByDate(date, kind === "navel" ? { navelCm: cm } : { waistCm: cm });
+export async function opMeasure(who: Who, date: string, kind: "navel" | "waist", cm: number): Promise<string> {
+  await upsertMeasurementByDate(who.userId, date, kind === "navel" ? { navelCm: cm } : { waistCm: cm });
   return `📏 ${kind} ${n1(cm)} cm saved for today.`;
 }

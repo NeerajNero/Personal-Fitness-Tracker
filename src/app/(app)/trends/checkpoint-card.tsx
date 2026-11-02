@@ -18,7 +18,7 @@ export function CheckpointCard({ summary, checkpointDate, daysToGo }: { summary:
   const frozen = daysToGo < 0;
   return (
     <Section
-      title={frozen ? "8-week review" : "Dec 10 checkpoint"}
+      title={frozen ? "8-week review" : `${shortDate(checkpointDate)} checkpoint`}
       aside={<span className="text-sm font-medium text-muted">{frozen ? `Reviewed ${shortDate(checkpointDate)}` : daysToGo === 0 ? "Today" : `${daysToGo} days to go`}</span>}
     >
       <p className="mb-3 text-xs text-muted">

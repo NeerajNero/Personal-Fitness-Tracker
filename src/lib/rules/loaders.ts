@@ -1,6 +1,8 @@
 /** Lazy, memoised metric loaders for rule conditions and messages. */
-import type { Measurement, Settings } from "@/db/schema";
+import { asc, eq } from "drizzle-orm";
+import { exercises, routineExercises, type Measurement, type Settings } from "@/db/schema";
 import { addDays, type IstNow } from "@/lib/dates";
+import { forUser, type UserId } from "@/lib/db/scope";
 import { listFoods, type Food } from "@/lib/food";
 import { checkpointSummary, type CheckpointSummary } from "@/lib/metrics/checkpoint";
 import { monthSpend, type MonthSpend } from "@/lib/metrics/spend";
@@ -9,9 +11,6 @@ import { loadMeasurements, mondayOf, weeklyRate, weeklyVerdict, type WeeklyRate,
 import { listRoutineExerciseNames } from "@/lib/training";
 import type { DayState } from "./dayState";
 import { buildWeeklyReport, type WeeklyReport } from "./weekly";
-import { db } from "@/db";
-import { exercises, routineExercises } from "@/db/schema";
-import { asc, eq } from "drizzle-orm";
 
 export type TopSet = { name: string; weightKg: number; reps: number };
 
@@ -41,9 +40,10 @@ function memoBy<K, T>(cache: Map<K, Promise<T>>, key: K, fn: () => Promise<T>): 
   return p;
 }
 
-export function makeLoaders(now: IstNow, settings: Settings, state: DayState): Loaders {
-  const foods = memo(() => listFoods());
-  const measurements = memo(() => loadMeasurements());
+export function makeLoaders(userId: UserId, now: IstNow, settings: Settings, state: DayState): Loaders {
+  const u = forUser(userId);
+  const foods = memo(() => listFoods(userId));
+  const measurements = memo(() => loadMeasurements(userId));
   const weeklyReports = new Map<string, Promise<WeeklyReport>>();
   const checkpoints = new Map<string, Promise<CheckpointSummary>>();
   const names = new Map<number, Promise<string[]>>();
@@ -51,25 +51,25 @@ export function makeLoaders(now: IstNow, settings: Settings, state: DayState): L
 
   return {
     foods,
-    spend: memo(() => monthSpend(now.date, { settings })),
-    rate: memo(() => weeklyRate()),
-    verdict: memo(() => weeklyVerdict()),
+    spend: memo(() => monthSpend(userId, now.date, { settings })),
+    rate: memo(() => weeklyRate(userId, settings.goal)),
+    verdict: memo(() => weeklyVerdict(userId, settings.goal)),
     measurements,
     measurementsInWeek: async (date = now.date) => {
       const start = mondayOf(date);
       const end = addDays(start, 6);
       return (await measurements()).filter((m) => m.date >= start && m.date <= end);
     },
-    typeExerciseNames: (typeId) => memoBy(names, typeId, async () => (await listRoutineExerciseNames(typeId)).map((r) => r.name)),
+    typeExerciseNames: (typeId) => memoBy(names, typeId, async () => (await listRoutineExerciseNames(userId, typeId)).map((r) => r.name)),
     typeTopSets: (typeId) =>
       memoBy(tops, typeId, async () => {
-        const rows = await db
+        const rows = await u.db
           .select({ id: exercises.id, name: exercises.name })
           .from(routineExercises)
           .innerJoin(exercises, eq(exercises.id, routineExercises.exerciseId))
-          .where(eq(routineExercises.routineDayId, typeId))
+          .where(u.own(routineExercises, eq(routineExercises.routineDayId, typeId)))
           .orderBy(asc(routineExercises.sortOrder));
-        const last = await loadLastSessionSets(rows.map((r) => r.id), state.flags.sessionId ?? undefined);
+        const last = await loadLastSessionSets(userId, rows.map((r) => r.id), state.flags.sessionId ?? undefined);
         return rows.flatMap((r) => {
           const l: LastSession | undefined = last.get(r.id);
           if (!l || l.sets.length === 0) return [];
@@ -77,22 +77,7 @@ export function makeLoaders(now: IstNow, settings: Settings, state: DayState): L
           return [{ name: r.name, weightKg: top.weightKg, reps: top.reps }];
         });
       }),
-    weeklyReport: (weekStart) => {
-      let p = weeklyReports.get(weekStart);
-      if (!p) {
-        p = buildWeeklyReport(weekStart, settings);
-        weeklyReports.set(weekStart, p);
-      }
-      return p;
-    },
-    checkpoint: (from, to) => {
-      const k = `${from}..${to}`;
-      let p = checkpoints.get(k);
-      if (!p) {
-        p = checkpointSummary(from, to, { settings });
-        checkpoints.set(k, p);
-      }
-      return p;
-    },
+    weeklyReport: (weekStart) => memoBy(weeklyReports, weekStart, () => buildWeeklyReport(userId, weekStart, settings)),
+    checkpoint: (from, to) => memoBy(checkpoints, `${from}..${to}`, () => checkpointSummary(userId, from, to, { settings })),
   };
 }

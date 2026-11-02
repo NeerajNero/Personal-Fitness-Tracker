@@ -8,6 +8,7 @@ import { listFoodLog, listFoods } from "@/lib/food";
 import { pickerTypes } from "@/lib/routine";
 import { listWorkoutTypes, sessionProgress } from "@/lib/training";
 import { getDayState } from "@/lib/rules/dayState";
+import { requireUser } from "@/lib/session";
 import { DateHeader } from "@/components/date-header";
 import { FoodSection } from "./food-section";
 import { MetricInputs } from "./metric-inputs";
@@ -21,14 +22,15 @@ export default async function TodayPage({ searchParams }: PageProps<"/today">) {
   const today = todayIST();
   const date = typeof d === "string" && isValidIsoDate(d) && d <= today ? d : today;
 
+  const userId = await requireUser();
   const [state, entries, foodList, types, cardio] = await Promise.all([
-    getDayState(date),
-    listFoodLog(date),
-    listFoods(),
-    listWorkoutTypes({ includeArchived: true }),
-    listCardio(date),
+    getDayState(userId, date),
+    listFoodLog(userId, date),
+    listFoods(userId),
+    listWorkoutTypes(userId, { includeArchived: true }),
+    listCardio(userId, date),
   ]);
-  const progress = state.flags.sessionId ? await sessionProgress(state.flags.sessionId) : null;
+  const progress = state.flags.sessionId ? await sessionProgress(userId, state.flags.sessionId) : null;
   const plan = state.dayPlan;
   const trainHref = date === today ? "/train" : `/train?d=${date}`;
 

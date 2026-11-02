@@ -1,9 +1,12 @@
 import type { Measurement, Settings } from "@/db/schema";
+
+/** Rendered only when the owner-style navel goal is set (see `hasNavelGoal`). */
+type NavelSettings = Settings & { navelStartCm: number; navelGoalMinCm: number; navelGoalMaxCm: number; goalDate: string };
 import { dateTicks, dayNum, LineChart } from "@/components/charts/line-chart";
 import { todayIST } from "@/lib/dates";
 import { Section } from "./section";
 
-export function NavelSection({ measurements, settings, today }: { measurements: Measurement[]; settings: Settings; today: string }) {
+export function NavelSection({ measurements, settings, today }: { measurements: Measurement[]; settings: NavelSettings; today: string }) {
   const navels = measurements.filter((m) => m.navelCm !== null) as (Measurement & { navelCm: number })[];
   const first = navels[0];
   const startDate = first?.date ?? (settings.onboardedAt ? todayIST(settings.onboardedAt) : settings.smokeFreeSince ?? today);

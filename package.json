@@ -17,7 +17,8 @@
     "bot:webhook-info": "node --env-file=.env --import=tsx scripts/bot-webhook.ts info",
     "bot:delete-webhook": "node --env-file=.env --import=tsx scripts/bot-webhook.ts delete",
     "tick": "node --env-file=.env --import=tsx scripts/tick.ts",
-    "tick:dry": "node --env-file=.env --import=tsx scripts/tick.ts dry"
+    "tick:dry": "node --env-file=.env --import=tsx scripts/tick.ts dry",
+    "test": "node --conditions=react-server --import=tsx --test tests/multi-user.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",
@@ -33,6 +34,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

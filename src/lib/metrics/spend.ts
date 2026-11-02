@@ -1,7 +1,7 @@
 /** Protein-spend metrics. Read by the Trends spend section and the budget_80 nudge rule. */
 import { sql } from "drizzle-orm";
-import { db } from "@/db";
 import type { Settings } from "@/db/schema";
+import { forUser, type UserId } from "@/lib/db/scope";
 import { getTargets } from "@/lib/metrics/phase";
 import { getSettings } from "@/lib/settings";
 
@@ -22,8 +22,9 @@ export type MonthSpend = {
   dayOfMonth: number;
   daysInMonth: number;
   spent: number;
-  budget: number;
-  pctOfBudget: number;
+  /** null when the user has no monthly budget (then pctOfBudget is null too). */
+  budget: number | null;
+  pctOfBudget: number | null;
   projectedMonthEnd: number;
   /** Foods actually eaten this month, cheapest ₹ per g protein first. */
   foodsRanked: FoodSpend[];
@@ -34,15 +35,16 @@ export function daysInMonth(date: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
-export async function monthSpend(date: string, opts: { settings?: Settings } = {}): Promise<MonthSpend> {
-  const settings = opts.settings ?? (await getSettings());
+export async function monthSpend(userId: UserId, date: string, opts: { settings?: Settings } = {}): Promise<MonthSpend> {
+  const u = forUser(userId);
+  const settings = opts.settings ?? (await getSettings(userId));
   const from = `${date.slice(0, 7)}-01`;
   const dayOfMonth = Number(date.slice(8, 10));
   const dim = daysInMonth(date);
 
-  const res = await db.execute<{ food_id: number | null; label: string; entries: number; cost_inr: number; protein_g: number }>(sql`
+  const res = await u.db.execute<{ food_id: number | null; label: string; entries: number; cost_inr: number; protein_g: number }>(sql`
     select food_id, max(label) as label, count(*)::int as entries, sum(cost_inr)::float as cost_inr, sum(protein_g)::float as protein_g
-    from food_log where date between ${from} and ${date}
+    from food_log where user_id = ${u.uid} and date between ${from} and ${date}
     group by food_id, case when food_id is null then label else '' end`);
 
   const foodsRanked: FoodSpend[] = res.rows
@@ -66,7 +68,7 @@ export async function monthSpend(date: string, opts: { settings?: Settings } = {
     daysInMonth: dim,
     spent,
     budget,
-    pctOfBudget: budget > 0 ? Math.round((spent / budget) * 100) : 0,
+    pctOfBudget: budget !== null && budget > 0 ? Math.round((spent / budget) * 100) : budget !== null ? 0 : null,
     projectedMonthEnd: Math.round((spent / dayOfMonth) * dim),
     foodsRanked,
   };

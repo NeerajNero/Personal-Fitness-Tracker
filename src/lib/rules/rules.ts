@@ -12,7 +12,7 @@ import type { WeeklyReport } from "./weekly";
 
 const fmtW = (w: number) => (w <= 0 ? "BW" : Number.isInteger(w) ? `${w}` : w.toFixed(1).replace(/\.0$/, ""));
 const link = (path: string, label: string) => `<a href="${appUrl()}${path}">${label}</a>`;
-const onboardingDate = (s: Settings, fallback: string) => (s.onboardedAt ? todayIST(s.onboardedAt) : (s.smokeFreeSince ?? fallback));
+export const onboardingDate = (s: Settings, fallback: string) => (s.onboardedAt ? todayIST(s.onboardedAt) : (s.smokeFreeSince ?? fallback));
 
 /** Greedy cheapest protein top-up: ≤ 2 foods, ≤ 2 servings each. */
 export function cheapestFix(remainingG: number, ranked: Food[]): { text: string; grams: number } | null {
@@ -203,12 +203,13 @@ export const RULES: Rule[] = [
     window: { start: "09:00", end: "21:00" },
     once: "month",
     enabled: (s) => s.nudgeBudget,
-    condition: async ({ now, load }) => now.dayOfMonth < 24 && (await load.spend()).pctOfBudget >= 80,
+    // Needs a monthly budget (owner only); users without one never get it.
+    condition: async ({ now, load }) => now.dayOfMonth < 24 && ((await load.spend()).pctOfBudget ?? 0) >= 80,
     message: async ({ load }) => {
       const sp = await load.spend();
       const cheap = sp.foodsRanked.filter((f) => f.inrPerGProtein !== null).slice(0, 2).map((f) => `${esc(f.label)} ₹${f.inrPerGProtein}/g`);
       return {
-        text: `💸 Protein spend <b>₹${n0(sp.spent)}</b> = ${sp.pctOfBudget}% of ₹${n0(sp.budget)} by day ${sp.dayOfMonth}. Projected ₹${n0(sp.projectedMonthEnd)} by month end.${cheap.length ? `\nCheapest this month: ${cheap.join(", ")}.` : ""}`,
+        text: `💸 Protein spend <b>₹${n0(sp.spent)}</b> = ${sp.pctOfBudget ?? 0}% of ₹${n0(sp.budget ?? 0)} by day ${sp.dayOfMonth}. Projected ₹${n0(sp.projectedMonthEnd)} by month end.${cheap.length ? `\nCheapest this month: ${cheap.join(", ")}.` : ""}`,
       };
     },
   },
@@ -217,9 +218,10 @@ export const RULES: Rule[] = [
     window: { start: "08:00", end: "21:00" },
     once: "ever",
     enabled: milestones,
-    condition: ({ now, settings }) => now.date === settings.phaseSwitchDate && settings.phaseOverride === null,
+    // Only users with protein phases (the owner) have a switch date.
+    condition: ({ now, settings }) => settings.phaseSwitchDate !== null && now.date === settings.phaseSwitchDate && settings.phaseOverride === null,
     message: ({ settings }) => ({
-      text: `🔁 <b>Phase switch:</b> non-veg from today. Protein target ${settings.proteinMinNonveg}–${settings.proteinMaxNonveg} g/day, budget ₹${n0(settings.budgetNonvegInr)}/month. Eggs, chicken and fish are now in the food list.`,
+      text: `🔁 <b>Phase switch:</b> non-veg from today. Protein target ${settings.proteinMinNonveg}–${settings.proteinMaxNonveg} g/day${settings.budgetNonvegInr !== null ? `, budget ₹${n0(settings.budgetNonvegInr)}/month` : ""}. Eggs, chicken and fish are now in the food list.`,
     }),
   },
   {
@@ -227,7 +229,7 @@ export const RULES: Rule[] = [
     window: { start: "08:00", end: "21:00" },
     once: "ever",
     enabled: milestones,
-    condition: ({ now, settings }) => now.date === settings.checkpointDate,
+    condition: ({ now, settings }) => settings.checkpointDate !== null && now.date === settings.checkpointDate,
     message: async ({ now, settings, load }) => {
       const c = await load.checkpoint(onboardingDate(settings, now.date), now.date);
       const sgn = (n: number, u: string) => `${n > 0 ? "+" : ""}${n} ${u}`;

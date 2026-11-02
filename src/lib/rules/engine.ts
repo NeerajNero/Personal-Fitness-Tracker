@@ -1,14 +1,13 @@
 /**
- * Rules engine. `evaluate(now)` decides what is due; `send(due)` delivers via Telegram and
- * records nudge_log. Idempotent per key per IST date (water uses slot keys like water_10),
- * capped per day, silent in quiet hours, each rule behind its settings toggle.
+ * Rules engine, run per user by /api/tick. `evaluate(userId, settings, now)` decides what is due; `send(...)` delivers
+ * to that user's chat and records nudge_log. Idempotent per key per IST date (water uses slot keys like water_10),
+ * capped per day with each user's own cap, silent in quiet hours, each rule behind its settings toggle.
  */
 import { and, eq, gte, inArray, or, sql } from "drizzle-orm";
 import type { InlineKeyboardButton } from "grammy/types";
-import { db } from "@/db";
 import { nudgeLog, type Settings } from "@/db/schema";
 import { inQuietHours, type IstNow } from "@/lib/dates";
-import { getSettings } from "@/lib/settings";
+import { forUser, type UserId } from "@/lib/db/scope";
 import { sendMessage } from "@/lib/telegram/send";
 import { getDayState, type DayState } from "./dayState";
 import { makeLoaders, type Loaders } from "./loaders";
@@ -17,6 +16,7 @@ import { RULES } from "./rules";
 export type RuleMessage = { text: string; inlineKeyboard?: InlineKeyboardButton[][] };
 
 export type RuleCtx = {
+  userId: UserId;
   now: IstNow;
   settings: Settings;
   state: DayState;
@@ -53,19 +53,23 @@ function inWindow(rule: Rule, now: IstNow): boolean {
   return now.minutes >= sh * 60 + sm && now.minutes < eh * 60 + em;
 }
 
-async function loadLogged(now: IstNow): Promise<{ logged: Set<string>; sentToday: number }> {
+async function loadLogged(userId: UserId, now: IstNow): Promise<{ logged: Set<string>; sentToday: number }> {
+  const u = forUser(userId);
   const monthKeys = RULES.filter((r) => r.once === "month").map((r) => r.key);
   const everKeys = RULES.filter((r) => r.once === "ever").map((r) => r.key);
   const monthStart = `${now.date.slice(0, 7)}-01`;
-  const rows = await db
+  const rows = await u.db
     .select({ ruleKey: nudgeLog.ruleKey, date: nudgeLog.date })
     .from(nudgeLog)
     .where(
-      or(
-        eq(nudgeLog.date, now.date),
-        monthKeys.length ? and(inArray(nudgeLog.ruleKey, monthKeys), gte(nudgeLog.date, monthStart)) : sql`false`,
-        everKeys.length ? inArray(nudgeLog.ruleKey, everKeys) : sql`false`,
-        sql`${nudgeLog.ruleKey} like 'weekly_report_%' and ${nudgeLog.date} >= ${now.date}::date - 8`,
+      u.own(
+        nudgeLog,
+        or(
+          eq(nudgeLog.date, now.date),
+          monthKeys.length ? and(inArray(nudgeLog.ruleKey, monthKeys), gte(nudgeLog.date, monthStart)) : sql`false`,
+          everKeys.length ? inArray(nudgeLog.ruleKey, everKeys) : sql`false`,
+          sql`${nudgeLog.ruleKey} like 'weekly_report_%' and ${nudgeLog.date} >= ${now.date}::date - 8`,
+        ),
       ),
     );
   const logged = new Set(rows.map((r) => r.ruleKey));
@@ -73,12 +77,11 @@ async function loadLogged(now: IstNow): Promise<{ logged: Set<string>; sentToday
   return { logged, sentToday };
 }
 
-export async function evaluate(now: IstNow, opts: { force?: string } = {}): Promise<Evaluation> {
-  const settings = await getSettings();
+export async function evaluate(userId: UserId, settings: Settings, now: IstNow, opts: { force?: string } = {}): Promise<Evaluation> {
   if (!settings.telegramChatId) return { due: [], skipped: [{ key: "*", reason: "not_linked" }], sentToday: 0 };
 
-  const [state, { logged, sentToday }] = await Promise.all([getDayState(now.date, { settings }), loadLogged(now)]);
-  const ctx: RuleCtx = { now, settings, state, logged, load: makeLoaders(now, settings, state) };
+  const [state, { logged, sentToday }] = await Promise.all([getDayState(userId, now.date, { settings }), loadLogged(userId, now)]);
+  const ctx: RuleCtx = { userId, now, settings, state, logged, load: makeLoaders(userId, now, settings, state) };
 
   if (opts.force) {
     const rule = RULES.find((r) => r.key === opts.force);
@@ -107,17 +110,20 @@ export async function evaluate(now: IstNow, opts: { force?: string } = {}): Prom
   return { due, skipped, sentToday };
 }
 
-/** Deliver and record. Returns the keys actually sent. */
-export async function send(due: Due[], now: IstNow): Promise<string[]> {
+/** Deliver to the user's chat and record. Returns the keys actually sent. */
+export async function send(userId: UserId, chatId: string, due: Due[], now: IstNow): Promise<string[]> {
+  const u = forUser(userId);
   const sent: string[] = [];
   for (const d of due) {
-    const r = await sendMessage(d.message.text, { inlineKeyboard: d.message.inlineKeyboard });
+    const r = await sendMessage(chatId, d.message.text, { inlineKeyboard: d.message.inlineKeyboard });
     if (!r.sent) continue;
-    await db.insert(nudgeLog).values({
-      ruleKey: d.logKey,
-      date: now.date,
-      payload: { rule: d.key, at: now.time, forced: d.forced || undefined },
-    });
+    await u.db.insert(nudgeLog).values(
+      u.stamp({
+        ruleKey: d.logKey,
+        date: now.date,
+        payload: { rule: d.key, at: now.time, forced: d.forced || undefined },
+      }),
+    );
     sent.push(d.logKey);
   }
   return sent;

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import type { Goal } from "@/db/schema";
 import type { Maintenance } from "@/lib/metrics/trends";
+import { GOALS } from "@/lib/targets";
 import { applyKcalTarget } from "./actions";
 import { Section } from "./section";
 
-export function MaintenanceCard({ data, currentTarget }: { data: Maintenance; currentTarget: number }) {
+export function MaintenanceCard({ data, currentTarget, goal }: { data: Maintenance; currentTarget: number; goal: Goal }) {
+  const delta = GOALS[goal].kcalDelta;
   const [armed, setArmed] = useState(false);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +31,7 @@ export function MaintenanceCard({ data, currentTarget }: { data: Maintenance; cu
           <p className="text-2xl font-semibold tabular-nums">{data.tdee.toLocaleString("en-IN")} <span className="text-sm font-normal text-muted">kcal</span></p>
         </div>
         <div>
-          <p className="text-xs text-muted">Suggested target</p>
+          <p className="text-xs text-muted">Suggested target ({delta > 0 ? "+" : ""}{delta})</p>
           <p className="text-2xl font-semibold tabular-nums">{data.suggestedTarget.toLocaleString("en-IN")} <span className="text-sm font-normal text-muted">kcal</span></p>
         </div>
       </div>

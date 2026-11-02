@@ -1,17 +1,17 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { db } from "@/db";
-import { exercises, sessionExercises, sessions, sets } from "@/db/schema";
+import { sessionExercises, sessions, sets } from "@/db/schema";
 import { deleteCardio, insertCardio, repeatLastCardio, updateCardio } from "@/lib/activities";
 import type { CardioInput } from "@/lib/cardio";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
+import { forUser } from "@/lib/db/scope";
 import { MUSCLE_GROUPS } from "@/lib/routine";
-import { requireSession } from "@/lib/session";
-import { addExerciseToType, copyLastSets, findOrCreateExercise } from "@/lib/training";
+import { requireUser } from "@/lib/session";
+import { addExerciseToType, copyLastSets, findExercise, findOrCreateExercise } from "@/lib/training";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const id = z.number().int().positive();
@@ -25,9 +25,9 @@ function revalidate() {
 
 /** ✓ Same as last time — one exercise, or every unlogged exercise when `exerciseId` is omitted. */
 export async function sameAsLast(sessionId: number, exerciseId?: number): Promise<ActionResult<{ filled: number }>> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    const filled = await copyLastSets(id.parse(sessionId), exerciseId === undefined ? undefined : [id.parse(exerciseId)]);
+    const filled = await copyLastSets(userId, id.parse(sessionId), exerciseId === undefined ? undefined : [id.parse(exerciseId)]);
     revalidate();
     return { ok: true, filled };
   } catch (e) {
@@ -36,9 +36,10 @@ export async function sameAsLast(sessionId: number, exerciseId?: number): Promis
 }
 
 export async function discardSession(sessionId: number): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    await db.delete(sessions).where(eq(sessions.id, id.parse(sessionId)));
+    const u = forUser(userId);
+    await u.db.delete(sessions).where(u.own(sessions, eq(sessions.id, id.parse(sessionId))));
     revalidate();
     return { ok: true };
   } catch (e) {
@@ -47,10 +48,11 @@ export async function discardSession(sessionId: number): Promise<ActionResult> {
 }
 
 export async function saveSessionNotes(sessionId: number, notes: string): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const n = z.string().trim().max(500, "Notes too long").parse(notes);
-    await db.update(sessions).set({ notes: n === "" ? null : n }).where(eq(sessions.id, id.parse(sessionId)));
+    const u = forUser(userId);
+    await u.db.update(sessions).set({ notes: n === "" ? null : n }).where(u.own(sessions, eq(sessions.id, id.parse(sessionId))));
     revalidate();
     return { ok: true };
   } catch (e) {
@@ -75,12 +77,16 @@ export async function upsertSet(input: {
   weightKg: string;
   reps: string;
 }): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const v = setSchema.parse(input);
-    await db
+    const u = forUser(userId);
+    // The session must be the user's own; a foreign id is simply not found.
+    const [sess] = await u.db.select({ id: sessions.id }).from(sessions).where(u.own(sessions, eq(sessions.id, v.sessionId))).limit(1);
+    if (!sess) return { ok: false, error: "Session not found" };
+    await u.db
       .insert(sets)
-      .values({ ...v, isWorking: true })
+      .values(u.stamp({ ...v, isWorking: true }))
       .onConflictDoUpdate({
         target: [sets.sessionId, sets.exerciseId, sets.setNo],
         set: { weightKg: v.weightKg, reps: v.reps },
@@ -93,11 +99,12 @@ export async function upsertSet(input: {
 }
 
 export async function deleteSet(sessionId: number, exerciseId: number, setNo: number): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    await db
+    const u = forUser(userId);
+    await u.db
       .delete(sets)
-      .where(and(eq(sets.sessionId, id.parse(sessionId)), eq(sets.exerciseId, id.parse(exerciseId)), eq(sets.setNo, z.number().int().parse(setNo))));
+      .where(u.own(sets, eq(sets.sessionId, id.parse(sessionId)), eq(sets.exerciseId, id.parse(exerciseId)), eq(sets.setNo, z.number().int().parse(setNo))));
     revalidate();
     return { ok: true };
   } catch (e) {
@@ -118,29 +125,30 @@ export async function addExerciseToSession(
   input: { exerciseId: number } | { name: string; muscleGroup: string },
   alsoAddToType = false,
 ): Promise<ActionResult<{ exerciseId: number }>> {
-  await requireSession();
+  const userId = await requireUser();
   try {
     const sid = id.parse(sessionId);
     const v = addExerciseSchema.parse(input);
+    const u = forUser(userId);
+
+    const [sess] = await u.db.select({ typeId: sessions.routineDayId }).from(sessions).where(u.own(sessions, eq(sessions.id, sid))).limit(1);
+    if (!sess) return { ok: false, error: "Session not found" };
 
     let exerciseId: number;
     if ("exerciseId" in v) {
-      const [ex] = await db.select({ id: exercises.id }).from(exercises).where(eq(exercises.id, v.exerciseId)).limit(1);
+      const ex = await findExercise(userId, v.exerciseId);
       if (!ex) return { ok: false, error: "Exercise not found" };
       exerciseId = ex.id;
     } else {
-      exerciseId = await findOrCreateExercise(v.name, v.muscleGroup);
+      exerciseId = await findOrCreateExercise(userId, v.name, v.muscleGroup);
     }
 
-    const [{ max }] = await db
+    const [{ max }] = await u.db
       .select({ max: sql<number>`coalesce(max(${sessionExercises.sortOrder}), 0)::int` })
       .from(sessionExercises)
-      .where(eq(sessionExercises.sessionId, sid));
-    await db.insert(sessionExercises).values({ sessionId: sid, exerciseId, sortOrder: max + 1 }).onConflictDoNothing();
-    if (z.boolean().parse(alsoAddToType)) {
-      const [sess] = await db.select({ typeId: sessions.routineDayId }).from(sessions).where(eq(sessions.id, sid)).limit(1);
-      if (sess?.typeId) await addExerciseToType(sess.typeId, exerciseId);
-    }
+      .where(u.own(sessionExercises, eq(sessionExercises.sessionId, sid)));
+    await u.db.insert(sessionExercises).values(u.stamp({ sessionId: sid, exerciseId, sortOrder: max + 1 })).onConflictDoNothing();
+    if (z.boolean().parse(alsoAddToType) && sess.typeId) await addExerciseToType(userId, sess.typeId, exerciseId);
 
     revalidate();
     return { ok: true, exerciseId };
@@ -153,9 +161,9 @@ export async function addExerciseToSession(
 
 /** Add a cardio entry (validation + speed ⇄ distance derivation in normalizeCardio). */
 export async function addCardio(date: string, input: CardioInput): Promise<ActionResult<{ id: number }>> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    const e = await insertCardio(dateSchema.parse(date), input);
+    const e = await insertCardio(userId, dateSchema.parse(date), input);
     revalidate();
     return { ok: true, id: e.id };
   } catch (e) {
@@ -164,9 +172,9 @@ export async function addCardio(date: string, input: CardioInput): Promise<Actio
 }
 
 export async function editCardio(entryId: number, input: CardioInput): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    const e = await updateCardio(id.parse(entryId), input);
+    const e = await updateCardio(userId, id.parse(entryId), input);
     if (!e) return { ok: false, error: "Entry not found" };
     revalidate();
     return { ok: true };
@@ -176,9 +184,9 @@ export async function editCardio(entryId: number, input: CardioInput): Promise<A
 }
 
 export async function removeCardio(entryId: number): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    await deleteCardio(id.parse(entryId));
+    await deleteCardio(userId, id.parse(entryId));
     revalidate();
     return { ok: true };
   } catch (e) {
@@ -188,9 +196,9 @@ export async function removeCardio(entryId: number): Promise<ActionResult> {
 
 /** "Same as last time": copy the most recent entry onto `date` with the current time. */
 export async function repeatCardio(date: string): Promise<ActionResult> {
-  await requireSession();
+  const userId = await requireUser();
   try {
-    const e = await repeatLastCardio(dateSchema.parse(date));
+    const e = await repeatLastCardio(userId, dateSchema.parse(date));
     if (!e) return { ok: false, error: "No earlier cardio to repeat" };
     revalidate();
     return { ok: true };

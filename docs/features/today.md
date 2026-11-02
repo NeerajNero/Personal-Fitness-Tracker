@@ -30,13 +30,13 @@ The food + body-metrics screen. It should take under 10 seconds to use, one-hand
 ## Files
 | File | Role |
 |---|---|
-| `src/app/(app)/today/page.tsx` | Loads DayState, the log, foods and workout types in parallel; session progress for the picker line |
+| `src/app/(app)/today/page.tsx` | Loads the user's DayState, log, foods and workout types in parallel; session progress for the picker line |
 | `src/components/day-picker.tsx` + `src/app/(app)/day-actions.ts` | Day picker + `chooseDay` action (Today and Train) |
 | `today/totals.tsx` | Progress card + status line |
 | `today/metric-inputs.tsx` | Weight / steps |
 | `today/food-section.tsx` | My meals, All foods, Add a meal, Logged list (client, optimistic) |
 | `today/actions.ts` | `saveWeight`, `saveSteps`, `addFoodLog`, `quickAddFoodLog`, `copyPreviousDay`, `updateFoodLogQty`, `deleteFoodLog` |
-| `src/lib/food.ts` | Shared writes: `entryFromFood`, `insertFoodEntries`, `saveMeal`, `copyFoodLog`, `deleteLatestFoodEntry` |
+| `src/lib/food.ts` | Shared writes (all take `userId` first): `entryFromFood`, `insertFoodEntries`, `saveMeal`, `copyFoodLog`, `deleteFoodEntry` |
 
 ## Ideas not built
 Whole-day templates (dropped because the owner mixes meals; My meals + Same as yesterday cover it).

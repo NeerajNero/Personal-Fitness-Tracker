@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { dateTicks, dayNum, LineChart } from "@/components/charts/line-chart";
 import { addDays } from "@/lib/dates";
+import type { Goal } from "@/db/schema";
 import type { WeeklyRate, WeightPoint } from "@/lib/metrics/trends";
+import { GOALS } from "@/lib/targets";
 import { Section } from "./section";
 
 type Range = 30 | 90 | "all";
 
-export function WeightSection({ series, rate, today }: { series: WeightPoint[]; rate: WeeklyRate | null; today: string }) {
+export function WeightSection({ series, rate, today, goal }: { series: WeightPoint[]; rate: WeeklyRate | null; today: string; goal: Goal }) {
   const [range, setRange] = useState<Range>(30);
   const from = range === "all" ? (series[0]?.date ?? today) : addDays(today, -(range - 1));
   const visible = series.filter((p) => p.date >= from);
@@ -53,7 +55,7 @@ export function WeightSection({ series, rate, today }: { series: WeightPoint[]; 
               <span className="text-muted"> · {rate.pctPerWeek > 0 ? "+" : ""}{rate.pctPerWeek.toFixed(2)} %/week · 7-day avg {rate.latest.avg7.toFixed(1)} kg</span>
             </p>
             {rate.tooFast ? (
-              <p className="mt-1 font-medium text-danger">Losing faster than 0.5 %/week — eat slightly more to protect muscle.</p>
+              <p className="mt-1 font-medium text-danger">Losing faster than {GOALS[goal].maxLossPctPerWeek} %/week — eat slightly more to protect muscle.</p>
             ) : null}
           </>
         ) : (

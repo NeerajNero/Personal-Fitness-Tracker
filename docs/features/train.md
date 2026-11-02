@@ -13,7 +13,7 @@ archived). Choosing a type creates the session. **Rest:** "Walk 8,000–10,000 s
 - One line per exercise: name, a `stalled` badge, and the hint `last 45 × 10/10/9 → try 47.5` → **✓** button.
   - ✓ copies last session's working sets for that exercise. The line then turns green: `✓ 45 kg × 10/10/9`.
   - Tapping the name opens the set grid (kg × reps per set, placeholders from last session, ± set), the stall advice and the cues.
-- **+ Add an exercise**: search the full library or create a new one (with a muscle group). "Also add to <type>" (off by default)
+- **+ Add an exercise**: search the shared library plus your own custom exercises, or create a new one (with a muscle group; it's yours only). "Also add to <type>" (off by default)
   appends it to the type's list too (3 × 8).
 - **Cardio** (below the workout, or on its own on rest/unset days): see [cardio.md](cardio.md).
 
@@ -39,7 +39,7 @@ archived). Choosing a type creates the session. **Rest:** "Walk 8,000–10,000 s
 | `train/session-view.tsx` | Header, `ExerciseRow` (collapsed line + set grid), `AddExercise` |
 | `train/cardio.tsx` | Cardio section (repeat, type picker, per-type form, entries) |
 | `train/actions.ts` | `sameAsLast`, `upsertSet`, `deleteSet`, `addExerciseToSession`, `setInclineWalk`, `saveSessionNotes`, `discardSession`, `addCardio`, `editCardio`, `removeCardio`, `repeatCardio` |
-| `src/lib/training.ts` | `listWorkoutTypes`, `setDayPlan`, `getSessionDetail`, `createSession`, `copyLastSets`, `addExerciseToType`, `sessionProgress`, `findOrCreateExercise` |
+| `src/lib/training.ts` | All take `userId` first: `listWorkoutTypes`, `setDayPlan`, `getSessionDetail`, `createSession`, `copyLastSets`, `addExerciseToType`, `sessionProgress`, `findOrCreateExercise` (custom = own), `findExercise`, `createWorkoutType` (onboarding) |
 | `src/lib/metrics/strength.ts` | `e1rm`, history loaders, `hintFromSets`, `stallFromHistory` |
 
 ## Gotcha
