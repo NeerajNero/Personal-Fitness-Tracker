@@ -59,7 +59,9 @@ snapshot, then edit the SQL. Keep the statement breakpoints. 0007 is re-runnable
 `pnpm tick:dry` evaluates every linked user without sending or logging; `pnpm tick` runs it for real;
 `pnpm tick force=day_close` sends one rule to **every** linked user now (still logged). Both call `TICK_URL`
 (default `http://localhost:3000`); set it to the production URL to run against Vercel. The response lists per user
-(first 8 chars of the id) the due keys, what was sent, and a skip reason per rule; never message bodies, emails or chat ids.
+(first 8 chars of the id) `ok: true` with the due keys, what was sent and a skip reason per rule, or `ok: false` with the
+error class and code when that user's run threw (a 403 also sets `blocked: true` and marks their chat blocked); one
+user's failure never stops the others. Never message bodies, emails or chat ids.
 Production is driven by cron-job.org every 15 minutes with the `x-tick-secret` header; its job history is the first
 place to look when a reminder didn't arrive.
 
@@ -67,11 +69,14 @@ place to look when a reminder didn't arrive.
 1. Append the email to `ALLOWED_EMAILS` in Vercel (owner stays first) and add them as a Google test user. Redeploy.
 2. They sign in → onboarding (goal, gym/home, days, minutes → targets; gym users get Push/Pull/Legs) → `/start <code>`
    to the bot (`settings.telegram_link_code`, shown on the confirm page and in Settings → Telegram).
-3. Settings → People (admin) shows onboarded / linked.
+3. Settings → People (admin) shows allowed / onboarded / linked (or `blocked`: they blocked the bot; their next message
+   to it clears that).
 
 ## Removing a person
-1. Remove the email from `ALLOWED_EMAILS` and redeploy (an existing users row stays allowed until deleted).
-2. `pnpm remove-user:dry <email>` (counts per table), then `pnpm remove-user <email>`: unlinks the chat, deletes the users
+1. `pnpm backup` (or a Neon branch): the only undo.
+2. Remove the email from `ALLOWED_EMAILS` and redeploy. The jwt callback re-checks the list on every request, so their
+   app session ends immediately and sign-in is refused. Their linked chat still works until step 3.
+3. `pnpm remove-user:dry <email>` (counts per table), then `pnpm remove-user <email>`: unlinks the chat, deletes the users
    row; every owned table cascades. Refuses admins.
 
 ## Data scripts (owner runs them)
@@ -79,17 +84,22 @@ place to look when a reminder didn't arrive.
 archive Upper/Lower, "no training" marks → rest days. Idempotent; prints any exercise name it couldn't match.
 
 ## Backups
-There is no backup job. **The CSV exports are the only application-level backup:** Settings → Export (or
-`/api/export/<table>`), one file per table, the signed-in user's rows only, `settings` and `users` excluded. Each person
-exports their own. Beyond that: Neon's point-in-time restore / branches (short window on the free plan) and the
-`pnpm db:generate` snapshots for the schema. Take a Neon branch before every migration and before `remove-user`.
+There is no scheduled job; the owner runs `pnpm backup` by hand (before every migration and before `remove-user`, and
+every so often). It writes `backups/recomp-<timestamp>.json` (gitignored): every public table as plain `select *` rows,
+column names as in the database, tables in dependency order (users, settings, exercises, foods, …), plus `takenAt`, the
+table list and what was redacted. By default `settings.telegram_chat_id` and `settings.telegram_link_code` are written as
+null; `pnpm backup --full` keeps them (file name ends in `-full`) so chat links can be restored without everyone sending
+`/start` again. Keep the files off git and off shared drives: they hold everyone's data. Restore = replay the file's tables
+in order into an empty schema (`pnpm db:migrate` first), or restore Neon's point-in-time / branch for a whole-database
+undo (short window on the free plan). The two restore sources are this file and the Neon branch; the per-user CSV export
+in Settings stays for users who want their own data, and never includes `settings` or `users`.
 
 ## Files
 | File | Role |
 |---|---|
 | `.env.example` | Every variable with a comment |
 | `scripts/bot-webhook.ts`, `scripts/tick.ts` | Webhook set/info/delete; call the tick |
-| `scripts/seed.ts`, `scripts/choose-your-day.ts`, `scripts/remove-user.ts` | Library seed; one-off data step; delete a person |
+| `scripts/seed.ts`, `scripts/choose-your-day.ts`, `scripts/remove-user.ts`, `scripts/backup.ts` | Library seed; one-off data step; delete a person; JSON dump of every table |
 | `drizzle/`, `drizzle.config.ts` | Migrations and snapshots |
 | `src/app/api/tick/route.ts`, `src/app/api/telegram/route.ts`, `src/app/api/export/[table]/route.ts` | The three route handlers |
 | `vercel.json` | Absent on purpose: no `crons` |

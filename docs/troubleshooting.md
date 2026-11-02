@@ -26,6 +26,10 @@ Each entry: what you see → where to look → what fixes it. The short table is
    when nothing was measured this week).
 3. Owner-only rules (`phase_switch`, `checkpoint_card`, `budget_80`) never fire for users without those dates/budgets.
 4. `pnpm tick force=morning_brief` sends it now (to every linked user; it's logged, so the normal one won't repeat today).
+5. One person only, and Settings → People shows **blocked**: they blocked the bot, a send got 403 and the tick now skips
+   them (`listLinkedUsers` leaves them out, so `tick:dry` doesn't list them either). Their next message to the bot
+   (Restart sends `/start`) clears it. Any other failed send shows in the tick response as that user's `ok: false` with the
+   error class; the other users are unaffected.
 
 ## Sign-in loops back to onboarding
 `users.onboarded_at` is null for that email. Normal for a new person. If they already finished the form (a `settings` row
@@ -33,8 +37,9 @@ exists), `markOnboarded` didn't run; set `onboarded_at = now()` on their users r
 settings row who lands on `/onboarding/confirm` is redirected back to the form.
 
 ## "That Google account isn't allowed"
-- The app's message: the email isn't in `ALLOWED_EMAILS` (watch spelling, spaces and an un-redeployed env change) and has
-  no users row.
+- The app's message: the email isn't in `ALLOWED_EMAILS` (watch spelling, spaces and an un-redeployed env change). An
+  existing users row doesn't help: the list is the authority. Someone signed in when they were removed is dropped on their
+  next request (the jwt callback re-checks the list) and lands on `/login` with this message.
 - A Google-branded error instead ("access blocked / app not verified / not a test user"): the OAuth consent screen is in
   Testing and the person isn't listed as a test user. Add them.
 - Empty `ALLOWED_EMAILS` refuses everyone on purpose.
@@ -44,6 +49,10 @@ The placeholder owner wasn't claimed: `ensureUser` only hands the `owner@recomp.
 entry. The owner now has a fresh empty row. Fix the order, then in SQL: delete the empty row (`delete from users where
 email = '<owner>'` — it has no data yet) and `update users set email = '<owner>' where email = 'owner@recomp.local'`.
 Sign in again.
+
+## A removed person can still use the bot
+Expected: dropping the email from `ALLOWED_EMAILS` ends app access only. `pnpm remove-user <email>` unlinks the chat and
+deletes their data; until then their linked chat keeps working.
 
 ## A food, type or session is "not found" that clearly exists
 It belongs to another user (ids are global, rows are per user), or the request came with a stale optimistic id (negative
@@ -75,6 +84,6 @@ After a Neon password reset, update `DATABASE_URL` in Vercel and `.env`.
 |---|---|
 | `scripts/bot-webhook.ts`, `scripts/tick.ts` | The two diagnostics |
 | `src/lib/telegram/bot.ts` | The gate (`userIdByChat`, `linkChatByCode`) and `bot.catch` logging |
-| `src/lib/rules/engine.ts` | Skip reasons |
-| `src/lib/users.ts` | `ensureUser` claim logic |
+| `src/lib/rules/engine.ts`, `src/app/api/tick/route.ts` | Skip reasons; per-user try/catch and the blocked mark |
+| `src/lib/users.ts` | `isAllowedEmail`, `ensureUser` claim logic, blocked flag |
 | `auth.ts`, `src/app/login/page.tsx` | Allowlist and the sign-in error text |

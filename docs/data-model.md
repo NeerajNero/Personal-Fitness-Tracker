@@ -18,7 +18,7 @@ Views: `drizzle/0007_multi_user.sql` (rebuilt per user; first written in `0001_v
 | Table | Key columns | Notes |
 |---|---|---|
 | `users` | id uuid, email (unique, lower-case), name, is_admin, onboarded_at, created_at | Created on the first allowed sign-in (`ensureUser`). `onboarded_at` gates the app. Migration 0007 creates a placeholder owner (`owner@recomp.local`, admin, onboarded) for the pre-existing data; the first `ALLOWED_EMAILS` entry claims it at sign-in |
-| `settings` | **PK user_id** (legacy `id` column kept, never read) | One row per user, written by onboarding. Body stats, `goal` (recomp/fat_loss/muscle_gain), `training_location` (gym/home), `equipment` text[], `days_per_week`, `session_minutes`, kcal target/range, `protein_min/max` (single range), `weekly_session_target`, steps, nudge toggles, cap, quiet hours, `telegram_chat_id` + `telegram_link_code` (both unique across users). **Owner-only, nullable, no default:** phase switch/override + per-phase protein, budgets, navel start/goal + `goal_date`, `checkpoint_date`, `smoke_free_since` |
+| `settings` | **PK user_id** (legacy `id` column kept, never read) | One row per user, written by onboarding. Body stats, `goal` (recomp/fat_loss/muscle_gain), `training_location` (gym/home), `equipment` text[], `days_per_week`, `session_minutes`, kcal target/range, `protein_min/max` (single range), `weekly_session_target`, steps, nudge toggles, cap, quiet hours, `telegram_chat_id` + `telegram_link_code` (both unique across users), `telegram_blocked_at` (set on a 403 send, cleared by their next message; the tick skips the user while set). **Owner-only, nullable, no default:** phase switch/override + per-phase protein, budgets, navel start/goal + `goal_date`, `checkpoint_date`, `smoke_free_since` |
 | `foods` | user_id, name (unique per user), serving_label, serving_grams, kcal, protein_g, cost_inr, phase_tag, is_favourite, archived | **Saved meals live here too**: `serving_label = "1 meal"` (`MEAL_SERVING`), `is_favourite = true`, `phase_tag = both` |
 | `food_log` | user_id, date, time (IST), food_id (nullable), label, qty, kcal, protein_g, cost_inr, source (app/telegram/ai) | kcal/protein are stored already multiplied by qty. `food_id` null = one-off manual entry |
 | `daily_metrics` | PK (user_id, date), weight_kg, steps, water_glasses, notes, rest_day | Upserted. `rest_day` = the owner chose Rest (wins over any session that day) |
@@ -45,7 +45,9 @@ All four carry `user_id`; every reader filters on it.
 - Defaults only affect new rows. If existing `settings` rows must change too, append an `UPDATE "settings" …`
   to the generated SQL (see `0004_nudge_defaults.sql`).
 - View changes are hand-written SQL migrations. `0007_multi_user.sql` is hand-written too (nullable `user_id` → backfill onto
-  the placeholder owner → NOT NULL; re-runnable) and is exercised by `pnpm test` against PGlite.
+  the placeholder owner → NOT NULL; re-runnable) and is exercised by `pnpm test` against PGlite, as is every later one
+  (`0008_telegram_blocked.sql`: one nullable column, `IF NOT EXISTS`).
+- `pnpm backup` before migrating (see [operations.md](operations.md#backups)).
 - `pnpm seed` is idempotent and only upserts the shared exercise library. Users, settings, foods and workout types come from
   sign-in and onboarding (gym users get Push/Pull/Legs from `src/lib/library.ts`).
 - One-off data scripts live in `scripts/` with a `:dry` variant (e.g. `pnpm choose-day:dry`, then `pnpm choose-day` after migration 0005).

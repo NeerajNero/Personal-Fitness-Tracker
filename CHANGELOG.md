@@ -14,7 +14,9 @@ Skip pure refactors and internal-only changes unless they change behaviour.
   empty workout-type list. Verdicts and the maintenance suggestion follow the goal (fat loss: > 1 %/week → eat more, flat 2
   weeks → eat less). One bot for everyone: `/start <code>` links a chat to its owner; reminders run per user with each
   person's own cap. Export is per user. Settings → People (admin only) lists accounts, onboarding and link status.
-- `pnpm test`: migrations + two-user isolation test on an in-memory Postgres (PGlite).
+- `pnpm test`: migrations + two-user isolation test on an in-memory Postgres (PGlite), plus the allowlist / blocked-chat test.
+- `pnpm backup` / `pnpm backup --full`: dated JSON of every table into `backups/` (gitignored); chat ids and link codes
+  are nulled unless `--full`. With the Neon branch, this is the restore source; the per-user CSV export stays for users.
 - **Cardio log:** incline walk, walk, run, cycle, cross-trainer, swim, stairs and sport, each showing only its fields
   (speed, distance, incline, name), plus effort and a note. Every field but minutes is optional (`walk 30` is fine);
   give speed or distance and the other is derived, and pace is shown for walks/runs.
@@ -35,8 +37,16 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 - `/sync-docs` project skill (`.claude/skills/sync-docs`): maps a diff to the docs it affects, updates them and the changelog.
 
 ### Security
+- `ALLOWED_EMAILS` is the only authority: a `users` row no longer grants access, and the list is re-checked on every
+  request, so removing someone from the env and redeploying locks them out of the app immediately (their bot access ends
+  when `remove-user` runs). The first entry still claims the placeholder owner.
 - Next.js 16.4.0 → 16.4.4 (and `eslint-config-next`): fixes an unauthenticated RCE in the image optimizer with SVG files,
   an RCE in `use cache` functions returning typed arrays, and a Server Actions denial of service.
+
+### Fixed
+- One failed Telegram send (429, or a 403 from someone who blocked the bot) no longer aborts `/api/tick` for the users
+  after them: each user's run is isolated and reported as `ok` or the error class. A 403 marks that chat blocked
+  (Settings → People shows it); reminders pause until they write to the bot again.
 
 ### Changed
 - README rewritten as a from-zero setup guide (Neon, Google OAuth, BotFather, Gemini, Vercel env, cron-job.org), with

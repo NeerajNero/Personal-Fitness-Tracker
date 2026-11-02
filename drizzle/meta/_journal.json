@@ -57,6 +57,13 @@
       "when": 1793631489593,
       "tag": "0007_multi_user",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793638506592,
+      "tag": "0008_telegram_blocked",
+      "breakpoints": true
     }
   ]
 }

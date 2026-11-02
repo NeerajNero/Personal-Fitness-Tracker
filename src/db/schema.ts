@@ -94,6 +94,8 @@ export const settings = pgTable(
     // Telegram (chat id and link code are unique across users)
     telegramChatId: text("telegram_chat_id"),
     telegramLinkCode: text("telegram_link_code"), // one-time code shown in onboarding (`/start <code>`)
+    /** Set when a send got 403 (they blocked the bot). The tick skips them until their next message clears it. */
+    telegramBlockedAt: timestamp("telegram_blocked_at", { withTimezone: true }),
 
     // Onboarding stats
     weightKg: num("weight_kg", 5, 2),

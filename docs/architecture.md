@@ -16,7 +16,7 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
 |---|---|
 | `auth.ts` | Auth.js v5, Google provider, allowlist `ALLOWED_EMAILS` (or an existing users row; fails closed). Creates the users row on first sign-in and puts the user id in the JWT. Imported as `@/auth` |
 | `src/lib/db/scope.ts` | `forUser(userId)`: the only door to the db from app code (`own`, `visible`, `stamp`, `uid`). `UserId` is a branded type |
-| `src/lib/users.ts` | The users table and the only cross-user queries: `ensureUser`, chat id → user, link by code, linked users for the tick, People |
+| `src/lib/users.ts` | The users table and the only cross-user queries: `isAllowedEmail`, `ensureUser`, chat id → user, link by code, blocked flag, linked users for the tick, People |
 | `src/lib/session.ts` | `requireSession()` / `requireUser()` (the user id from the JWT) |
 | `src/lib/targets.ts`, `src/lib/library.ts` | Client-safe: targets per goal (Mifflin-St Jeor), the shared exercise library + gym starter types |
 | `src/app/(app)/` | Gated screens: `today/`, `train/`, `trends/`, `settings/`. Each has `page.tsx` + client components + `actions.ts` (Server Actions) |
@@ -35,7 +35,7 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
 | `src/components/day-picker.tsx` + `src/app/(app)/day-actions.ts` | "What's today?" picker shared by Today and Train |
 | `src/lib/dates.ts` | IST helpers: `todayIST`, `nowTimeIST`, `addDays`, `istNow`, quiet-hours math |
 | `src/components/` | `tab-bar`, `date-header`, `day-picker`, `charts/line-chart.tsx` (hand-written SVG; no chart library) |
-| `scripts/` | `seed.ts` (shared exercise library only), `remove-user.ts` (delete a person, `:dry`), `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` (PWA icons, one-off) |
+| `scripts/` | `seed.ts` (shared exercise library only), `remove-user.ts` (delete a person, `:dry`), `backup.ts` (JSON dump of every table, `--full` keeps chat ids), `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` (PWA icons, one-off) |
 | `drizzle/` | SQL migrations (0001 = views, 0007 = multi-user; both hand-written) |
 | `tests/` | `multi-user.test.ts`: migrations + two-user isolation on PGlite (`pnpm test`) |
 

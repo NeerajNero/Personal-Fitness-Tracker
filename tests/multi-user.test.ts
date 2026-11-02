@@ -2,7 +2,9 @@
  * Multi-user isolation, end to end against a real Postgres (PGlite, in memory):
  *   1. migrations 0000–0006 + legacy single-user rows → 0007 stamps them onto the placeholder owner;
  *   2. two users each log a food, a weigh-in and a set; Today state, Trends data, export and bot resolution
- *      contain only their own rows.
+ *      contain only their own rows;
+ *   3. ALLOWED_EMAILS is the authority (a users row grants nothing) and a blocked chat drops out of the tick's list
+ *      until that person writes to the bot again.
  * Run: pnpm test   (node --conditions=react-server so `server-only` resolves)
  */
 import assert from "node:assert/strict";
@@ -184,4 +186,34 @@ test("two users see only their own rows", async () => {
 
   const people = await listPeople();
   assert.deepEqual(people.map((p) => [p.email, p.onboarded, p.linked]), [["owner@example.com", true, true], ["ana@example.com", true, true]]);
+});
+
+test("the allowlist is the authority; blocked chats are skipped until they write again", async () => {
+  const { isAllowedEmail, findUserByEmail, listLinkedUsers, listPeople, markChatBlocked, clearChatBlocked, userIdByChat } = await import("@/lib/users");
+  const { describeSendError } = await import("@/lib/telegram/send");
+  const { GrammyError, HttpError } = await import("grammy");
+
+  // Dropping ana from the env is enough: her users row still exists, but sign-in and the jwt callback ask only this.
+  assert.equal(isAllowedEmail("Ana@Example.com"), true);
+  process.env.ALLOWED_EMAILS = "owner@example.com";
+  assert.ok(await findUserByEmail("ana@example.com"), "the row is still there");
+  assert.equal(isAllowedEmail("ana@example.com"), false, "a users row grants nothing");
+  assert.deepEqual((await listPeople()).map((p) => [p.email, p.allowed]), [["owner@example.com", true], ["ana@example.com", false]]);
+  process.env.ALLOWED_EMAILS = "owner@example.com, ana@example.com";
+  assert.equal(isAllowedEmail("ana@example.com"), true);
+
+  // A 403 from Telegram = they blocked the bot. The chat stays linked, the tick skips them, People shows it.
+  const forbidden = new GrammyError("Call to 'sendMessage' failed!", { ok: false, error_code: 403, description: "Forbidden: bot was blocked by the user" }, "sendMessage", {});
+  assert.deepEqual(describeSendError(forbidden), { error: "GrammyError", code: 403, blocked: true });
+  assert.deepEqual(describeSendError(new HttpError("Network request for 'sendMessage' failed!", new Error("ECONNRESET"))), { error: "HttpError", code: null, blocked: false });
+  assert.deepEqual(describeSendError(new TypeError("x")), { error: "TypeError", code: null, blocked: false });
+
+  const B = (await userIdByChat("222"))!;
+  await markChatBlocked(B);
+  assert.deepEqual((await listLinkedUsers()).map((x) => x.chatId), ["111"], "blocked chat is skipped by the tick");
+  assert.deepEqual((await listPeople()).map((p) => [p.linked, p.blocked]), [[true, false], [true, true]]);
+  assert.equal(await userIdByChat("222"), B, "still linked: her next message resolves to her and clears the flag");
+  await clearChatBlocked(B);
+  assert.deepEqual((await listLinkedUsers()).map((x) => x.chatId).sort(), ["111", "222"]);
+  assert.deepEqual((await listPeople()).map((p) => p.blocked), [false, false]);
 });

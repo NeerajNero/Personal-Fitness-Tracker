@@ -10,7 +10,7 @@ import { n0, n1 } from "@/lib/format";
 import { getDayState } from "@/lib/rules/dayState";
 import { getSettings } from "@/lib/settings";
 import { listWorkoutTypes } from "@/lib/training";
-import { linkChatByCode, userIdByChat } from "@/lib/users";
+import { clearChatBlocked, linkChatByCode, userIdByChat } from "@/lib/users";
 import { createPending, expirePending, parseFreeText, takePending, type ParsedItem } from "./ai";
 import { botToken } from "./env";
 import { entryLine, HELP, runningLine, withOverage } from "./messages";
@@ -34,7 +34,10 @@ export function getBot(): Bot<BotContext> {
     const chat = String(chatId);
     const userId = await userIdByChat(chat);
     if (userId !== null) {
-      ctx.who = { userId, settings: await getSettings(userId) };
+      const settings = await getSettings(userId);
+      // Any message from a chat marked blocked (a send got 403) proves they unblocked us: reminders resume.
+      if (settings.telegramBlockedAt !== null) await clearChatBlocked(userId);
+      ctx.who = { userId, settings: { ...settings, telegramBlockedAt: null } };
       return next();
     }
     const m = /^\/start\s+(\S+)/i.exec(ctx.message?.text ?? "");

@@ -15,6 +15,7 @@
     "choose-day:dry": "node --conditions=react-server --env-file=.env --import=tsx scripts/choose-your-day.ts dry",
     "remove-user": "node --conditions=react-server --env-file=.env --import=tsx scripts/remove-user.ts",
     "remove-user:dry": "node --conditions=react-server --env-file=.env --import=tsx scripts/remove-user.ts dry",
+    "backup": "node --conditions=react-server --env-file=.env --import=tsx scripts/backup.ts",
     "bot:set-webhook": "node --env-file=.env --import=tsx scripts/bot-webhook.ts set",
     "bot:webhook-info": "node --env-file=.env --import=tsx scripts/bot-webhook.ts info",
     "bot:delete-webhook": "node --env-file=.env --import=tsx scripts/bot-webhook.ts delete",

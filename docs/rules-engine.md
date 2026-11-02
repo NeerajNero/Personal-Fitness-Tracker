@@ -35,7 +35,10 @@ DayState {
 ## Engine (`engine.ts` + `rules.ts`)
 - `GET /api/tick` (cron-job.org every 15 min, header `x-tick-secret`) loops over onboarded users with a linked chat
   (`listLinkedUsers`) and runs `evaluate(userId, settings, now)` → `send(userId, chatId, due, now)` for each, with that user's
-  toggles, quiet hours and daily cap. The response lists results per user (first 8 chars of the id), never emails or chat ids.
+  toggles, quiet hours and daily cap. Each user's run is wrapped in try/catch: a failed send (429, a blocked bot's 403, a
+  network error) is reported for that user as `ok: false` + the error class (`describeSendError`) and the loop goes on; a
+  403 also sets `settings.telegram_blocked_at`, so `listLinkedUsers` skips them until their next message to the bot clears
+  it. The response lists results per user (first 8 chars of the id), never emails or chat ids.
 - A rule is `{ key, window, days?, once?, enabled(settings), condition(ctx), message(ctx), logKey? }`.
 - Skip reasons: `disabled`, `quiet_hours`, `outside_window`, `already_sent`, `daily_cap`, `condition_false`, `not_linked`.
 - Idempotency: one `nudge_log` row per user per rule_key per IST date. Water logs `water_HH`, the weekly report logs `weekly_report_<monday>`,
@@ -83,8 +86,8 @@ The weekly smoke-free milestone isn't a separate rule: it's a line inside `morni
 | `src/lib/rules/engine.ts` | `evaluate(userId, settings, now)`, `send(userId, chatId, due, now)`, skip reasons |
 | `src/lib/rules/rules.ts` | `RULES`, `formatWeeklyReport`, `cheapestFix`, `onboardingDate` |
 | `src/lib/rules/loaders.ts`, `weekly.ts`, `instant.ts` | Memoised loaders, the weekly report, the overage line |
-| `src/app/api/tick/route.ts` | Loops `listLinkedUsers()`; `?dry=1`, `?force=` |
-| `src/lib/telegram/send.ts`, `messages.ts` | Delivery and templates |
+| `src/app/api/tick/route.ts` | Loops `listLinkedUsers()` (linked, not blocked) with a try/catch per user; `?dry=1`, `?force=` |
+| `src/lib/telegram/send.ts`, `messages.ts` | Delivery (`sendMessage`, `describeSendError`) and templates |
 | `src/lib/nudges.ts`, `src/app/(app)/settings/nudge-settings.tsx` | Toggle list and its UI |
 
 ## Adding a rule

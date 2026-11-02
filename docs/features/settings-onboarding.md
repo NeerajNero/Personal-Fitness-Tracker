@@ -32,7 +32,8 @@ bot. Already-onboarded users are redirected to Today, so targets are never recom
 - **Body & habits**: onboarding stats + smoke-free date (`body-stats-form.tsx`)
 - **Export data**: one CSV per table (`/api/export/<table>`), the signed-in user's rows only (exercises: library + own).
   `settings` and `users` are never exported.
-- **People** (admins only, read-only, `people.tsx`): every account with email, onboarded yes/no, Telegram linked yes/no.
+- **People** (admins only, read-only, `people.tsx`): every account with email, "not in ALLOWED_EMAILS" when their row has
+  outlived the list, onboarded yes/no, and Telegram linked / no chat / **blocked** (a send got 403; clears on their next message).
 
 All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forUser(userId)`). Shared UI bits (Card with
 `collapsible`, Field, Status) are in `settings/ui.tsx`. Cues can only be edited on the user's own custom exercises; library cues are shared.

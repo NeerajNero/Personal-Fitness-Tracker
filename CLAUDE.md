@@ -31,8 +31,8 @@ in the same commit. Touch this file only if a convention, hard rule or the build
 - App code reaches the db only through `forUser(userId)` (`src/lib/db/scope.ts`), filtering with `own()` / `visible()` and
   stamping inserts. ESLint forbids `@/db` imports elsewhere (exceptions: `src/lib/users.ts` for sign-in / chat / admin lookups).
   Every lib function that queries takes `userId: UserId` first. Server actions get it from `requireUser()`, never from the client.
-- `ALLOWED_EMAILS` (comma-separated, case-insensitive; old `ALLOWED_EMAIL` accepted). **First entry = owner/admin**; it claims
-  the placeholder owner row from migration 0007. Others get a fresh account on first sign-in.
+- `ALLOWED_EMAILS` (comma-separated, case-insensitive; old `ALLOWED_EMAIL` ok) is the only authority, re-checked on every request;
+  a `users` row grants nothing. **First entry = owner/admin** and claims the placeholder owner row from migration 0007.
 - Targets per goal in `src/lib/targets.ts` (recomp −225 / fat_loss −500 with floors / muscle_gain +250; protein by g/kg).
   Written once at onboarding; never recompute an existing user's stored numbers. Owner-only columns (phases, budgets, navel
   goal, checkpoint dates) are null for everyone else and the features that need them stay hidden.

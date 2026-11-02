@@ -23,7 +23,8 @@ commit `.env`.
    `AUTH_GOOGLE_SECRET`, and `openssl rand -base64 32` into `AUTH_SECRET`.
 3. **Allowlist.** `ALLOWED_EMAILS=you@example.com,friend@example.com`. Comma-separated, case-insensitive. **The first
    entry is the owner (admin)**: on an existing database it claims the data that migration 0007 parked under a
-   placeholder owner. The older name `ALLOWED_EMAIL` still works.
+   placeholder owner. The list is the only authority and is re-checked on every request: a `users` row grants nothing
+   by itself. The older name `ALLOWED_EMAIL` still works.
 4. **Telegram bot.** In Telegram, talk to @BotFather → `/newbot` → copy the token into `TELEGRAM_BOT_TOKEN` and the
    username (without `@`) into `TELEGRAM_BOT_USERNAME`. `openssl rand -hex 32` into `TELEGRAM_WEBHOOK_SECRET`. After the
    first deploy: `pnpm bot:set-webhook https://<your-app>.vercel.app` (it appends `/api/telegram` and sends the secret).
@@ -69,6 +70,7 @@ redirect URI is in step 2.
 | `pnpm seed` | Idempotent: upsert the shared exercise library (`src/lib/library.ts`) |
 | `pnpm choose-day:dry` / `pnpm choose-day` | One-off Oct 2026 data step (Push/Pull/Legs, archive Upper/Lower, marks → rest days); already applied |
 | `pnpm remove-user:dry <email>` / `pnpm remove-user <email>` | Show, then delete, everything a person owns (refuses admins) |
+| `pnpm backup` / `pnpm backup --full` | Dump every table to `backups/recomp-<timestamp>.json` (gitignored); chat ids and link codes are nulled unless `--full` |
 | `pnpm bot:set-webhook <https-url>` | Point Telegram at `<url>/api/telegram` with `TELEGRAM_WEBHOOK_SECRET`; drops pending updates |
 | `pnpm bot:webhook-info` | Current webhook URL, pending update count, last delivery error |
 | `pnpm bot:delete-webhook` | Remove the webhook (the bot goes silent) |
@@ -87,24 +89,28 @@ redirect URI is in step 2.
 5. They send `/start <code>` (shown after onboarding and in Settings → Telegram) to the bot. One bot serves everyone;
    the code decides whose chat it is.
 
-Someone already in the `users` table stays allowed even if you later remove them from the list; removal is the step below.
+The list is the authority: a `users` row never grants access on its own, and the list is re-read on every request.
+Settings → People marks anyone whose row has outlived the list as "not in ALLOWED_EMAILS".
 
 ## Removing a person
 
-1. Drop them from `ALLOWED_EMAILS` and redeploy, so they can't sign in and get a fresh account afterwards.
-2. `pnpm remove-user:dry their@email` to see what will go (row counts per table), then `pnpm remove-user their@email`.
+1. `pnpm backup` (or a Neon branch): the only undo.
+2. Drop them from `ALLOWED_EMAILS` and redeploy. Their app session ends on their next request and sign-in is refused
+   from then on. The bot still answers their linked chat until the next step.
+3. `pnpm remove-user:dry their@email` to see what will go (row counts per table), then `pnpm remove-user their@email`.
    It unlinks their Telegram chat and deletes their `users` row; every table they own cascades. The script refuses admins.
-3. Optionally remove them as a Google test user.
+4. Optionally remove them as a Google test user.
 
-There is no soft delete and no undo other than a Neon restore (see Costs & quotas).
+There is no soft delete; the undo is the backup file or a Neon restore (see Costs & quotas).
 
 ## Privacy & access
 
 - **Each person sees only their own rows.** Every query goes through `forUser(userId)` with the id taken from the
   signed-in session; a foreign id in a request is simply "not found". The bot resolves the user from the chat id, so one
   chat can never act for another. The exercise library (names, muscle groups, cues) is the only shared data.
-- **What the admin sees.** Settings → People: each account's email, name, admin flag, whether onboarding is finished and
-  whether a Telegram chat is linked. No weights, food, lifts or chat ids. Admins have no other powers in the app; removing
+- **What the admin sees.** Settings → People: each account's email, name, admin flag, whether they're still in
+  `ALLOWED_EMAILS`, whether onboarding is finished and whether a Telegram chat is linked or blocked. No weights, food,
+  lifts or chat ids. Admins have no other powers in the app; removing
   someone is a script run by whoever has the database URL.
 - **Third parties.** Google receives the sign-in (and returns email, name, picture; the app stores email and name).
   Telegram sees every message to and from the bot, as with any bot. Gemini receives the free-text meal message and the
@@ -112,12 +118,15 @@ There is no soft delete and no undo other than a Neon restore (see Costs & quota
   cron-job.org sees only the tick's HTTP status and the JSON of rule keys, skip reasons and the first 8 characters of
   user ids. Vercel keeps request logs (paths, status codes) and the app's `console.error` lines, which carry the error
   class and message only, never message bodies, chat ids or tokens. Neon holds the data.
-- **Exports** (Settings → Export) are per user and never include `settings` or `users` (chat ids, emails).
+- **Exports** (Settings → Export) are per user and never include `settings` or `users` (chat ids, emails). `pnpm backup`
+  is for whoever holds the database URL: every table, with chat ids and link codes nulled unless `--full`.
 
 ## Security model
 
-- **Allowlist in the Auth.js `signIn` callback** (`auth.ts`): the email must be in `ALLOWED_EMAILS` or already have a
-  `users` row; anything else is refused. An unset list refuses everyone. The first allowed sign-in creates the row.
+- **Allowlist is the authority** (`auth.ts`): `signIn` refuses any email not in `ALLOWED_EMAILS`; a `users` row never
+  grants access by itself, and an unset list refuses everyone. The first allowed sign-in creates the row (the first entry
+  claims the placeholder owner). The `jwt` callback re-reads the list on every request and drops the session when the
+  email is gone, so removing someone and redeploying locks them out of the app at once.
 - **JWT sessions.** The user's id is written into the JWT once at sign-in and read back with `requireUser()`; nothing
   trusts an id from the client. Sessions issued before multi-user get their id resolved by email on the next request.
 - **The `@/db` import rule.** ESLint only lets `src/lib/db/scope.ts`, `src/lib/users.ts` and `src/db/` import the
@@ -138,7 +147,7 @@ There is no soft delete and no undo other than a Neon restore (see Costs & quota
 | Vercel Hobby | Free. Function duration is capped (the webhook route declares 30 s, the tick 60 s); cron is daily only | The webhook answers Telegram after 25 s and keeps working in the background; if Vercel then kills it, that reply is lost (Telegram doesn't retry a 200). A killed tick stops mid-list and the remaining users get their reminders on the next 15-minute run. Daily cron is why cron-job.org exists |
 | Neon free tier | Monthly compute-hour quota; compute auto-suspends after inactivity; short point-in-time restore window | A cold start makes the first request after idle take a few seconds. Over quota, Neon suspends compute: every query throws, screens return a server error, the bot answers nothing (`bot.catch` logs the error class), the tick returns 500 and cron-job.org marks the run failed. Nothing retries; it recovers when the quota resets |
 | Gemini free tier | Requests-per-minute and per-day caps on flash-lite | `parseFreeText` returns null on 429, timeout (15 s) or bad JSON, so the bot replies "couldn't parse that — try `paneer 150` style". Exact commands and the app are unaffected |
-| Telegram Bot API | ~30 messages/s overall, ~1/s per chat | The app sends at most each user's `nudge_daily_cap` reminders a day plus one reply per message, far below the limits. A failed send (429, or a user who blocked the bot) throws inside the tick: nothing is logged for it, the run ends with a 500 and the users after that one in the list wait for the next run |
+| Telegram Bot API | ~30 messages/s overall, ~1/s per chat | The app sends at most each user's `nudge_daily_cap` reminders a day plus one reply per message, far below the limits. A failed send (429, or a user who blocked the bot) is caught per user: the run goes on, the response lists that user as `ok: false` with the error class, and a 403 marks their chat blocked so the tick skips them until they write to the bot again |
 | cron-job.org free | 1-minute minimum interval; a request that exceeds its timeout (30 s by default) is marked failed | A "failed" run usually still completed on Vercel (the tick is idempotent per rule per day, so a double run sends nothing twice). Raise the job's timeout if the history shows timeouts |
 | Google OAuth in Testing | 100 test users; refresh tokens aren't used (JWT sessions) | Someone not on the test-user list is refused by Google with its own error page before reaching the app |
 
@@ -149,8 +158,10 @@ There is no soft delete and no undo other than a Neon restore (see Costs & quota
 | Bot never answers | `pnpm bot:webhook-info`: URL must be `https://<app>/api/telegram`, pending updates should be 0, last error empty. Re-run `pnpm bot:set-webhook <url>` |
 | `/api/telegram` or `/api/tick` returns 401 | Secret mismatch: the webhook secret in Vercel vs the one `bot:set-webhook` sent (re-run it), or cron-job.org's `x-tick-secret` header vs `TICK_SECRET` |
 | No morning brief / reminders | cron-job.org job history (is it running, 200s?), then `pnpm tick:dry` with `TICK_URL` set: look at the skip reason per rule (`disabled`, `quiet_hours`, `already_sent`, `daily_cap`, `not_linked`) |
+| One person gets no reminders | Settings → People shows `blocked`: they blocked the bot and a send got 403. They tap Restart / send anything to the bot and reminders resume. `pnpm tick` shows `ok: false` + error class for a user whose send failed |
+| A removed person can still use the bot | Expected until `pnpm remove-user <email>` unlinks the chat; dropping the email from `ALLOWED_EMAILS` only ends app access |
 | Sign-in loops back to onboarding | `users.onboarded_at` is null for that email. Finish onboarding, or set it in the Neon SQL editor if the settings row already exists |
-| "That Google account isn't allowed" | Email not in `ALLOWED_EMAILS` (check spelling, spaces, and that Vercel was redeployed), or a Google-side error: the person isn't a test user on the consent screen |
+| "That Google account isn't allowed" | Email not in `ALLOWED_EMAILS` (check spelling, spaces, and that Vercel was redeployed; an existing `users` row doesn't help), or a Google-side error: the person isn't a test user on the consent screen |
 | Owner signed in but sees an empty app | The claim didn't happen: the owner's email isn't the **first** `ALLOWED_EMAILS` entry. Fix the order, or `update users set email = '<owner>' where email = 'owner@recomp.local'` |
 | Migration failed half-way | Restore the Neon branch (or point-in-time restore) to before `pnpm db:migrate`, fix the SQL, re-run. 0007 is re-runnable |
 | Gemini never parses | `GEMINI_API_KEY` set? Free-tier RPM/day exhausted? The bot replies "couldn't parse that" for every failure; exact commands still work |

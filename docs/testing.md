@@ -1,7 +1,7 @@
 # Testing
 
-One integration test, no mocks: `pnpm test` runs `tests/multi-user.test.ts` with `node --test` against **PGlite**, a
-real Postgres compiled to WebAssembly that runs in memory. It needs no `DATABASE_URL` and no network.
+One test file, no mocks: `pnpm test` runs `tests/multi-user.test.ts` (three tests) with `node --test` against **PGlite**,
+a real Postgres compiled to WebAssembly that runs in memory. It needs no `DATABASE_URL` and no network.
 
 ## How the database is swapped
 `src/db/index.ts` exports `db = globalThis.__recompTestDb ?? connect()`. The test creates a PGlite instance, wraps it with
@@ -14,7 +14,7 @@ on Neon.
 ## The migration test
 Runs `drizzle/0000` … `0006` statement by statement (split on `--> statement-breakpoint`), inserts single-user rows
 (settings id = 1, a food, a food-log line, a weigh-in, a library exercise and a custom one, a workout type), then runs `0007`
-and asserts: exactly one user, `owner@recomp.local`, admin, onboarded; no NULL `user_id` left in any stamped table; the
+and everything after it, and asserts: exactly one user, `owner@recomp.local`, admin, onboarded; no NULL `user_id` left in any stamped table; the
 library exercise stays shared and the custom one is owned; the owner's settings keep their values with `goal = recomp`,
 `training_location = gym`, `days_per_week = 4`. It then runs 0007 again to prove it's re-runnable.
 
@@ -27,6 +27,13 @@ checked, including the 1,400 kcal floor), the owner gets Push/Pull/Legs and the 
 `linkChatByCode`, `listLinkedUsers`), pending parses (`takePending`), `getFood` / `getSessionDetail` / `setDayPlan` with
 another user's ids, and the People list — each contains only the caller's rows.
 
+## The allowlist and blocked-chat test
+`isAllowedEmail` goes false the moment the email leaves `ALLOWED_EMAILS` even though `findUserByEmail` still finds the
+row, and `listPeople` reports `allowed: false` (that's what `auth.ts` asks at sign-in and in the jwt callback).
+`describeSendError` classifies a constructed grammY 403 as `blocked`, an `HttpError` and a plain error as not. After
+`markChatBlocked`, `listLinkedUsers` leaves that chat out while `userIdByChat` still resolves it (so their next message
+can clear it); `clearChatBlocked` puts them back.
+
 ## Adding a test
 - Add a `test("…", async () => { … })` to `tests/multi-user.test.ts` (it shares the migrated database and the two users),
   or create `tests/<name>.test.ts` with the same preamble (PGlite → `globalThis.__recompTestDb` → `await import`), and add it
@@ -35,7 +42,9 @@ another user's ids, and the People list — each contains only the caller's rows
 - Anything that calls `auth()`, `redirect()` or `revalidatePath` (server actions, pages) isn't testable this way; test the
   lib function it calls.
 - Gemini and Telegram are never called: `parseFreeText` needs `GEMINI_API_KEY` (unset in tests → null) and
-  `sendMessage` isn't exercised.
+  `sendMessage` isn't exercised (`describeSendError` is, with constructed grammY errors).
+- `scripts/backup.ts` can be smoke-tested the same way: a preload module that builds a PGlite db, runs the migrations and
+  sets `globalThis.__recompTestDb`, passed as a second `--import` before the script; delete `backups/` afterwards.
 
 ## Files
 | File | Role |

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # keep the env template
 !.env.example
+
+# database dumps from `pnpm backup` (contain personal data)
+/backups

@@ -4,9 +4,12 @@ Read this before touching sign-in, onboarding, targets, anything that reads `set
 
 ## Model
 - `users`: id (uuid), email (unique, lower-cased), name, is_admin, onboarded_at, created_at. A row is created on the first
-  allowed sign-in (`ensureUser`). `onboarded_at` is the app gate. Migration 0007 created a placeholder owner
+  allowed sign-in (`ensureUser`) and **never grants access by itself**: `ALLOWED_EMAILS` is the authority, checked at
+  sign-in and on every request. `onboarded_at` is the app gate. Migration 0007 created a placeholder owner
   (`owner@recomp.local`, admin, onboarded) for the pre-existing data; the **first `ALLOWED_EMAILS` entry claims it** at sign-in.
 - `settings`: one row per user, PK `user_id`, written by onboarding and edited in Settings. The legacy `id` column stays, never read.
+  `telegram_chat_id` links the chat; `telegram_blocked_at` is set when a send gets 403 (they blocked the bot) and cleared by
+  their next message, and the tick skips them while it's set.
 - Every per-person table carries `user_id` (cascade on delete): foods, food_log, daily_metrics, measurements, routine_days,
   routine_exercises, sessions, session_exercises, sets, activities, nudge_log, pending_parses. `exercises.user_id` is
   nullable: null = shared library (seed), set = that user's custom exercise.
@@ -19,15 +22,18 @@ Read this before touching sign-in, onboarding, targets, anything that reads `set
   `stamp(values)`; raw SQL uses `uid`. A foreign id is simply not found.
 - Every function in `src/lib/` that queries takes `userId: UserId` first (`UserId` is a branded string). Server actions get
   it from `requireUser()` (the JWT); pages too. Pure helpers (`*From`, `getTargets`, `hintFromSets`) take no user.
-- Cross-user lookups live only in `src/lib/users.ts`: `ensureUser`, `findUserByEmail`, `getUser`, `markOnboarded`,
-  `userIdByChat`, `linkChatByCode`, `listLinkedUsers`, `listPeople`.
+- Cross-user lookups live only in `src/lib/users.ts`: `isAllowedEmail`, `ensureUser`, `findUserByEmail`, `getUser`,
+  `markOnboarded`, `userIdByChat`, `linkChatByCode`, `markChatBlocked`, `clearChatBlocked`, `listLinkedUsers`, `listPeople`.
 - `pnpm test` proves two users can't see each other (see [testing.md](testing.md)).
 
 ## Sign-in
-Auth.js v5, Google. `signIn` allows an email in `ALLOWED_EMAILS` (or `ALLOWED_EMAIL`; comma-separated, case-insensitive) or
-one that already has a users row, then `ensureUser` creates / claims the row. The `jwt` callback stores `uid`; `session`
-exposes it as `session.user.id`; old tokens without `uid` are resolved by email once. `src/app/(app)/layout.tsx` redirects to
-`/login` without a session and to `/onboarding` while `users.onboarded_at` is null.
+Auth.js v5, Google. `signIn` allows only an email in `ALLOWED_EMAILS` (or `ALLOWED_EMAIL`; comma-separated,
+case-insensitive; `isAllowedEmail`), then `ensureUser` creates the row or, for the first entry, claims the placeholder owner.
+The `jwt` callback runs on every session read: it re-checks the list and returns `null` (session dropped, cookie cleared)
+when the email is no longer on it, so removing someone from the env and redeploying locks them out of the app at once.
+Their bot access lasts until `remove-user` deletes them (or the chat is unlinked). Otherwise the callback keeps `uid`
+(old tokens without one are resolved by email once); `session` exposes it as `session.user.id`.
+`src/app/(app)/layout.tsx` redirects to `/login` without a session and to `/onboarding` while `users.onboarded_at` is null.
 
 ## Onboarding and `targets.ts`
 `/onboarding` is one form (`onboarding-form.tsx` → `completeOnboarding`): weight, height, age, sex, goal, gym or home
@@ -70,9 +76,9 @@ and `budget_80` reminders. Everyone else has one protein range (`protein_min/max
 ## Files
 | File | Role |
 |---|---|
-| `auth.ts` | Allowlist, users row at sign-in, uid in the JWT |
+| `auth.ts` | Allowlist at sign-in and on every request, users row at sign-in, uid in the JWT |
 | `src/lib/db/scope.ts` | `forUser`, `UserId`, `asUserId` |
-| `src/lib/users.ts` | users table + the only cross-user queries |
+| `src/lib/users.ts` | users table, `isAllowedEmail`, the blocked flag + the only cross-user queries |
 | `src/lib/session.ts` | `requireSession`, `requireUser` |
 | `src/lib/settings.ts` | `getSettings`, `findSettings`, `hasPhases`, `hasBudgets`, `hasNavelGoal` |
 | `src/lib/targets.ts`, `src/lib/library.ts` | Targets per goal; shared exercise library + gym starter types |
@@ -80,4 +86,4 @@ and `budget_80` reminders. Everyone else has one protein range (`protein_min/max
 | `src/app/(app)/layout.tsx` | The gate |
 | `src/app/(app)/settings/people.tsx` | Admin list |
 | `eslint.config.mjs` | The `@/db` import rule |
-| `drizzle/0007_multi_user.sql` | The migration |
+| `drizzle/0007_multi_user.sql`, `0008_telegram_blocked.sql` | The migrations |
