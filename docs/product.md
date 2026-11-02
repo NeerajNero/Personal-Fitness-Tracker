@@ -101,3 +101,12 @@ Note shown with the cues: upper-trap or forearm pain during pulls = shrugging + 
 ## Non-goals (don't build unless asked)
 Food-database search, photo/AI calorie estimation in the app, fat/carb tracking, calorie-burn estimates, sleep, mood,
 social features, a native app.
+
+## Files
+| File | Role |
+|---|---|
+| `src/lib/targets.ts` | Targets per goal (Mifflin-St Jeor, activity factor, floors) |
+| `src/lib/metrics/phase.ts` | `getTargets`, `getPhase`, `foodInPhase` |
+| `src/lib/metrics/trends.ts` | `weeklyVerdictFrom`, `estimateMaintenanceFrom` (goal-aware) |
+| `src/lib/library.ts`, `scripts/seed.ts` | Exercise library, gym starter types |
+| `drizzle/0007_multi_user.sql` | Where the owner's values were preserved |

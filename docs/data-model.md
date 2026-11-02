@@ -51,3 +51,11 @@ All four carry `user_id`; every reader filters on it.
 - One-off data scripts live in `scripts/` with a `:dry` variant (e.g. `pnpm choose-day:dry`, then `pnpm choose-day` after migration 0005).
 - **Production rule: schema changes are additive** (new tables or nullable/defaulted columns; type relaxations like enum → text
   are OK; no drops or renames). The owner runs migrations and data scripts.
+
+## Files
+| File | Role |
+|---|---|
+| `src/db/schema.ts`, `src/db/index.ts` | Drizzle schema (all tables + types); the client (+ the test hook) |
+| `drizzle/*.sql`, `drizzle/meta/` | Migrations and snapshots (`pnpm db:generate`) |
+| `src/lib/db/scope.ts` | `forUser`: the only way app code queries |
+| `scripts/seed.ts`, `scripts/remove-user.ts`, `scripts/choose-your-day.ts` | Library seed; delete a person; one-off data step |

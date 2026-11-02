@@ -36,3 +36,14 @@ bot. Already-onboarded users are redirected to Today, so targets are never recom
 
 All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forUser(userId)`). Shared UI bits (Card with
 `collapsible`, Field, Status) are in `settings/ui.tsx`. Cues can only be edited on the user's own custom exercises; library cues are shared.
+
+## Files
+| File | Role |
+|---|---|
+| `auth.ts`, `src/lib/session.ts`, `src/lib/users.ts` | Allowlist, `requireUser`, users rows (details in [../users.md](../users.md)) |
+| `src/app/login/page.tsx`, `src/app/(app)/layout.tsx` | Sign-in page; the gate |
+| `src/app/onboarding/{page,onboarding-form,actions}.tsx`, `onboarding/confirm/page.tsx` | Onboarding flow |
+| `src/app/(app)/settings/page.tsx`, `actions.ts`, `ui.tsx` | Settings screen, every mutation, shared bits |
+| `settings/targets-form.tsx`, `phase-section.tsx`, `telegram-card.tsx`, `nudge-settings.tsx` | Everyday cards |
+| `settings/foods-editor.tsx`, `workout-types-editor.tsx`, `body-stats-form.tsx`, `people.tsx` | Setup cards; admin People |
+| `src/lib/targets.ts`, `src/lib/settings.ts` | Targets per goal; `hasPhases` / `hasBudgets` / `hasNavelGoal` |

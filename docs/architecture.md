@@ -29,11 +29,13 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
 | `src/lib/rules/` | "State of today" (`dayState.ts`) + nudge engine. See [rules-engine.md](rules-engine.md) |
 | `src/lib/metrics/` | Derived numbers: `phase.ts` (targets), `trends.ts`, `strength.ts`, `spend.ts`, `checkpoint.ts` |
 | `src/lib/telegram/` | `bot.ts` (handlers), `parse.ts` (commands, pure), `ops.ts` (command actions), `messages.ts` (templates), `ai.ts` (Gemini), `send.ts` |
-| `src/lib/food.ts`, `training.ts`, `activities.ts` (cardio), `daily.ts`, `measurements.ts` | **Shared writes** used by both the screens and the bot (`setDayPlan` decides what a day is) |
+| `src/lib/food.ts`, `training.ts`, `activities.ts` (cardio), `daily.ts`, `measurements.ts` | **Shared writes** used by both the screens and the bot (`setDayPlan` decides what a day is); all take `userId` first |
+| `src/lib/export.ts` | Per-user CSV builder used by the export route |
+| `public/sw.js`, `public/manifest.webmanifest` | Network-only service worker (installability only) and the PWA manifest |
 | `src/components/day-picker.tsx` + `src/app/(app)/day-actions.ts` | "What's today?" picker shared by Today and Train |
 | `src/lib/dates.ts` | IST helpers: `todayIST`, `nowTimeIST`, `addDays`, `istNow`, quiet-hours math |
 | `src/components/` | `tab-bar`, `date-header`, `day-picker`, `charts/line-chart.tsx` (hand-written SVG; no chart library) |
-| `scripts/` | `seed.ts` (shared exercise library only), `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` |
+| `scripts/` | `seed.ts` (shared exercise library only), `remove-user.ts` (delete a person, `:dry`), `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` (PWA icons, one-off) |
 | `drizzle/` | SQL migrations (0001 = views, 0007 = multi-user; both hand-written) |
 | `tests/` | `multi-user.test.ts`: migrations + two-user isolation on PGlite (`pnpm test`) |
 

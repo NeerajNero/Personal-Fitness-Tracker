@@ -76,6 +76,17 @@ The weekly smoke-free milestone isn't a separate rule: it's a line inside `morni
 `overageLine(state)` in `instant.ts`: any bot log that pushes kcal over target gets the overage appended to the reply
 (`withOverage` in `telegram/messages.ts`).
 
+## Files
+| File | Role |
+|---|---|
+| `src/lib/rules/dayState.ts` | `getDayState(userId, date)`, `nextUpFrom`, `loadTypeHistory` |
+| `src/lib/rules/engine.ts` | `evaluate(userId, settings, now)`, `send(userId, chatId, due, now)`, skip reasons |
+| `src/lib/rules/rules.ts` | `RULES`, `formatWeeklyReport`, `cheapestFix`, `onboardingDate` |
+| `src/lib/rules/loaders.ts`, `weekly.ts`, `instant.ts` | Memoised loaders, the weekly report, the overage line |
+| `src/app/api/tick/route.ts` | Loops `listLinkedUsers()`; `?dry=1`, `?force=` |
+| `src/lib/telegram/send.ts`, `messages.ts` | Delivery and templates |
+| `src/lib/nudges.ts`, `src/app/(app)/settings/nudge-settings.tsx` | Toggle list and its UI |
+
 ## Adding a rule
 1. Add the toggle column to `settings` + a migration, and add it to `NUDGE_TOGGLES` in `src/lib/nudges.ts`.
 2. Add the rule object to `RULES` in `rules.ts`. Read state from `ctx.state` and `ctx.load`, and never query directly.

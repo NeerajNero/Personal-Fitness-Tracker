@@ -34,7 +34,15 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 - Project documentation in `docs/` (product, architecture, data model, one doc per feature, rules engine, operations) and this changelog.
 - `/sync-docs` project skill (`.claude/skills/sync-docs`): maps a diff to the docs it affects, updates them and the changelog.
 
+### Security
+- Next.js 16.4.0 → 16.4.4 (and `eslint-config-next`): fixes an unauthenticated RCE in the image optimizer with SVG files,
+  an RCE in `use cache` functions returning typed arrays, and a Server Actions denial of service.
+
 ### Changed
+- README rewritten as a from-zero setup guide (Neon, Google OAuth, BotFather, Gemini, Vercel env, cron-job.org), with
+  scripts, adding/removing a person, privacy, security model, costs and troubleshooting. New docs: `users.md`,
+  `testing.md`, `troubleshooting.md`; `operations.md` covers the migration deploy order, webhook rotation and backups.
+- `pnpm remove-user:dry <email>` / `pnpm remove-user <email>`: delete a person and everything they own (refuses admins).
 - Owner-only settings (protein phases, budgets, navel goal, checkpoint dates, smoke-free date) are optional: Trends hides
   "Navel vs goal", the goal card, the spend section and the checkpoint card when they are unset, and the Protein phase card
   only shows for users with phases. The checkpoint card is titled by its date instead of "Dec 10".
@@ -56,7 +64,15 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 - Bot `dosa 350 12`: a manual meal with your own kcal + protein.
 - Train **✓ same as last time** per exercise and **✓ All same as last time** for the whole session.
 
+### Security
+- Next.js 16.4.0 → 16.4.4 (and `eslint-config-next`): fixes an unauthenticated RCE in the image optimizer with SVG files,
+  an RCE in `use cache` functions returning typed arrays, and a Server Actions denial of service.
+
 ### Changed
+- README rewritten as a from-zero setup guide (Neon, Google OAuth, BotFather, Gemini, Vercel env, cron-job.org), with
+  scripts, adding/removing a person, privacy, security model, costs and troubleshooting. New docs: `users.md`,
+  `testing.md`, `troubleshooting.md`; `operations.md` covers the migration deploy order, webhook rotation and backups.
+- `pnpm remove-user:dry <email>` / `pnpm remove-user <email>`: delete a person and everything they own (refuses admins).
 - Owner-only settings (protein phases, budgets, navel goal, checkpoint dates, smoke-free date) are optional: Trends hides
   "Navel vs goal", the goal card, the spend section and the checkpoint card when they are unset, and the Protein phase card
   only shows for users with phases. The checkpoint card is titled by its date instead of "Dec 10".

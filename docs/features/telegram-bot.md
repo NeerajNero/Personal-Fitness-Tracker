@@ -19,7 +19,7 @@ The primary daily interface. grammY in webhook mode at `/api/telegram`. Proactiv
 | `undo` | delete today's newest entry, food or cardio, whichever was logged last |
 | `navel 88.5` · `waist 85` | measurement, upserted by date |
 | `water` | +1 glass (only when the water toggle is on) |
-| `help` / `/start` | help text (`HELP` in `messages.ts`) |
+| `help` / `/start` | help text (`HELP` in `messages.ts`); `/start <code>` from an unlinked chat links it to the code's owner |
 
 Order matters in `parseCommand`: keywords → `w` → `s` → navel/waist → **cardio** (`parseCardio`, so `walk 30 5` isn't a meal) →
 `name kcal protein` → `name [n]`. Cardio validation errors reply with the reason instead of falling through to AI.
@@ -27,9 +27,9 @@ Then, for a bare word (food with no number), `matchPlanWord` checks `rest` and a
 A food name that matches nothing in the catalogue falls through to AI. Type names can't be bot keywords (Settings blocks them).
 
 ## Free text → Gemini (`ai.ts`)
-Anything else goes to Gemini (`GEMINI_MODEL`, default `gemini-3.5-flash-lite`, JSON-schema output) along with the foods list →
+Anything else goes to Gemini (`GEMINI_MODEL`, default `gemini-3.5-flash-lite`, JSON-schema output) along with the user's own foods list (in-phase names, servings, kcal, protein; nothing identifying) →
 items (matched or estimated) + totals → a reply with **✓ Log / ✗ Cancel** buttons. The DB is written only on ✓.
-The parse is stored in `pending_parses`, and only its id goes in the callback data. Pending parses expire after 24 h.
+The parse is stored in `pending_parses` with the user id, and only its id goes in the callback data; only that user's chat can confirm it. Pending parses expire after 24 h.
 On any failure (network, 429, bad JSON) the bot replies "couldn't parse that — try `paneer 150` style".
 
 ## Rules

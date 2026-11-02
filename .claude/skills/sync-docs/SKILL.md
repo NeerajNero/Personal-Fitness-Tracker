@@ -14,12 +14,15 @@ Keep this cheap: work from the diff, not from re-reading the repo.
    | `src/app/(app)/today/**`, `src/lib/food.ts` | `docs/features/today.md` |
    | `src/app/(app)/train/**`, `src/lib/training.ts`, `src/lib/metrics/strength.ts` | `docs/features/train.md` |
    | `src/app/(app)/trends/**`, `src/lib/metrics/{trends,checkpoint,spend}.ts`, `src/components/charts/**` | `docs/features/trends.md` |
-   | `src/app/(app)/settings/**`, `src/app/onboarding/**`, `src/app/login/**`, `auth.ts` | `docs/features/settings-onboarding.md` |
+   | `src/app/(app)/settings/**`, `src/app/onboarding/**`, `src/app/login/**` | `docs/features/settings-onboarding.md` |
+   | `auth.ts`, `src/lib/users.ts`, `src/lib/db/scope.ts`, `src/lib/session.ts`, `src/lib/targets.ts`, `src/lib/settings.ts` | `docs/users.md` |
+   | `tests/**`, `src/db/index.ts` | `docs/testing.md` |
    | `src/lib/telegram/**`, `src/app/api/telegram/**` | `docs/features/telegram-bot.md` |
    | `src/lib/rules/**`, `src/app/api/tick/**`, `src/lib/nudges.ts` | `docs/rules-engine.md` |
    | `src/db/schema.ts`, `drizzle/*.sql`, `scripts/seed.ts` | `docs/data-model.md` (+ `docs/product.md` for seed/targets) |
    | new top-level module, moved responsibility, client/server boundary | `docs/architecture.md` |
-   | `package.json` scripts, `.env.example`, deploy/config | `docs/operations.md` |
+   | `package.json` scripts, `.env.example`, `scripts/**`, deploy/config | `docs/operations.md` + the README (setup checklist, scripts table) |
+   | a new failure mode or diagnostic | `docs/troubleshooting.md` + the README table |
 3. Read the relevant hunks (`git diff HEAD -- <path>`), then edit each doc so it describes the **current** behaviour:
    what the owner sees, behaviour rules, and the Files table. Remove anything that's no longer true. No history in docs.
 4. If it's user-visible, add bullets under `## Unreleased` in `CHANGELOG.md` (Added / Changed / Fixed / Removed), in plain words.
