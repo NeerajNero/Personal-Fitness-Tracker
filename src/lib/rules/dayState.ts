@@ -9,10 +9,11 @@ import { desc, eq, sql } from "drizzle-orm";
 import { activities, dailyMetrics, foodLog, routineDays, sessions, type Settings } from "@/db/schema";
 import { lastCardio } from "@/lib/activities";
 import type { CardioEntry } from "@/lib/cardio";
-import { daysBetween } from "@/lib/dates";
+import { addDays, daysBetween, isoWeekday } from "@/lib/dates";
 import { forUser, type UserId } from "@/lib/db/scope";
+import { trainedThisWeek } from "@/lib/home-program";
 import { getTargets, type Targets } from "@/lib/metrics/phase";
-import { typeLabel } from "@/lib/routine";
+import { homeNextName, isHomePlan, typeLabel } from "@/lib/routine";
 import { getSettings } from "@/lib/settings";
 
 /**
@@ -135,6 +136,14 @@ export async function getDayState(userId: UserId, date: string, opts: { settings
   const targets = getTargets(date, s);
   const lastFoodAt = totals.lastFoodAt;
   const active = types.filter((t) => !t.archived);
+  // The home plan rotates by the week (3 days → A B C, 4 → A B C A, …), everything else by "the type after the last one trained".
+  let nextUp = nextUpFrom(active);
+  if (isHomePlan(active.map((t) => t.typeName))) {
+    const done = await trainedThisWeek(userId, date, addDays(date, -(isoWeekday(date) - 1)));
+    const name = homeNextName(done, s.daysPerWeek ?? s.weeklySessionTarget);
+    const t = active.find((x) => x.typeName.toLowerCase() === name.toLowerCase());
+    if (t) nextUp = { typeId: t.typeId, typeName: t.typeName };
+  }
   const dayPlan: DayPlan = metrics?.restDay
     ? { kind: "rest", typeId: null, typeName: null }
     : session?.typeId != null
@@ -155,7 +164,7 @@ export async function getDayState(userId: UserId, date: string, opts: { settings
     },
     cardio: { minutes: cardioAgg.minutes, entries: cardioAgg.entries + (session?.inclineWalk ? 1 : 0), lastEntry },
     dayPlan,
-    nextUp: nextUpFrom(active),
+    nextUp,
     daysSince: active.map((t) => ({ typeId: t.typeId, typeName: t.typeName, days: t.lastDate ? daysBetween(t.lastDate, date) : null })),
     flags: {
       weightLogged: metrics?.weightKg != null,

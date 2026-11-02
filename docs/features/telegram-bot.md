@@ -11,7 +11,7 @@ The primary daily interface. grammY in webhook mode at `/api/telegram`. Proactiv
 | `dosa 350 12` | manual meal: name, kcal, protein (numbers from the owner's outside photo estimate) |
 | `paneer 150` · `roti 3` · `scoop` · `<saved meal name>` | catalogue food: no number = 1 serving, < 10 = servings, ≥ 10 = grams via `serving_grams`. Aliases in `ALIASES` (scoop→whey, egg→whole egg…) |
 | `copy` / `same` | copy yesterday's food log (only onto an empty today) |
-| `push` · `pull` · `legs` (any active type name) · `rest` | set today's day; a type replies with its exercise list + **✓ All same as last time** |
+| `push` · `pull` · `legs` · `day a` (any active type name) · `rest` | set today's day; a type replies with its exercise list and each row's hint (bodyweight rows: "3 × 12/12/11 last time, aim for 13s") + **✓ All same as last time** |
 | `incline 20 4.5 6%` · `walk 30 5` · `run 25 4.2km hard` · `cycle`/`bike 40 15km` · `cross 20` · `stairs 10` · `swim 30` · `sport badminton 45` | cardio: first number = minutes (enough on its own, e.g. `walk 30`); then, optionally and in any order, a bare number = km/h, `4.2km`, `6%`, easy / mod / hard. Replies with the entry (derived distance or pace) + today's cardio total |
 | `cardio` | repeat the most recent cardio entry for today |
 | `done` | log the chosen type as same as last time (`copyLastSets`); day unset or rest → "What did you do today?" type buttons |

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
+import { createHomePlan, PUSHUP_ANSWERS } from "@/lib/home-program";
 import { requireUser } from "@/lib/session";
 import { setDayPlan } from "@/lib/training";
 
@@ -12,6 +13,20 @@ const choiceSchema = z.union([
   z.object({ kind: z.literal("custom") }),
   z.object({ kind: z.literal("workout"), typeId: z.number().int().positive() }),
 ]);
+
+/** "Set up your home plan": Day A/B/C from the ladders, after the push-up question. Idempotent. */
+export async function createHomePlanAction(pushups: string): Promise<ActionResult<{ created: boolean }>> {
+  const userId = await requireUser();
+  try {
+    const r = await createHomePlan(userId, z.enum(PUSHUP_ANSWERS).parse(pushups));
+    revalidatePath("/today");
+    revalidatePath("/train");
+    revalidatePath("/settings");
+    return { ok: true, created: r.created };
+  } catch (e) {
+    return fail(e);
+  }
+}
 
 /** The day picker on Today and Train. `needsConfirm` → the current session has sets; call again with confirm to switch and keep them. */
 export async function chooseDay(

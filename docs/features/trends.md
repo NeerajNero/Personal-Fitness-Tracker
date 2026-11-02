@@ -14,7 +14,7 @@ Answers "am I on track, and do I need to change anything?" before showing any de
 - **Estimated maintenance**: when the suggested target (tdee + the goal's delta) differs from the current one by ≥ 50 kcal. It has an Apply button and is never applied automatically.
 
 **Under "More details"** (a `<details>` element; still rendered on the server)
-Goal progress % (navel goal set only), lifts (e1RM per exercise with stall runs), **sets per muscle** (working sets per `exercises.muscle_group`, last 4
+Goal progress % (navel goal set only), lifts (e1RM per exercise with stall runs; bodyweight exercises listed with their ladder rung and best set instead), **sets per muscle** (working sets per `exercises.muscle_group`, last 4
 ISO weeks, back first), **cardio** (minutes per week for 8 weeks + a conditioning chart: pick a type, speed per entry over the last
 180 days, incline labelled on each point, dot colour = effort), weekly protein / kcal adherence (12 weeks; sessions vs `weekly_session_target`), spend vs budget (budgets set only),
 the checkpoint / maintenance card when not promoted, and the CSV export link.
@@ -27,6 +27,6 @@ the checkpoint / maintenance card when not promoted, and the CSV export link.
 | `trends/goal-card.tsx`, `lifts-section.tsx`, `muscle-volume.tsx`, `cardio-section.tsx`, `adherence-table.tsx`, `maintenance-card.tsx`, `checkpoint-card.tsx`, `spend-section.tsx` | Detail cards |
 | `trends/actions.ts` | Measurement upsert/delete, `applyKcalTarget` |
 | `src/lib/metrics/trends.ts` | Weight series, weekly rate, adherence, verdict, maintenance |
-| `src/lib/metrics/checkpoint.ts`, `spend.ts`, `strength.ts` | Checkpoint summary (planned sessions = days ÷ 7 × weekly target), month spend, e1RM history, `weeklySetsByMuscle` |
+| `src/lib/metrics/checkpoint.ts`, `spend.ts`, `strength.ts` | Checkpoint summary (planned sessions = days ÷ 7 × weekly target), month spend, e1RM history (loaded lifts only), `bodyweightProgress`, `weeklySetsByMuscle` |
 | `src/lib/activities.ts` | `cardioByWeek`, `loadCardioSince` |
 | `src/components/charts/line-chart.tsx` | The SVG chart (series, band, marker, per-point colours/labels). Don't add a chart library |

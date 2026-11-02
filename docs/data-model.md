@@ -23,7 +23,7 @@ Views: `drizzle/0007_multi_user.sql` (rebuilt per user; first written in `0001_v
 | `food_log` | user_id, date, time (IST), food_id (nullable), label, qty, kcal, protein_g, cost_inr, source (app/telegram/ai) | kcal/protein are stored already multiplied by qty. `food_id` null = one-off manual entry |
 | `daily_metrics` | PK (user_id, date), weight_kg, steps, water_glasses, notes, rest_day | Upserted. `rest_day` = the owner chose Rest (wins over any session that day) |
 | `measurements` | user_id, date (unique together), navel_cm, waist_cm | Upsert by date (bot + Trends) |
-| `exercises` | user_id (null = shared library), name, muscle_group, cues, is_custom | `pnpm seed` upserts the library (`src/lib/library.ts`); custom rows belong to one user |
+| `exercises` | user_id (nullable: null = shared library), name, muscle_group, cues, is_custom, **pattern** (enum), **equipment** text[] (none / dumbbells / bands / pullup_bar / gym; `{}` = unknown), **measure** (reps / seconds, stored in `sets.reps`), **ladder** + **ladder_level** | Library rows come from `pnpm seed` (idempotent by name); custom ones are the user's. Ladders and rules: [home-program.md](home-program.md) |
 | `routine_days` | user_id, name (text, unique per user), sort_order, archived, weekday (legacy, nullable, never read) | **Workout types.** sort_order = rotation for "next up"; archived = hidden from picker and rotation, history kept. `name` was an enum until 0005 (type `routine_day_name` still exists, unused). Display via `typeLabel()` |
 | `routine_exercises` | user_id, (routine_day_id, exercise_id) PK, sort_order, target_sets, target_reps | A workout type's exercise list |
 | `sessions` | user_id, date, routine_day_id (null = custom), incline_walk (legacy, no longer set by the UI), notes | Choosing a type for a date creates it (`setDayPlan`) |
@@ -38,7 +38,7 @@ Views: `drizzle/0007_multi_user.sql` (rebuilt per user; first written in `0001_v
 All four carry `user_id`; every reader filters on it.
 - `v_daily_totals`: per (user, day) kcal, protein, cost, entries, first/last log time
 - `v_weight_7d`: weight + trailing 7-calendar-day average (RANGE window partitioned by user, so gaps don't widen it)
-- `v_e1rm_by_exercise`: best working set per (session, exercise) by Epley e1RM
+- `v_e1rm_by_exercise`: best working set per (session, exercise) by Epley e1RM; bodyweight exercises (`'none' = any(equipment)`) are left out since 0010
 - `v_weekly_summary`: raw weekly aggregates per user. Adherence and verdicts are computed in `src/lib/metrics`, not here
 
 ## Migrations
@@ -47,7 +47,8 @@ All four carry `user_id`; every reader filters on it.
   to the generated SQL (see `0004_nudge_defaults.sql`).
 - View changes are hand-written SQL migrations. `0007_multi_user.sql` is hand-written too (nullable `user_id` → backfill onto
   the placeholder owner → NOT NULL; re-runnable) and is exercised by `pnpm test` against PGlite, as is every later one
-  (`0008_telegram_blocked.sql`: one nullable column; `0009_diag_events.sql`: the events table and its enum; both `IF NOT EXISTS`).
+  (`0008_telegram_blocked.sql`: one nullable column; `0009_diag_events.sql`: the events table and its enum; `0010_home_program.sql`:
+  the exercise columns, two enums and the rebuilt e1RM view; all `IF NOT EXISTS`). After 0010, run `pnpm seed`.
 - `pnpm backup` before migrating (see [operations.md](operations.md#backups)).
 - `pnpm seed` is idempotent and only upserts the shared exercise library. Users, settings, foods and workout types come from
   sign-in and onboarding (gym users get Push/Pull/Legs from `src/lib/library.ts`).

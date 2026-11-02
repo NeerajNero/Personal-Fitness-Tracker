@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, notInArray, sql } from "drizzle-orm";
-import { dailyMetrics, exercises, routineDays, routineExercises, sessionExercises, sessions, sets } from "@/db/schema";
+import { and, asc, desc, eq, inArray, isNotNull, notInArray, sql } from "drizzle-orm";
+import { activities, dailyMetrics, exercises, routineDays, routineExercises, sessionExercises, sessions, sets, type ExerciseMeasure, type ExercisePattern } from "@/db/schema";
 import { listCardio } from "@/lib/activities";
 import type { CardioEntry } from "@/lib/cardio";
 import { forUser, type UserId } from "@/lib/db/scope";
-import { hintFromSets, loadHistory, loadLastSessionSets, stallFromHistory, type Hint, type SetLite, type Stall } from "@/lib/metrics/strength";
+import { bodyweightHint, hintFromSets, isBodyweight, loadHistory, loadLastSessionSets, loadRecentSessionSets, stallFromHistory, type Hint, type RungInfo, type SetLite, type Stall } from "@/lib/metrics/strength";
 import { getDayState, type DayState } from "@/lib/rules/dayState";
 import { typeLabel } from "@/lib/routine";
 
@@ -17,6 +17,11 @@ export type ExerciseCard = {
   sets: SetLite[];
   hint: Hint;
   stall: Stall;
+  /** Bodyweight rows show reps (or seconds) only; conditioning rows show the finisher timer. */
+  bodyweight: boolean;
+  measure: ExerciseMeasure;
+  pattern: ExercisePattern;
+  rung: { ladder: string; level: number; max: number } | null;
 };
 
 export type SessionDetail = {
@@ -30,7 +35,36 @@ export type SessionDetail = {
   exercises: ExerciseCard[];
 };
 
-export type ExerciseLite = { id: number; name: string; muscleGroup: string };
+export type ExerciseLite = { id: number; name: string; muscleGroup: string; equipment: string[]; measure: ExerciseMeasure; pattern: ExercisePattern; ladder: string | null; ladderLevel: number | null };
+
+const liteCols = { id: exercises.id, name: exercises.name, muscleGroup: exercises.muscleGroup, equipment: exercises.equipment, measure: exercises.measure, pattern: exercises.pattern, ladder: exercises.ladder, ladderLevel: exercises.ladderLevel };
+
+/** Every rung of the given ladders visible to the user, by ladder, easiest first. */
+export async function loadLadders(userId: UserId, ladders: string[]): Promise<Map<string, { id: number; name: string; level: number }[]>> {
+  const out = new Map<string, { id: number; name: string; level: number }[]>();
+  const keys = [...new Set(ladders)];
+  if (keys.length === 0) return out;
+  const u = forUser(userId);
+  const rows = await u.db
+    .select({ id: exercises.id, name: exercises.name, ladder: exercises.ladder, level: exercises.ladderLevel })
+    .from(exercises)
+    .where(u.visible(inArray(exercises.ladder, keys), isNotNull(exercises.ladderLevel)))
+    .orderBy(asc(exercises.ladder), asc(exercises.ladderLevel));
+  for (const r of rows) {
+    const list = out.get(r.ladder!) ?? [];
+    list.push({ id: r.id, name: r.name, level: r.level! });
+    out.set(r.ladder!, list);
+  }
+  return out;
+}
+
+export function rungInfo(ladders: Map<string, { id: number; name: string; level: number }[]>, ladder: string | null, level: number | null): RungInfo | null {
+  if (!ladder || level === null) return null;
+  const rungs = ladders.get(ladder) ?? [];
+  const i = rungs.findIndex((r) => r.level === level);
+  const pick = (j: number) => (rungs[j] ? { id: rungs[j].id, name: rungs[j].name } : null);
+  return { ladder, level, max: rungs.length, next: i >= 0 ? pick(i + 1) : null, prev: i > 0 ? pick(i - 1) : null };
+}
 
 export type WorkoutType = { id: number; name: string; label: string; archived: boolean; sortOrder: number };
 
@@ -45,10 +79,10 @@ export async function listWorkoutTypes(userId: UserId, opts: { includeArchived?:
   return rows.map((r) => ({ ...r, label: typeLabel(r.name) }));
 }
 
-/** The shared library plus the user's custom exercises. */
+/** The shared library plus the user's custom exercises; ladder siblings sit together, easiest first. */
 export function listExercises(userId: UserId): Promise<ExerciseLite[]> {
   const u = forUser(userId);
-  return u.db.select({ id: exercises.id, name: exercises.name, muscleGroup: exercises.muscleGroup }).from(exercises).where(u.visible()).orderBy(asc(exercises.name));
+  return u.db.select(liteCols).from(exercises).where(u.visible()).orderBy(sql`${exercises.ladder} nulls last`, asc(exercises.ladderLevel), asc(exercises.name));
 }
 
 export function listRoutineExerciseNames(userId: UserId, routineDayId: number): Promise<{ name: string }[]> {
@@ -74,11 +108,27 @@ export function listRoutineExercises(userId: UserId) {
       name: exercises.name,
       muscleGroup: exercises.muscleGroup,
       cues: exercises.cues,
+      equipment: exercises.equipment,
+      measure: exercises.measure,
+      pattern: exercises.pattern,
+      ladder: exercises.ladder,
+      ladderLevel: exercises.ladderLevel,
     })
     .from(routineExercises)
     .innerJoin(exercises, eq(exercises.id, routineExercises.exerciseId))
     .where(u.own(routineExercises))
     .orderBy(asc(routineExercises.routineDayId), asc(routineExercises.sortOrder));
+}
+
+/** Rung count per ladder the user can see (for "rung 2 of 6" in Settings). */
+export async function ladderSizes(userId: UserId): Promise<Map<string, number>> {
+  const u = forUser(userId);
+  const rows = await u.db
+    .select({ ladder: exercises.ladder, n: sql<number>`count(*)::int` })
+    .from(exercises)
+    .where(u.visible(isNotNull(exercises.ladder)))
+    .groupBy(exercises.ladder);
+  return new Map(rows.map((r) => [r.ladder!, r.n]));
 }
 
 export async function getSessionDetail(userId: UserId, sessionId: number): Promise<SessionDetail | null> {
@@ -107,6 +157,11 @@ export async function getSessionDetail(userId: UserId, sessionId: number): Promi
         cues: exercises.cues,
         targetSets: sessionExercises.targetSets,
         targetReps: sessionExercises.targetReps,
+        equipment: exercises.equipment,
+        measure: exercises.measure,
+        pattern: exercises.pattern,
+        ladder: exercises.ladder,
+        ladderLevel: exercises.ladderLevel,
       })
       .from(sessionExercises)
       .innerJoin(exercises, eq(exercises.id, sessionExercises.exerciseId))
@@ -120,18 +175,32 @@ export async function getSessionDetail(userId: UserId, sessionId: number): Promi
   ]);
 
   const ids = exRows.map((e) => e.exerciseId);
-  const [history, lastSets] = await Promise.all([loadHistory(userId, ids, sessionId), loadLastSessionSets(userId, ids, sessionId)]);
+  const bwIds = exRows.filter((e) => isBodyweight(e.equipment)).map((e) => e.exerciseId);
+  const [history, lastSets, recent, ladders] = await Promise.all([
+    loadHistory(userId, ids, sessionId),
+    loadLastSessionSets(userId, ids, sessionId),
+    loadRecentSessionSets(userId, bwIds, 3, sessionId),
+    loadLadders(userId, exRows.flatMap((e) => (e.ladder ? [e.ladder] : []))),
+  ]);
 
   const { rawTypeName, ...rest } = row;
   return {
     ...rest,
     typeName: rawTypeName ? typeLabel(rawTypeName) : null,
-    exercises: exRows.map((e) => ({
-      ...e,
-      sets: setRows.filter((s) => s.exerciseId === e.exerciseId).map(({ setNo, weightKg, reps }) => ({ setNo, weightKg, reps })),
-      hint: hintFromSets(lastSets.get(e.exerciseId)?.sets ?? null, e.muscleGroup, e.targetSets, e.targetReps),
-      stall: stallFromHistory(history.get(e.exerciseId) ?? []),
-    })),
+    exercises: exRows.map(({ equipment, ladder, ladderLevel, ...e }) => {
+      const bodyweight = isBodyweight(equipment);
+      const rung = rungInfo(ladders, ladder, ladderLevel);
+      return {
+        ...e,
+        bodyweight,
+        rung: rung ? { ladder: rung.ladder, level: rung.level, max: rung.max } : null,
+        sets: setRows.filter((s) => s.exerciseId === e.exerciseId).map(({ setNo, weightKg, reps }) => ({ setNo, weightKg, reps })),
+        hint: bodyweight
+          ? bodyweightHint(recent.get(e.exerciseId) ?? [], e.measure, e.targetSets, rung)
+          : hintFromSets(lastSets.get(e.exerciseId)?.sets ?? null, e.muscleGroup, e.targetSets, e.targetReps),
+        stall: bodyweight ? { stalled: false, count: 0 } : stallFromHistory(history.get(e.exerciseId) ?? []),
+      };
+    }),
   };
 }
 
@@ -169,8 +238,34 @@ export async function sessionProgress(userId: UserId, sessionId: number): Promis
 /* ------------------------------ shared writes ------------------------------ */
 
 /**
- * Create a session. With a workout type, copy its exercises into session_exercises.
- * No sets are written — each exercise is logged with ✓ (same as last time, `copyLastSets`) or edited.
+ * Ladder rungs whose last session had every set at the top of the range move up one rung in the type's list, so the
+ * next session starts on the new rung (docs/home-program.md). Earlier sessions keep the old rung. Returns what moved.
+ */
+export async function advanceLadders(userId: UserId, routineDayId: number): Promise<{ from: string; to: string }[]> {
+  const u = forUser(userId);
+  const rows = await u.db
+    .select({ exerciseId: routineExercises.exerciseId, name: exercises.name, targetSets: routineExercises.targetSets, equipment: exercises.equipment, measure: exercises.measure, ladder: exercises.ladder, level: exercises.ladderLevel })
+    .from(routineExercises)
+    .innerJoin(exercises, eq(exercises.id, routineExercises.exerciseId))
+    .where(u.own(routineExercises, eq(routineExercises.routineDayId, routineDayId), isNotNull(exercises.ladder)));
+  const bw = rows.filter((r) => isBodyweight(r.equipment));
+  if (bw.length === 0) return [];
+  const [recent, ladders] = await Promise.all([loadRecentSessionSets(userId, bw.map((r) => r.exerciseId), 3), loadLadders(userId, bw.map((r) => r.ladder!))]);
+  const inType = new Set(rows.map((r) => r.exerciseId));
+  const moved: { from: string; to: string }[] = [];
+  for (const r of bw) {
+    const hint = bodyweightHint(recent.get(r.exerciseId) ?? [], r.measure, r.targetSets, rungInfo(ladders, r.ladder, r.level));
+    if (hint.mode !== "up" || !hint.nextRung || inType.has(hint.nextRung.id)) continue;
+    await u.db.update(routineExercises).set({ exerciseId: hint.nextRung.id }).where(u.own(routineExercises, eq(routineExercises.routineDayId, routineDayId), eq(routineExercises.exerciseId, r.exerciseId)));
+    inType.add(hint.nextRung.id);
+    moved.push({ from: r.name, to: hint.nextRung.name });
+  }
+  return moved;
+}
+
+/**
+ * Create a session. With a workout type, advance any ladder rung that earned it, then copy the type's exercises into
+ * session_exercises. No sets are written — each exercise is logged with ✓ (same as last time, `copyLastSets`) or edited.
  * Called through `setDayPlan`.
  */
 export async function createSession(userId: UserId, date: string, routineDayId: number | null): Promise<{ sessionId: number }> {
@@ -178,6 +273,7 @@ export async function createSession(userId: UserId, date: string, routineDayId: 
   if (routineDayId !== null) {
     const [day] = await u.db.select({ id: routineDays.id }).from(routineDays).where(u.own(routineDays, eq(routineDays.id, routineDayId))).limit(1);
     if (!day) throw new Error("Workout type not found");
+    await advanceLadders(userId, routineDayId);
   }
   const [sess] = await u.db.insert(sessions).values(u.stamp({ date, routineDayId })).returning({ id: sessions.id });
 
@@ -289,6 +385,31 @@ export async function addExerciseToType(userId: UserId, typeId: number, exercise
   await u.db.insert(routineExercises).values(u.stamp({ routineDayId: typeId, exerciseId, sortOrder: max + 1 })).onConflictDoNothing();
 }
 
+/** Settings: move a ladder exercise in a type to the rung above or below (no-op at the ends or when that rung is already in the type). */
+export async function setRoutineRung(userId: UserId, typeId: number, exerciseId: number, dir: "up" | "down"): Promise<{ name: string } | null> {
+  const u = forUser(userId);
+  const [row] = await u.db.select({ ladder: exercises.ladder, level: exercises.ladderLevel }).from(exercises).where(u.visible(eq(exercises.id, exerciseId))).limit(1);
+  if (!row?.ladder || row.level === null) return null;
+  const info = rungInfo(await loadLadders(userId, [row.ladder]), row.ladder, row.level);
+  const target = dir === "up" ? info?.next : info?.prev;
+  if (!target) return null;
+  const [taken] = await u.db.select({ id: routineExercises.exerciseId }).from(routineExercises).where(u.own(routineExercises, eq(routineExercises.routineDayId, typeId), eq(routineExercises.exerciseId, target.id))).limit(1);
+  if (taken) return null;
+  await u.db.update(routineExercises).set({ exerciseId: target.id }).where(u.own(routineExercises, eq(routineExercises.routineDayId, typeId), eq(routineExercises.exerciseId, exerciseId)));
+  return { name: target.name };
+}
+
+/** The finisher's 10 minutes are done: one set row (so the exercise counts as logged) and a cardio entry. */
+export async function logFinisher(userId: UserId, sessionId: number, exerciseId: number, minutes = 10): Promise<boolean> {
+  const u = forUser(userId);
+  const [sess] = await u.db.select({ date: sessions.date }).from(sessions).where(u.own(sessions, eq(sessions.id, sessionId))).limit(1);
+  const [ex] = await u.db.select({ name: exercises.name }).from(exercises).where(u.visible(eq(exercises.id, exerciseId))).limit(1);
+  if (!sess || !ex) return false;
+  await u.db.insert(sets).values(u.stamp({ sessionId, exerciseId, setNo: 1, weightKg: 0, reps: minutes, isWorking: true })).onConflictDoNothing();
+  await u.db.insert(activities).values(u.stamp({ date: sess.date, type: "sport", name: `${ex.name}, 30/30 intervals`, minutes, effort: "hard", loggedAt: new Date() }));
+  return true;
+}
+
 /** Reuse a visible exercise by name (case-insensitive) or create a custom one for this user. */
 export async function findOrCreateExercise(userId: UserId, name: string, muscleGroup: string): Promise<number> {
   const u = forUser(userId);
@@ -301,7 +422,7 @@ export async function findOrCreateExercise(userId: UserId, name: string, muscleG
 /** A library or own exercise by id, or null when it isn't visible to this user. */
 export async function findExercise(userId: UserId, exerciseId: number): Promise<ExerciseLite | null> {
   const u = forUser(userId);
-  const [row] = await u.db.select({ id: exercises.id, name: exercises.name, muscleGroup: exercises.muscleGroup }).from(exercises).where(u.visible(eq(exercises.id, exerciseId))).limit(1);
+  const [row] = await u.db.select(liteCols).from(exercises).where(u.visible(eq(exercises.id, exerciseId))).limit(1);
   return row ?? null;
 }
 

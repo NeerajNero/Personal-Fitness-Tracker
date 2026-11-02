@@ -14,7 +14,7 @@ export function People({ rows }: { rows: PersonRow[] }) {
           <span className="block font-semibold">People</span>
           <span className="block text-xs text-muted">{rows.length} {rows.length === 1 ? "account" : "accounts"}. Admin only, read-only.</span>
         </span>
-        <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180" />
+        <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-150" />
       </summary>
       <ul className="divide-y divide-border px-4 pb-2">
         {rows.map((p) => (

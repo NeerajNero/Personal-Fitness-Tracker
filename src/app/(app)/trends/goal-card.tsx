@@ -37,7 +37,7 @@ export function GoalCard({ settings, measurements, today }: { settings: NavelSet
         </span>
       </div>
       <div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-border">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full motion-safe:transition-[width] motion-safe:duration-150 bg-accent" style={{ width: `${pct}%` }} />
       </div>
       <p className="mt-1 text-xs text-muted">{achieved > 0 ? achieved.toFixed(1) : 0} of {required.toFixed(1)} cm lost.</p>
 

@@ -22,6 +22,45 @@ export function pickerTypes(types: { id: number; label: string; archived: boolea
   return types.map((t) => ({ id: t.id, label: t.label, archived: t.archived, days: days.get(t.id) ?? null }));
 }
 
+/* ------------------------------ home program ------------------------------ */
+
+/** The three home days in rotation order, with the subtitle the workout card shows. */
+export const HOME_DAYS = [
+  { name: "Day A", subtitle: "push and squat" },
+  { name: "Day B", subtitle: "pull and hinge" },
+  { name: "Day C", subtitle: "shoulders, legs and conditioning" },
+] as const;
+export const HOME_DAY_NAMES = HOME_DAYS.map((d) => d.name) as readonly string[];
+
+export function homeDaySubtitle(name: string): string | null {
+  return HOME_DAYS.find((d) => d.name.toLowerCase() === name.toLowerCase())?.subtitle ?? null;
+}
+
+/** True when the active types are exactly Day A, Day B, Day C in order: the weekly pattern decides "next up". */
+export function isHomePlan(activeNames: string[]): boolean {
+  return activeNames.length === 3 && activeNames.every((n, i) => n.toLowerCase() === HOME_DAY_NAMES[i].toLowerCase());
+}
+
+/** A week of home days for `daysPerWeek` sessions: 3 → A B C, 4 → A B C A, 5 → A B C A B. */
+export function weeklyPattern(daysPerWeek: number): string[] {
+  const n = Math.min(7, Math.max(1, daysPerWeek || 3));
+  return Array.from({ length: n }, (_, i) => HOME_DAY_NAMES[i % 3]);
+}
+
+/** Which home day comes next given how many sessions were trained earlier this ISO week. */
+export function homeNextName(trainedThisWeek: number, daysPerWeek: number): string {
+  const p = weeklyPattern(daysPerWeek);
+  return p[trainedThisWeek % p.length];
+}
+
+/** The one onboarding question for the home plan: push-ups in a row → the starting push-up rung. */
+export const PUSHUP_ANSWERS = ["0", "1-5", "6-15", "16+"] as const;
+export type PushupAnswer = (typeof PUSHUP_ANSWERS)[number];
+export const PUSHUP_LABEL: Record<PushupAnswer, string> = { "0": "None yet", "1-5": "1 to 5", "6-15": "6 to 15", "16+": "16 or more" };
+
+/** Bodyweight rep ranges (docs/home-program.md): reps 8–15, holds 20–45 s. */
+export const BW_RANGE = { reps: { bottom: 8, top: 15, step: 2 }, seconds: { bottom: 20, top: 45, step: 5 } } as const;
+
 /** The muscle group most of a list of exercises train (a workout type's icon). */
 export function dominantGroup(groups: string[]): string {
   const counts = new Map<string, number>();

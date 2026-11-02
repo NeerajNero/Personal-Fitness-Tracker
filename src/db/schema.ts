@@ -39,6 +39,12 @@ export const sexEnum = pgEnum("sex", ["male", "female"]);
 export const cardioEffortEnum = pgEnum("cardio_effort", ["easy", "moderate", "hard"]);
 export const goalEnum = pgEnum("goal", ["recomp", "fat_loss", "muscle_gain"]);
 export const trainingLocationEnum = pgEnum("training_location", ["gym", "home"]);
+/** Movement pattern (docs/home-program.md). `vertical_pull` and `isolation` exist so gym exercises can be classified too. */
+export const exercisePatternEnum = pgEnum("exercise_pattern", [
+  "horizontal_push", "vertical_push", "horizontal_pull", "vertical_pull", "squat", "hinge", "lunge", "core_brace", "core_lateral", "calves", "conditioning", "isolation",
+]);
+/** What a set counts: reps, or seconds for holds (stored in `sets.reps` either way). */
+export const exerciseMeasureEnum = pgEnum("exercise_measure", ["reps", "seconds"]);
 /** Legacy: routine_days.name used this until 0005 (now text). Kept so drizzle-kit never drops the type. */
 export const routineDayNameEnum = pgEnum("routine_day_name", [
   "UpperA",
@@ -262,6 +268,13 @@ export const exercises = pgTable(
     cues: text("cues"),
     isCustom: boolean("is_custom").notNull().default(false),
     createdAt: createdAt(),
+    pattern: exercisePatternEnum("pattern"),
+    /** none, dumbbells, bands, pullup_bar, or gym. Household items (chair, table, wall) count as none. Empty = unknown (custom rows). */
+    equipment: text("equipment").array().notNull().default(sql`'{}'::text[]`),
+    measure: exerciseMeasureEnum("measure").notNull().default("reps"),
+    /** Progression ladder this rung belongs to (e.g. push_up) and its 1-based level; null = not on a ladder. */
+    ladder: text("ladder"),
+    ladderLevel: smallint("ladder_level"),
   },
   (t) => [uniqueIndex("exercises_owner_name_uq").on(sql`coalesce(${t.userId}, '${sql.raw(NIL_UUID)}'::uuid)`, sql`lower(${t.name})`)],
 );
@@ -442,6 +455,8 @@ export type FoodLog = typeof foodLog.$inferSelect;
 export type DailyMetrics = typeof dailyMetrics.$inferSelect;
 export type Measurement = typeof measurements.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
+export type ExercisePattern = Exercise["pattern"];
+export type ExerciseMeasure = Exercise["measure"];
 export type RoutineDay = typeof routineDays.$inferSelect;
 export type RoutineExercise = typeof routineExercises.$inferSelect;
 export type Session = typeof sessions.$inferSelect;

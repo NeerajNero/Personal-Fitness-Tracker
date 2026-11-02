@@ -14,7 +14,7 @@ The full first-time setup (Neon, Google OAuth, BotFather, Gemini, Vercel, cron-j
 ```bash
 pnpm install
 pnpm db:migrate        # apply drizzle/ migrations to DATABASE_URL
-pnpm seed              # idempotent: the shared exercise library only
+pnpm seed              # idempotent: the shared exercise library (gym rows + home ladders); run after every deploy that changes it
 pnpm dev               # :3000; sign-in needs the localhost redirect URI on the Google client
 ```
 

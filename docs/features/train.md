@@ -12,12 +12,15 @@ hero with Start, or "Something else" for the picker (other types, Rest, Custom, 
 - Header (no box): **3 of 6 logged** as the section number (green with the one animated tick when the last exercise lands),
   **Log all the same as last time (k left)**, and a ⋯ menu for notes and discard. The old incline-walk checkbox is gone
   (column and data kept; a ticked legacy session counts as one cardio entry with no minutes).
-- One row per exercise: muscle icon, name, a `Stalled` badge, the hint as a sentence ("Last 45 × 10/10/9, try 47.5 next")
-  and a tick button.
+- One row per exercise: muscle icon, name, "rung n of m" for ladder exercises, a `Stalled` badge, the hint as a sentence
+  ("Last 45 × 10/10/9, try 47.5 next"; bodyweight: "3 × 12/12/11 last time, aim for 13s", in accent when a rung is earned)
+  and a tick button. Bodyweight rows show reps only, or seconds for holds; a finisher row opens the 10-minute interval
+  timer ([../home-program.md](../home-program.md)).
   - The tick copies last session's working sets for that exercise. The row then reads `45 kg × 10/10/9` in green.
   - Tapping the name opens the set grid (kg × reps per set, placeholders from last session, add / remove a set), the stall advice and the cues.
 - **Add an exercise**: search the shared library plus your own custom exercises, or create a new one (with a muscle group; it's yours only). "Also add to <type>" (off by default)
-  appends it to the type's list too (3 × 8).
+  appends it to the type's list too (3 × 8). Home users see only what fits their equipment unless they tick "Show all";
+  ladder siblings sort together.
 - **Cardio** (below the workout, or on its own on rest/unset days): see [cardio.md](cardio.md).
 
 ## Behaviour rules
@@ -30,6 +33,7 @@ hero with Start, or "Something else" for the picker (other types, Rest, Custom, 
 - "Last session" = the most recent session containing that exercise (any workout type), working sets only.
 - Next up = the active type after the most recently trained one (rotation = Settings order). See `docs/rules-engine.md`.
 - Hint (`hintFromSets`, a sentence): every target rep hit → "try +2.5 kg next" upper body / +5 kg lower body; otherwise "same weight, add reps"; never done → "First time, aim for 3 × 8".
+  Bodyweight exercises use `bodyweightHint` instead (rungs, 8–15 reps / 20–45 s): see [../home-program.md](../home-program.md).
 - Stall = no new best e1RM (Epley) for ≥ 3 sessions → badge + "drop ~10 % and rebuild, or swap the variation".
 - Lat cues are stored on the exercise rows (`exercises.cues`) and shown collapsed.
 - `workoutLogged` (DayState) = ≥ 1 set or a legacy incline-walk tick.
@@ -37,11 +41,12 @@ hero with Start, or "Something else" for the picker (other types, Rest, Custom, 
 ## Files
 | File | Role |
 |---|---|
-| `src/app/(app)/train/page.tsx` | `getTrainData(date)` + `loadWorkoutCard` → WorkoutCard (+ SessionView when a session exists) + Cardio |
+| `src/app/(app)/train/page.tsx` | `getTrainData(date)` + `loadWorkoutCard` → WorkoutCard (+ SessionView when a session exists) + Cardio; passes the user's equipment |
+| `train/finisher.tsx` | The 30/30 interval timer row and `logFinisher` |
 | `src/components/workout-card.tsx`, `day-picker.tsx`, `src/lib/workout-card.ts`, `src/app/(app)/day-actions.ts` | The card, the picker, its data and `chooseDay` (shared with Today) |
 | `train/session-view.tsx` | Header, `ExerciseRow` (collapsed line + set grid), `AddExercise` |
 | `train/cardio.tsx` | Cardio section (repeat, type picker, per-type form, entries) |
-| `train/actions.ts` | `sameAsLast`, `upsertSet`, `deleteSet`, `addExerciseToSession`, `setInclineWalk`, `saveSessionNotes`, `discardSession`, `addCardio`, `editCardio`, `removeCardio`, `repeatCardio` |
+| `train/actions.ts` | `sameAsLast`, `upsertSet` (reps up to 100, seconds up to 600), `deleteSet`, `addExerciseToSession`, `logFinisher`, `saveSessionNotes`, `discardSession`, `addCardio`, `editCardio`, `removeCardio`, `repeatCardio` |
 | `src/lib/training.ts` | All take `userId` first: `listWorkoutTypes`, `setDayPlan`, `getSessionDetail`, `createSession`, `copyLastSets`, `addExerciseToType`, `sessionProgress`, `findOrCreateExercise` (custom = own), `findExercise`, `createWorkoutType` (onboarding) |
 | `src/lib/metrics/strength.ts` | `e1rm`, history loaders, `hintFromSets`, `stallFromHistory` |
 

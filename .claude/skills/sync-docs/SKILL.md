@@ -19,6 +19,7 @@ Keep this cheap: work from the diff, not from re-reading the repo.
    | `tests/**`, `src/db/index.ts` | `docs/testing.md` |
    | `src/lib/telegram/**`, `src/app/api/telegram/**` | `docs/features/telegram-bot.md` |
    | `src/lib/rules/**`, `src/app/api/tick/**`, `src/lib/nudges.ts` | `docs/rules-engine.md` |
+   | `src/lib/library*.ts`, `src/lib/home-program.ts`, `src/lib/metrics/strength.ts` (bodyweight), `train/finisher.tsx` | `docs/home-program.md` |
    | `src/db/schema.ts`, `drizzle/*.sql`, `scripts/seed.ts` | `docs/data-model.md` (+ `docs/product.md` for seed/targets) |
    | `src/app/globals.css`, `src/components/{ui,icons,workout-card,day-picker}.tsx`, `src/lib/workout-card.ts`, any screen's look or copy | `docs/design.md` |
    | new top-level module, moved responsibility, client/server boundary | `docs/architecture.md` |

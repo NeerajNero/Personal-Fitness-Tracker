@@ -38,6 +38,7 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
 | `src/lib/dates.ts` | IST helpers: `todayIST`, `nowTimeIST`, `addDays`, `istNow`, quiet-hours math |
 | `src/components/` | `ui.tsx` (shared classes and primitives), `icons.tsx` (the lucide vocabulary), `workout-card.tsx` + `day-picker.tsx` (today's workout, the picker it opens), `tab-bar`, `date-header`, `charts/line-chart.tsx` (hand-written SVG; no chart library). See [design.md](design.md) |
 | `src/lib/workout-card.ts` | Data for the workout card and the session-minute estimate the morning brief uses |
+| `src/lib/home-program.ts`, `src/lib/library-seed.ts` | Day A/B/C creation and the weekly-rotation count; the idempotent library upsert shared by `pnpm seed` and the tests. See [home-program.md](home-program.md) |
 | `scripts/` | `seed.ts` (shared exercise library only), `remove-user.ts` (delete a person, `:dry`), `backup.ts` (JSON dump of every table, `--full` keeps chat ids), `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` (PWA icons, one-off) |
 | `drizzle/` | SQL migrations (0001 = views, 0007 = multi-user; both hand-written; 0008–0009 generated then made re-runnable) |
 | `tests/` | `multi-user.test.ts`: migrations + two-user isolation on PGlite (`pnpm test`) |

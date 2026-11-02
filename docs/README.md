@@ -20,7 +20,8 @@ you can open those directly instead of searching the repo.
 | `pnpm test`, PGlite, adding a test | [testing.md](testing.md) |
 | Something's broken | [troubleshooting.md](troubleshooting.md), starting with Settings → Diagnostics |
 | What each Diagnostics line means, `diag`, diag_events | [diagnostics.md](diagnostics.md) |
-| Tokens, type, icons, the one motion, copy rules, the workout card | [design.md](design.md) |
+| Tokens, type, icons, motion, copy rules, the workout card | [design.md](design.md) |
+| Bodyweight ladders, progression rules, Day A/B/C, the finisher | [home-program.md](home-program.md) |
 | What changed and when | [../CHANGELOG.md](../CHANGELOG.md) |
 | First-time setup from zero | [../README.md](../README.md) |
 

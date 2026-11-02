@@ -11,7 +11,7 @@ import { ISO_DATE } from "@/lib/dates";
 import { forUser } from "@/lib/db/scope";
 import { MUSCLE_GROUPS } from "@/lib/routine";
 import { requireUser } from "@/lib/session";
-import { addExerciseToType, copyLastSets, findExercise, findOrCreateExercise } from "@/lib/training";
+import { addExerciseToType, copyLastSets, findExercise, findOrCreateExercise, logFinisher as finishFinisher } from "@/lib/training";
 
 const dateSchema = z.string().regex(ISO_DATE, "Bad date");
 const id = z.number().int().positive();
@@ -67,7 +67,8 @@ const setSchema = z.object({
   exerciseId: id,
   setNo: z.number().int().min(1).max(30),
   weightKg: z.coerce.number().min(0, "0–500 kg").max(500, "0–500 kg"),
-  reps: z.coerce.number().int("Whole reps").min(1, "1–100 reps").max(100, "1–100 reps"),
+  /** Reps, or seconds for holds (checked against the exercise's measure below). */
+  reps: z.coerce.number().int("Whole numbers only").min(1, "At least 1").max(600, "Up to 600 seconds"),
 });
 
 export async function upsertSet(input: {
@@ -84,6 +85,9 @@ export async function upsertSet(input: {
     // The session must be the user's own; a foreign id is simply not found.
     const [sess] = await u.db.select({ id: sessions.id }).from(sessions).where(u.own(sessions, eq(sessions.id, v.sessionId))).limit(1);
     if (!sess) return { ok: false, error: "Session not found" };
+    const ex = await findExercise(userId, v.exerciseId);
+    if (!ex) return { ok: false, error: "Exercise not found" };
+    if (ex.measure === "reps" && v.reps > 100) return { ok: false, error: "1–100 reps" };
     await u.db
       .insert(sets)
       .values(u.stamp({ ...v, isWorking: true }))
@@ -105,6 +109,19 @@ export async function deleteSet(sessionId: number, exerciseId: number, setNo: nu
     await u.db
       .delete(sets)
       .where(u.own(sets, eq(sets.sessionId, id.parse(sessionId)), eq(sets.exerciseId, id.parse(exerciseId)), eq(sets.setNo, z.number().int().parse(setNo))));
+    revalidate();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** The finisher timer ran its 10 minutes (or the user marked it done): one set row + a cardio entry. */
+export async function logFinisher(sessionId: number, exerciseId: number): Promise<ActionResult> {
+  const userId = await requireUser();
+  try {
+    const ok = await finishFinisher(userId, id.parse(sessionId), id.parse(exerciseId));
+    if (!ok) return { ok: false, error: "Session or exercise not found" };
     revalidate();
     return { ok: true };
   } catch (e) {

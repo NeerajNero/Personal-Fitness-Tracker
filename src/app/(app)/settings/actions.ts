@@ -12,7 +12,7 @@ import { listFoods } from "@/lib/food";
 import { BOT_COMMAND_WORDS, MUSCLE_GROUPS } from "@/lib/routine";
 import { hasBudgets, hasPhases, getSettings } from "@/lib/settings";
 import { matchFood } from "@/lib/telegram/parse";
-import { findOrCreateExercise, listWorkoutTypes } from "@/lib/training";
+import { findOrCreateExercise, listWorkoutTypes, setRoutineRung as moveRung } from "@/lib/training";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/session";
 
@@ -263,6 +263,19 @@ export async function setRoutineTargets(dayId: number, exerciseId: number, sets:
   try {
     const v = { targetSets: int(1, 10, "1–10").parse(sets), targetReps: int(1, 50, "1–50").parse(reps) };
     await forUser(userId).db.update(routineExercises).set(v).where(routineRow(userId, id.parse(dayId), id.parse(exerciseId)));
+    revalidateAll();
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Ladder exercises: one rung up or down in this type (Settings shows "rung n of m"). */
+export async function setRoutineRung(dayId: number, exerciseId: number, dir: "up" | "down"): Promise<ActionResult> {
+  const userId = await requireUser();
+  try {
+    const r = await moveRung(userId, id.parse(dayId), id.parse(exerciseId), z.enum(["up", "down"]).parse(dir));
+    if (!r) return { ok: false, error: "That rung isn't available: you're at the end of the ladder, or it's already in this type" };
     revalidateAll();
     return { ok: true };
   } catch (e) {

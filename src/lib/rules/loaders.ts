@@ -6,14 +6,15 @@ import { forUser, type UserId } from "@/lib/db/scope";
 import { listFoods, type Food } from "@/lib/food";
 import { checkpointSummary, type CheckpointSummary } from "@/lib/metrics/checkpoint";
 import { monthSpend, type MonthSpend } from "@/lib/metrics/spend";
-import { loadLastSessionSets, type LastSession } from "@/lib/metrics/strength";
+import { bodyweightHint, isBodyweight, loadLastSessionSets, loadRecentSessionSets, type LastSession } from "@/lib/metrics/strength";
 import { loadMeasurements, mondayOf, weeklyRate, weeklyVerdict, type WeeklyRate, type WeeklyVerdict } from "@/lib/metrics/trends";
-import { listRoutineExerciseNames } from "@/lib/training";
+import { listRoutineExerciseNames, loadLadders, rungInfo } from "@/lib/training";
 import { estimateTypeMinutes } from "@/lib/workout-card";
 import type { DayState } from "./dayState";
 import { buildWeeklyReport, type WeeklyReport } from "./weekly";
 
-export type TopSet = { name: string; weightKg: number; reps: number };
+/** A loaded lift's top set, or, for a bodyweight rung, the progression hint ("3 × 12/12/11 last time, aim for 13s"). */
+export type TopSet = { name: string; weightKg: number; reps: number; hint: string | null };
 
 export type Loaders = {
   foods: () => Promise<Food[]>;
@@ -69,17 +70,27 @@ export function makeLoaders(userId: UserId, now: IstNow, settings: Settings, sta
     typeTopSets: (typeId) =>
       memoBy(tops, typeId, async () => {
         const rows = await u.db
-          .select({ id: exercises.id, name: exercises.name })
+          .select({ id: exercises.id, name: exercises.name, equipment: exercises.equipment, measure: exercises.measure, pattern: exercises.pattern, ladder: exercises.ladder, level: exercises.ladderLevel, targetSets: routineExercises.targetSets })
           .from(routineExercises)
           .innerJoin(exercises, eq(exercises.id, routineExercises.exerciseId))
           .where(u.own(routineExercises, eq(routineExercises.routineDayId, typeId)))
           .orderBy(asc(routineExercises.sortOrder));
-        const last = await loadLastSessionSets(userId, rows.map((r) => r.id), state.flags.sessionId ?? undefined);
-        return rows.flatMap((r) => {
+        const bw = rows.filter((r) => isBodyweight(r.equipment) && r.pattern !== "conditioning");
+        const [last, recent, ladders] = await Promise.all([
+          loadLastSessionSets(userId, rows.map((r) => r.id), state.flags.sessionId ?? undefined),
+          loadRecentSessionSets(userId, bw.map((r) => r.id), 3, state.flags.sessionId ?? undefined),
+          loadLadders(userId, bw.flatMap((r) => (r.ladder ? [r.ladder] : []))),
+        ]);
+        return rows.flatMap((r): TopSet[] => {
           const l: LastSession | undefined = last.get(r.id);
           if (!l || l.sets.length === 0) return [];
+          if (isBodyweight(r.equipment)) {
+            if (r.pattern === "conditioning") return [];
+            const h = bodyweightHint(recent.get(r.id) ?? [], r.measure, r.targetSets, rungInfo(ladders, r.ladder, r.level));
+            return [{ name: r.name, weightKg: 0, reps: Math.max(...l.sets.map((s) => s.reps)), hint: h.text }];
+          }
           const top = l.sets.reduce((a, b) => (b.weightKg * (1 + b.reps / 30) > a.weightKg * (1 + a.reps / 30) ? b : a));
-          return [{ name: r.name, weightKg: top.weightKg, reps: top.reps }];
+          return [{ name: r.name, weightKg: top.weightKg, reps: top.reps, hint: null }];
         });
       }),
     weeklyReport: (weekStart) => memoBy(weeklyReports, weekStart, () => buildWeeklyReport(userId, weekStart, settings)),

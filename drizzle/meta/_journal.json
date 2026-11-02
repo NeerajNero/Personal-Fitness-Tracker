@@ -71,6 +71,13 @@
       "when": 1793639634993,
       "tag": "0009_diag_events",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793644396171,
+      "tag": "0010_home_program",
+      "breakpoints": true
     }
   ]
 }

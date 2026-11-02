@@ -82,7 +82,7 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
               <span className="block text-xs text-muted">{r.when}</span>
             </span>
             <input type="checkbox" role="switch" checked={state[r.key]} onChange={() => toggle(r.key)} aria-label={r.label} className="peer sr-only" />
-            <span className="relative h-7 w-12 shrink-0 rounded-full bg-border peer-checked:bg-accent after:absolute after:top-0.5 after:left-0.5 after:size-6 after:rounded-full after:bg-white peer-checked:after:translate-x-5" />
+            <span className="relative h-7 w-12 shrink-0 rounded-full bg-border peer-checked:bg-accent after:absolute after:top-0.5 after:left-0.5 after:size-6 after:rounded-full after:bg-white peer-checked:after:translate-x-5 motion-safe:after:transition-transform motion-safe:after:duration-150 motion-safe:transition-colors motion-safe:duration-150" />
           </label>
         </li>
       ))}
@@ -99,7 +99,7 @@ export function NudgeSettings({ toggles, quietStart, quietEnd, dailyCap }: Props
       <details className="group mt-2 border-t border-border pt-2">
         <summary className="flex h-11 cursor-pointer list-none items-center justify-between text-sm font-medium text-muted [&::-webkit-details-marker]:hidden">
           More reminders, quiet hours, daily cap
-          <ChevronDown {...ICON} className="group-open:rotate-180" />
+          <ChevronDown {...ICON} className="group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-150" />
         </summary>
         {list(EXTRA)}
         <form

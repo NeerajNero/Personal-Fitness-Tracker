@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { dateTicks, dayNum, LineChart } from "@/components/charts/line-chart";
-import type { HistoryPoint, Stall } from "@/lib/metrics/strength";
+import type { BodyweightProgress, HistoryPoint, Stall } from "@/lib/metrics/strength";
 import { Section } from "./section";
 
 export type Lift = {
@@ -16,14 +16,42 @@ export type Lift = {
   deltaPct: number;
 };
 
-export function LiftsSection({ lifts }: { lifts: Lift[] }) {
+/** Bodyweight exercises have no e1RM: the ladder rung and the best set are the progress. */
+function BodyweightTable({ rows }: { rows: BodyweightProgress[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <table className="mt-3 w-full text-sm">
+      <thead className="text-left text-[11px] font-medium text-muted">
+        <tr>
+          <th className="pb-2 font-medium">Bodyweight</th>
+          <th className="pb-2 text-right font-medium">Rung</th>
+          <th className="pb-2 text-right font-medium">Best set</th>
+          <th className="pb-2 text-right font-medium">Sessions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-border">
+        {rows.map((r) => (
+          <tr key={r.exerciseId} className="h-10">
+            <td className="pr-2"><span className="line-clamp-1">{r.name}</span></td>
+            <td className="text-right text-muted">{r.level !== null && r.max !== null ? `${r.level} of ${r.max}` : "—"}</td>
+            <td className="text-right font-medium">{r.best}{r.measure === "seconds" ? " s" : ""}</td>
+            <td className="text-right text-muted">{r.sessions}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+export function LiftsSection({ lifts, bodyweight }: { lifts: Lift[]; bodyweight: BodyweightProgress[] }) {
   const [selected, setSelected] = useState<number | null>(lifts[0]?.exerciseId ?? null);
   const lift = lifts.find((l) => l.exerciseId === selected) ?? lifts[0];
 
   if (!lift) {
     return (
       <Section title="Lifts">
-        <p className="text-sm text-muted">Charts appear once an exercise has two logged sessions. Log a workout on Train to start one.</p>
+        <p className="text-sm text-muted">{bodyweight.length ? "Loaded lifts chart once an exercise has two logged sessions." : "Charts appear once an exercise has two logged sessions. Log a workout on Train to start one."}</p>
+        <BodyweightTable rows={bodyweight} />
       </Section>
     );
   }
@@ -91,6 +119,7 @@ export function LiftsSection({ lifts }: { lifts: Lift[] }) {
           ))}
         </tbody>
       </table>
+      <BodyweightTable rows={bodyweight} />
     </Section>
   );
 }

@@ -10,7 +10,7 @@ import { getPhase } from "@/lib/metrics/phase";
 import { NUDGE_TOGGLES } from "@/lib/nudges";
 import { requireUser } from "@/lib/session";
 import { getSettings, hasBudgets, hasPhases } from "@/lib/settings";
-import { listExercises, listRoutineExercises, listWorkoutTypes } from "@/lib/training";
+import { ladderSizes, listExercises, listRoutineExercises, listWorkoutTypes } from "@/lib/training";
 import { getUser, listPeople } from "@/lib/users";
 import { BodyStatsForm } from "./body-stats-form";
 import { Diagnostics } from "./diagnostics";
@@ -27,13 +27,14 @@ export const metadata: Metadata = { title: "Settings" };
 export default async function SettingsPage() {
   const userId = await requireUser();
   const today = todayIST();
-  const [s, user, allFoods, allExercises, days, re] = await Promise.all([
+  const [s, user, allFoods, allExercises, days, re, ladders] = await Promise.all([
     getSettings(userId),
     getUser(userId),
     listAllFoods(userId),
     listExercises(userId),
     listWorkoutTypes(userId, { includeArchived: true }),
     listRoutineExercises(userId),
+    ladderSizes(userId),
   ]);
   const people = user?.isAdmin ? await listPeople() : null;
 
@@ -41,7 +42,12 @@ export default async function SettingsPage() {
     id: d.id,
     label: d.label,
     archived: d.archived,
-    exercises: re.filter((x) => x.routineDayId === d.id).map(({ exerciseId, name, muscleGroup, cues, targetSets, targetReps }) => ({ exerciseId, name, muscleGroup, cues, targetSets, targetReps })),
+    exercises: re
+      .filter((x) => x.routineDayId === d.id)
+      .map(({ exerciseId, name, muscleGroup, cues, targetSets, targetReps, measure, pattern, ladder, ladderLevel }) => ({
+        exerciseId, name, muscleGroup, cues, targetSets, targetReps, measure, finisher: pattern === "conditioning",
+        rung: ladder && ladderLevel !== null ? { ladder, level: ladderLevel, max: ladders.get(ladder) ?? ladderLevel } : null,
+      })),
   }));
   const toggles = Object.fromEntries(NUDGE_TOGGLES.map((k) => [k, s[k]])) as Record<(typeof NUDGE_TOGGLES)[number], boolean>;
   const bot = process.env.TELEGRAM_BOT_USERNAME?.replace(/^@/, "") ?? null;
@@ -58,7 +64,7 @@ export default async function SettingsPage() {
 
       <h2 className={`mt-3 ${label}`}>Setup, rarely changed</h2>
       <FoodsEditor foods={allFoods} />
-      <WorkoutTypesEditor types={types} allExercises={allExercises} weeklyTarget={s.weeklySessionTarget} home={s.trainingLocation === "home"} />
+      <WorkoutTypesEditor types={types} allExercises={allExercises} weeklyTarget={s.weeklySessionTarget} home={s.trainingLocation === "home"} userEquipment={s.trainingLocation === "home" ? s.equipment : null} />
       <BodyStatsForm s={s} today={today} />
 
       <details id="export" className="group rounded-2xl border border-border bg-surface">
@@ -67,7 +73,7 @@ export default async function SettingsPage() {
             <span className="block font-semibold">Export data</span>
             <span className={`block ${label}`}>One CSV per table, your rows only. Settings is not exported.</span>
           </span>
-          <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180" />
+          <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-150" />
         </summary>
         <ul className="grid grid-cols-2 gap-2 px-4 pb-4">
           {EXPORT_TABLES.map((t) => (

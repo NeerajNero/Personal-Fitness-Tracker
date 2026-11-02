@@ -89,7 +89,7 @@ export function Diagnostics() {
         <button type="button" className={`${btn} shrink-0`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); copy(); }}>
           {copied === "done" ? "Copied ✓" : "Copy"}
         </button>
-        <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180" />
+        <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-150" />
       </summary>
       <div className="flex flex-col gap-3 px-4 pb-4">
         {error ? <p className="text-xs text-danger">{error}</p> : null}

@@ -13,7 +13,7 @@ One form: weight, height, age, sex, **goal** (recomp / fat loss / muscle gain), 
 picker: bodyweight only, dumbbells, bands, pull-up bar), days per week, minutes per session. `completeOnboarding` computes the
 targets (`src/lib/targets.ts`: Mifflin-St Jeor × activity factor → kcal ± 25, protein g/kg range), writes the user's
 `settings` row (single protein range; owner-only columns stay null), creates Push/Pull/Legs for gym users (home users get an
-empty workout-type list for now), marks `users.onboarded_at` and shows the confirm page: targets + `/start <code>` for the
+empty workout-type list; the Today card builds Day A/B/C after one question), marks `users.onboarded_at` and shows the confirm page: targets + `/start <code>` for the
 bot. Already-onboarded users are redirected to Today, so targets are never recomputed behind someone's back.
 
 ## Settings layout
@@ -26,10 +26,12 @@ bot. Already-onboarded users are redirected to Today, so targets are never recom
 
 **Setup: rarely changed** (all collapsed)
 - **Foods and My meals**: grouped under veg / non-veg icons; edit, star into My meals, archive (`foods-editor.tsx`). Saved meals show here with the serving "1 meal".
-- **Workout types** (`workout-types-editor.tsx`): a banner for home users with no types yet (bodyweight plans arrive in the
-  next release; add a type by hand meanwhile) · sessions-per-week target · each active type (up/down = rotation order, Rename,
+- **Workout types** (`workout-types-editor.tsx`): a note for home users with no types yet (the card on Today builds Day A/B/C)
+  · sessions-per-week target · each active type (up/down = rotation order, Rename,
   Archive; expand for its exercises: order, sets × reps, cues, + Exercise) · Add type · Archived list with Restore.
   Names are bot commands: a reserved bot word (`BOT_COMMAND_WORDS`, incl. the cardio words walk/run/…) or a duplicate is refused; a food with the same name only warns.
+  Ladder exercises show "rung n of m" with up / down (`setRoutineRung`), finishers show "10 min", holds target seconds; "Add an
+  exercise" filters by the user's equipment with a "Show all" toggle ([../home-program.md](../home-program.md)).
 - **Body & habits**: onboarding stats + smoke-free date (`body-stats-form.tsx`)
 - **Export data**: one CSV per table (`/api/export/<table>`), the signed-in user's rows only (exercises: library + own).
   `settings` and `users` are never exported.

@@ -74,7 +74,7 @@ export const RULES: Rule[] = [
       let inlineKeyboard: RuleMessage["inlineKeyboard"];
       const topSets = async (typeId: number) => {
         const tops = await load.typeTopSets(typeId);
-        if (tops.length) lines.push(tops.map((t) => `${esc(t.name)} ${fmtW(t.weightKg)}×${t.reps}`).join(" · "));
+        if (tops.length) lines.push(tops.map((t) => (t.hint ? `${esc(t.name)}: ${esc(t.hint)}` : `${esc(t.name)} ${fmtW(t.weightKg)}×${t.reps}`)).join(" · "));
         else {
           lines.push((await load.typeExerciseNames(typeId)).map(esc).join(" · "));
           lines.push("First time — pick weights you can do for 8.");

@@ -5,7 +5,7 @@ import { ICON } from "@/components/icons";
 import { addDays, daysBetween, todayIST } from "@/lib/dates";
 import { checkpointSummary } from "@/lib/metrics/checkpoint";
 import { monthSpend } from "@/lib/metrics/spend";
-import { loadAllHistory, stallFromHistory, stallIndices, weeklySetsByMuscle } from "@/lib/metrics/strength";
+import { bodyweightProgress, loadAllHistory, stallFromHistory, stallIndices, weeklySetsByMuscle } from "@/lib/metrics/strength";
 import {
   adherenceByWeekFrom,
   estimateMaintenanceFrom,
@@ -43,7 +43,7 @@ export default async function TrendsPage() {
   const today = todayIST();
   const from = addDays(mondayOf(today), -7 * (WEEKS - 1));
 
-  const [settings, series, measurements, totals, sessionDates, history, volume, cardioWeeks, cardioEntries] = await Promise.all([
+  const [settings, series, measurements, totals, sessionDates, history, volume, cardioWeeks, cardioEntries, bodyweight] = await Promise.all([
     getSettings(userId),
     loadWeightSeries(userId),
     loadMeasurements(userId),
@@ -53,6 +53,7 @@ export default async function TrendsPage() {
     weeklySetsByMuscle(userId, 4, today),
     cardioByWeek(userId, 8, today),
     loadCardioSince(userId, addDays(today, -180)),
+    bodyweightProgress(userId),
   ]);
 
   // Owner-only cards: the checkpoint review needs a date, spend needs budgets, the navel goal needs its numbers.
@@ -107,11 +108,11 @@ export default async function TrendsPage() {
         <summary className="flex h-12 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border text-sm font-medium text-muted [&::-webkit-details-marker]:hidden">
           <span className="group-open:hidden">More details</span>
           <span className="hidden group-open:inline">Hide details</span>
-          <ChevronDown {...ICON} className="group-open:rotate-180" />
+          <ChevronDown {...ICON} className="group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-150" />
         </summary>
         <div className="mt-4 flex flex-col gap-4">
           {hasNavelGoal(settings) ? <GoalCard settings={settings} measurements={measurements} today={today} /> : null}
-          <LiftsSection lifts={lifts} />
+          <LiftsSection lifts={lifts} bodyweight={bodyweight} />
           <MuscleVolume weeks={volume} />
           <CardioSection weeks={cardioWeeks.map(({ weekStart, minutes }) => ({ weekStart, minutes }))} entries={cardioEntries} />
           <AdherenceTable weeks={weeks} />

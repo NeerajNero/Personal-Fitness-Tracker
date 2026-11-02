@@ -56,7 +56,25 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The one motion in the app: the moment a workout, or the protein target, is completed. */
+/*
+ * Motion. Things that answer a tap (a switch, a chevron, a bar fill, a card opening) transition in 150 ms; the only
+ * unprompted motion is `.celebrate`. Both sit under prefers-reduced-motion: no-preference (Tailwind's `motion-safe:`).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  details::details-content {
+    transition: height 150ms ease, content-visibility 150ms allow-discrete;
+    height: 0;
+    overflow: clip;
+  }
+  details[open]::details-content {
+    height: auto;
+  }
+  @supports (interpolate-size: allow-keywords) {
+    :root { interpolate-size: allow-keywords; }
+  }
+}
+
+/* The one unprompted motion in the app: the moment a workout, or the protein target, is completed. */
 @keyframes pop {
   0% { transform: scale(0.5); opacity: 0; }
   60% { transform: scale(1.18); opacity: 1; }

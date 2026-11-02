@@ -27,7 +27,7 @@ export function Card({ title, sub, children, collapsible, defaultOpen = true, cl
             <span className="block font-semibold">{title}</span>
             {sub ? <span className={`block ${label}`}>{sub}</span> : null}
           </span>
-          <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180" />
+          <ChevronDown {...ICON} className="shrink-0 text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-150" />
         </summary>
         <div className="px-4 pb-4">{children}</div>
       </details>

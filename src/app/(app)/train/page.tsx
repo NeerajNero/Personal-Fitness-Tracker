@@ -27,7 +27,7 @@ export default async function TrainPage({ searchParams }: PageProps<"/train">) {
 
       <WorkoutCard key={`plan-${date}`} date={date} data={card} plan={state.dayPlan} nextUpId={state.nextUp?.typeId ?? null} types={pickerTypes(types, state.daysSince)} trainHref="/train" onTrain />
 
-      {session ? <SessionView key={session.id} session={session} allExercises={allExercises} /> : null}
+      {session ? <SessionView key={session.id} session={session} allExercises={allExercises} userEquipment={settings.trainingLocation === "home" ? settings.equipment : null} /> : null}
 
       <Cardio key={`cardio-${date}`} date={date} entries={cardio} last={state.cardio.lastEntry} />
     </div>

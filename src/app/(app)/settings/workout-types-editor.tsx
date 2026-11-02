@@ -5,9 +5,10 @@ import { useState, useTransition } from "react";
 import { ICON, MuscleIcon } from "@/components/icons";
 import { MUSCLE_GROUPS, type MuscleGroup } from "@/lib/routine";
 import type { ExerciseLite } from "@/lib/training";
+import { fitsEquipment } from "@/app/(app)/train/session-view";
 import {
   addRoutineExercise, addWorkoutType, moveRoutineExercise, moveWorkoutType, removeRoutineExercise, renameWorkoutType,
-  saveExerciseCues, saveWeeklySessionTarget, setRoutineTargets, setWorkoutTypeArchived,
+  saveExerciseCues, saveWeeklySessionTarget, setRoutineRung, setRoutineTargets, setWorkoutTypeArchived,
 } from "./actions";
 import { btn, Card, input, primary } from "./ui";
 
@@ -15,13 +16,18 @@ export type WorkoutTypeView = {
   id: number;
   label: string;
   archived: boolean;
-  exercises: { exerciseId: number; name: string; muscleGroup: string; cues: string | null; targetSets: number; targetReps: number }[];
+  exercises: {
+    exerciseId: number; name: string; muscleGroup: string; cues: string | null; targetSets: number; targetReps: number;
+    measure: "reps" | "seconds"; finisher: boolean;
+    /** Ladder exercises: "rung level of max" with up/down controls. */
+    rung: { ladder: string; level: number; max: number } | null;
+  }[];
 };
 
 type Result = { ok: boolean; error?: string; warning?: string | null };
 type Run = (fn: () => Promise<Result>) => void;
 
-export function WorkoutTypesEditor({ types, allExercises, weeklyTarget, home }: { types: WorkoutTypeView[]; allExercises: ExerciseLite[]; weeklyTarget: number; home: boolean }) {
+export function WorkoutTypesEditor({ types, allExercises, weeklyTarget, home, userEquipment }: { types: WorkoutTypeView[]; allExercises: ExerciseLite[]; weeklyTarget: number; home: boolean; userEquipment: string[] | null }) {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
@@ -42,7 +48,7 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget, home }: 
     <Card title="Workout types" sub="You pick one each day. The list order is the rotation for next up. Names also work as bot commands." collapsible defaultOpen={false} className="scroll-mt-4">
       {home && active.length === 0 ? (
         <p className="mb-4 rounded-xl border border-accent/40 px-3 py-2 text-sm">
-          <span className="font-semibold">Home plans are coming.</span> Bodyweight, dumbbell and band plans built from your equipment arrive in the next release. Until then, add a type below and pick exercises from the library.
+          <span className="font-semibold">No plan yet.</span> Today&apos;s workout card on Today builds Day A, B and C for you after one question. Or add a type below and pick exercises from the library.
         </p>
       ) : null}
       <label className="mb-4 flex items-center justify-between gap-3">
@@ -63,7 +69,7 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget, home }: 
 
       <div className="flex flex-col gap-3">
         {active.map((t, i) => (
-          <TypeEditor key={t.id} type={t} first={i === 0} last={i === active.length - 1} allExercises={allExercises} run={run} />
+          <TypeEditor key={t.id} type={t} first={i === 0} last={i === active.length - 1} allExercises={allExercises} userEquipment={userEquipment} run={run} />
         ))}
       </div>
 
@@ -106,7 +112,7 @@ export function WorkoutTypesEditor({ types, allExercises, weeklyTarget, home }: 
   );
 }
 
-function TypeEditor({ type, first, last, allExercises, run }: { type: WorkoutTypeView; first: boolean; last: boolean; allExercises: ExerciseLite[]; run: Run }) {
+function TypeEditor({ type, first, last, allExercises, userEquipment, run }: { type: WorkoutTypeView; first: boolean; last: boolean; allExercises: ExerciseLite[]; userEquipment: string[] | null; run: Run }) {
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const inType = new Set(type.exercises.map((e) => e.exerciseId));
@@ -144,7 +150,7 @@ function TypeEditor({ type, first, last, allExercises, run }: { type: WorkoutTyp
         )}
         <button type="button" onClick={(e) => { e.preventDefault(); setRenaming(true); }} className="h-9 px-2 text-xs text-accent">Rename</button>
         <button type="button" onClick={(e) => { e.preventDefault(); run(() => setWorkoutTypeArchived(type.id, true)); }} className="h-9 px-2 text-xs text-muted">Archive</button>
-        <ChevronDown {...ICON} className="mx-1 shrink-0 text-muted group-open:rotate-180" />
+        <ChevronDown {...ICON} className="mx-1 shrink-0 text-muted group-open:rotate-180 motion-safe:transition-transform motion-safe:duration-150" />
       </summary>
       <ul className="divide-y divide-border border-t border-border">
         {type.exercises.map((e, i) => (
@@ -154,7 +160,7 @@ function TypeEditor({ type, first, last, allExercises, run }: { type: WorkoutTyp
       </ul>
       <div className="p-2">
         {adding ? (
-          <AddToDay allExercises={allExercises.filter((x) => !inType.has(x.id))} onPick={(input) => { run(() => addRoutineExercise(dayId, input)); setAdding(false); }} onClose={() => setAdding(false)} />
+          <AddToDay allExercises={allExercises.filter((x) => !inType.has(x.id))} userEquipment={userEquipment} onPick={(input) => { run(() => addRoutineExercise(dayId, input)); setAdding(false); }} onClose={() => setAdding(false)} />
         ) : (
           <button type="button" onClick={() => setAdding(true)} className={`${btn} h-10 w-full text-xs`}><Plus {...ICON} size={14} /> Add an exercise</button>
         )}
@@ -182,11 +188,24 @@ function ExerciseRow({ dayId, e, first, last, run }: { dayId: number; e: Workout
         </div>
         <button type="button" onClick={() => setCuesOpen((v) => !v)} className="min-w-0 flex-1 text-left">
           <span className="flex items-center gap-1.5 truncate text-sm font-medium"><MuscleIcon group={e.muscleGroup} size={14} className="shrink-0 text-muted" /> {e.name}</span>
-          <span className="block text-[11px] text-muted">{e.muscleGroup}{e.cues ? ", has cues" : ""}</span>
+          <span className="block text-[11px] text-muted">{e.rung ? `rung ${e.rung.level} of ${e.rung.max}` : e.muscleGroup}{e.cues ? ", has cues" : ""}</span>
         </button>
-        <input type="number" inputMode="numeric" min={1} max={10} value={sets} onChange={(ev) => setSets(ev.target.value)} onBlur={commit} aria-label="Target sets" className={small} />
-        <span className="text-xs text-muted">×</span>
-        <input type="number" inputMode="numeric" min={1} max={50} value={reps} onChange={(ev) => setReps(ev.target.value)} onBlur={commit} aria-label="Target reps" className={small} />
+        {e.rung ? (
+          <span className="flex flex-col">
+            <button type="button" disabled={e.rung.level >= e.rung.max} onClick={() => run(() => setRoutineRung(dayId, e.exerciseId, "up"))} aria-label={`${e.name}: one rung harder`} className="flex size-7 items-center justify-center text-accent disabled:opacity-25"><ChevronUp {...ICON} /></button>
+            <button type="button" disabled={e.rung.level <= 1} onClick={() => run(() => setRoutineRung(dayId, e.exerciseId, "down"))} aria-label={`${e.name}: one rung easier`} className="flex size-7 items-center justify-center text-accent disabled:opacity-25"><ChevronDown {...ICON} /></button>
+          </span>
+        ) : null}
+        {e.finisher ? (
+          <span className="text-xs text-muted">{e.targetReps} min</span>
+        ) : (
+          <>
+            <input type="number" inputMode="numeric" min={1} max={10} value={sets} onChange={(ev) => setSets(ev.target.value)} onBlur={commit} aria-label="Target sets" className={small} />
+            <span className="text-xs text-muted">×</span>
+            <input type="number" inputMode="numeric" min={1} max={e.measure === "seconds" ? 600 : 50} value={reps} onChange={(ev) => setReps(ev.target.value)} onBlur={commit} aria-label={e.measure === "seconds" ? "Target seconds" : "Target reps"} className={small} />
+            {e.measure === "seconds" ? <span className="text-xs text-muted">s</span> : null}
+          </>
+        )}
         <button type="button" onClick={() => run(() => removeRoutineExercise(dayId, e.exerciseId))} aria-label={`Remove ${e.name}`} className="flex size-9 items-center justify-center text-muted"><X {...ICON} /></button>
       </div>
       {cuesOpen ? (
@@ -206,11 +225,13 @@ function ExerciseRow({ dayId, e, first, last, run }: { dayId: number; e: Workout
   );
 }
 
-function AddToDay({ allExercises, onPick, onClose }: { allExercises: ExerciseLite[]; onPick: (input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }) => void; onClose: () => void }) {
+function AddToDay({ allExercises, userEquipment, onPick, onClose }: { allExercises: ExerciseLite[]; userEquipment: string[] | null; onPick: (input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }) => void; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [mg, setMg] = useState<MuscleGroup>("back");
+  const [showAll, setShowAll] = useState(false);
   const lower = q.trim().toLowerCase();
-  const matches = allExercises.filter((e) => !lower || e.name.toLowerCase().includes(lower)).slice(0, 8);
+  const pool = userEquipment && !showAll ? allExercises.filter((e) => fitsEquipment(e, userEquipment)) : allExercises;
+  const matches = pool.filter((e) => !lower || e.name.toLowerCase().includes(lower)).slice(0, 10);
   const exact = allExercises.some((e) => e.name.toLowerCase() === lower);
   return (
     <div className="rounded-xl border border-border bg-bg/50 p-2">
@@ -218,11 +239,17 @@ function AddToDay({ allExercises, onPick, onClose }: { allExercises: ExerciseLit
         <input autoFocus type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search or type a new exercise" className={`${input} h-10 text-sm`} />
         <button type="button" onClick={onClose} className={`${btn} h-10 px-3 text-xs`}>Close</button>
       </div>
+      {userEquipment ? (
+        <label className="flex h-9 items-center gap-2 px-1 text-xs text-muted">
+          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="size-4 accent-[var(--accent)]" />
+          Show all, not only what fits my equipment
+        </label>
+      ) : null}
       <ul className="mt-1 max-h-48 divide-y divide-border overflow-y-auto">
         {matches.map((e) => (
           <li key={e.id}>
-            <button type="button" onClick={() => onPick({ exerciseId: e.id })} className="flex h-10 w-full items-center justify-between px-2 text-left text-sm active:bg-bg">
-              <span>{e.name}</span><span className="text-xs text-muted">{e.muscleGroup}</span>
+            <button type="button" onClick={() => onPick({ exerciseId: e.id })} className="flex h-10 w-full items-center justify-between gap-2 px-2 text-left text-sm active:bg-bg">
+              <span className="truncate">{e.name}</span><span className="shrink-0 text-xs text-muted">{e.ladder ? `${e.ladder.replace(/_/g, " ")} rung ${e.ladderLevel}` : e.muscleGroup}</span>
             </button>
           </li>
         ))}

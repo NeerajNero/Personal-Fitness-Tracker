@@ -37,11 +37,13 @@ spacing. A bordered card (`Card`) appears only where it groups something; a sing
 A workout type's icon is its dominant muscle group (`dominantGroup` in `src/lib/routine.ts`). Disclosure uses ChevronDown,
 day navigation ChevronLeft/Right, add Plus, remove X, more Ellipsis. Never append arrows to buttons or links.
 
-## Motion: exactly one place
-`.celebrate` (a 480 ms pop on the check icon) plays the moment a workout's last exercise is logged (Train header) or the
-protein target is reached (Today). Both components remember whether the thing was already done when they mounted, so a
-page that opens already complete does not animate. The keyframes sit inside `@media (prefers-reduced-motion: no-preference)`;
-nothing else in the app transitions or animates (bars, chevrons and switches change state instantly).
+## Motion
+Two kinds, both under `prefers-reduced-motion: no-preference`:
+- **Answers to a tap** transition in 150 ms: switches, chevrons, bar fills and card collapse (`details::details-content`
+  in `globals.css`). Use Tailwind's `motion-safe:transition-* motion-safe:duration-150`; never longer, never on load.
+- **The one unprompted motion**, `.celebrate` (a 480 ms pop on the check icon), plays the moment a workout's last
+  exercise is logged (Train header) or the protein target is reached (Today). Both components remember whether the thing
+  was already done when they mounted, so a page that opens already complete does not animate.
 
 ## Copy
 Sentence case, plain verbs ("Start Pull", "Log cardio", "Add a set"). Every empty state says what to do next ("Nothing

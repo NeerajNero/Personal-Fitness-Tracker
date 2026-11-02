@@ -7,6 +7,7 @@ import { big, ErrorLine, label, primary } from "@/components/ui";
 import type { ExerciseCard, ExerciseLite, SessionDetail } from "@/lib/training";
 import { MUSCLE_GROUPS, type MuscleGroup } from "@/lib/routine";
 import { addExerciseToSession, deleteSet, discardSession, sameAsLast, saveSessionNotes, upsertSet } from "./actions";
+import { FinisherRow } from "./finisher";
 
 const btn = "flex items-center justify-center gap-1.5 rounded-xl border border-border bg-bg active:opacity-70 disabled:opacity-50";
 /** Server errors are short ("Session not found"); add what to do about them. */
@@ -19,7 +20,8 @@ let tempId = -1;
  * Confirm by exception: each exercise is one line. ✓ logs it the same as last time;
  * tapping the line opens the set grid only when something changed.
  */
-export function SessionView({ session, allExercises }: { session: SessionDetail; allExercises: ExerciseLite[] }) {
+/** `userEquipment` = a home user's gear (the search filters by it); null for gym users, whose screen is unchanged. */
+export function SessionView({ session, allExercises, userEquipment }: { session: SessionDetail; allExercises: ExerciseLite[]; userEquipment: string[] | null }) {
   const [cards, addCard] = useOptimistic<ExerciseCard[], ExerciseCard>(session.exercises, (list, c) => [...list, c]);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,10 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
         sets: [],
         hint: { text: "Adding", mode: "first", suggestedWeight: null, last: null },
         stall: { stalled: false, count: 0 },
+        bodyweight: display.equipment.includes("none"),
+        measure: display.measure,
+        pattern: display.pattern,
+        rung: null,
       });
       const r = await addExerciseToSession(session.id, input, alsoAddToType);
       if (r.ok) setOpenId(r.exerciseId);
@@ -143,19 +149,23 @@ export function SessionView({ session, allExercises }: { session: SessionDetail;
       <ErrorLine>{error}</ErrorLine>
 
       <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
-        {cards.map((c) => (
-          <ExerciseRow
-            key={c.exerciseId}
-            sessionId={session.id}
-            card={c}
-            open={openId === c.exerciseId}
-            onToggle={() => setOpenId(openId === c.exerciseId ? null : c.exerciseId)}
-            onError={setError}
-          />
-        ))}
+        {cards.map((c) =>
+          c.pattern === "conditioning" ? (
+            <FinisherRow key={c.exerciseId} sessionId={session.id} card={c} onError={setError} />
+          ) : (
+            <ExerciseRow
+              key={c.exerciseId}
+              sessionId={session.id}
+              card={c}
+              open={openId === c.exerciseId}
+              onToggle={() => setOpenId(openId === c.exerciseId ? null : c.exerciseId)}
+              onError={setError}
+            />
+          ),
+        )}
       </ul>
 
-      <AddExercise allExercises={allExercises} inSession={inSession} typeName={session.typeId !== null ? session.typeName : null} onAdd={addExercise} />
+      <AddExercise allExercises={allExercises} inSession={inSession} typeName={session.typeId !== null ? session.typeName : null} userEquipment={userEquipment} onAdd={addExercise} />
     </section>
   );
 }
@@ -187,9 +197,13 @@ function initialRows(card: ExerciseCard): Row[] {
   return Array.from({ length: n }, (_, i) => ({ setNo: i + 1, weight: "", reps: "", savedWeight: null, savedReps: null, status: "idle" }));
 }
 
-/** "45 kg × 10/10/9" when every set used one weight, else "45×10, 42.5×9". */
-function summary(rows: Row[]): string {
+/** "45 kg × 10/10/9" when every set used one weight, else "45×10, 42.5×9". Bodyweight: "3 × 12/12/11" or "30/30/25 s". */
+function summary(rows: Row[], card: ExerciseCard): string {
   const saved = rows.filter((r) => r.savedWeight !== null && r.savedReps !== null);
+  if (card.bodyweight) {
+    const reps = saved.map((r) => r.savedReps).join("/");
+    return card.measure === "seconds" ? `${reps} s` : `${saved.length} × ${reps}`;
+  }
   const weights = new Set(saved.map((r) => r.savedWeight));
   if (weights.size === 1) {
     const w = saved[0].savedWeight;
@@ -212,6 +226,8 @@ function ExerciseRow({
   onError: (e: string | null) => void;
 }) {
   const [rows, setRows] = useState<Row[]>(() => initialRows(card));
+  const bw = card.bodyweight;
+  const unit = card.measure === "seconds" ? "s" : "reps";
   const [sameing, startSame] = useTransition();
   const [, startTransition] = useTransition();
   const pending = card.exerciseId < 0;
@@ -238,13 +254,14 @@ function ExerciseRow({
 
   function commit(i: number) {
     const r = rows[i];
-    if (!r || r.weight === "" || r.reps === "") return;
-    if (r.weight === r.savedWeight && r.reps === r.savedReps) return;
+    const weight = bw ? "0" : r?.weight;
+    if (!r || weight === "" || r.reps === "") return;
+    if (weight === r.savedWeight && r.reps === r.savedReps) return;
     patch(i, { status: "saving", error: undefined });
     startTransition(async () => {
-      const res = await upsertSet({ sessionId, exerciseId: card.exerciseId, setNo: r.setNo, weightKg: r.weight, reps: r.reps });
+      const res = await upsertSet({ sessionId, exerciseId: card.exerciseId, setNo: r.setNo, weightKg: weight, reps: r.reps });
       if (res.ok) {
-        patch(i, { status: "saved", savedWeight: r.weight, savedReps: r.reps });
+        patch(i, { status: "saved", savedWeight: weight, savedReps: r.reps });
         setTimeout(() => setRows((rs) => rs.map((x, j) => (j === i && x.status === "saved" ? { ...x, status: "idle" } : x))), 1500);
       } else {
         patch(i, { status: "error", error: explain(res.error) });
@@ -280,11 +297,12 @@ function ExerciseRow({
         <button type="button" disabled={pending} onClick={onToggle} aria-expanded={open} className="min-w-0 flex-1 py-2 text-left">
           <span className="flex items-center gap-2">
             <span className="truncate font-semibold">{card.name}</span>
-            {card.stall.stalled ? <span className="shrink-0 rounded-full border border-warn/40 px-2 text-[11px] font-medium text-warn">Stalled</span> : null}
+            {card.rung ? <span className="shrink-0 text-[11px] font-medium text-muted">rung {card.rung.level} of {card.rung.max}</span> : null}
+            {card.stall.stalled || card.hint.mode === "stall" ? <span className="shrink-0 rounded-full border border-warn/40 px-2 text-[11px] font-medium text-warn">Stalled</span> : null}
           </span>
-          <span className={`flex items-center gap-1 truncate text-sm ${done ? "font-medium text-done" : "text-muted"}`}>
+          <span className={`flex items-center gap-1 truncate text-sm ${done ? "font-medium text-done" : card.hint.mode === "up" ? "font-medium text-accent" : "text-muted"}`}>
             {done ? <CheckIcon size={14} strokeWidth={2.5} /> : null}
-            {done ? summary(rows) : card.hint.text}
+            {done ? summary(rows, card) : card.hint.text}
           </span>
         </button>
         {!done && last ? (
@@ -304,16 +322,17 @@ function ExerciseRow({
             </details>
           ) : null}
 
-          <div className="mt-2 grid grid-cols-[1.75rem_1fr_1fr_1.5rem] items-center gap-x-2 gap-y-2">
+          <div className={`mt-2 grid items-center gap-x-2 gap-y-2 ${bw ? "grid-cols-[1.75rem_1fr_1.5rem]" : "grid-cols-[1.75rem_1fr_1fr_1.5rem]"}`}>
             <span className="text-[11px] text-muted">Set</span>
-            <span className="text-center text-[11px] text-muted">kg</span>
-            <span className="text-center text-[11px] text-muted">reps</span>
+            {bw ? null : <span className="text-center text-[11px] text-muted">kg</span>}
+            <span className="text-center text-[11px] text-muted">{unit}</span>
             <span />
             {rows.map((r, i) => (
               <SetRow
                 key={r.setNo}
                 row={r}
                 inputCls={input}
+                bodyweight={bw}
                 weightHint={last ? fmtW(last.weightKg) : "kg"}
                 repsHint={String(last?.reps[i] ?? card.targetReps)}
                 onChange={(p) => patch(i, p)}
@@ -340,6 +359,7 @@ function ExerciseRow({
 function SetRow({
   row: r,
   inputCls,
+  bodyweight,
   weightHint,
   repsHint,
   onChange,
@@ -347,6 +367,7 @@ function SetRow({
 }: {
   row: Row;
   inputCls: string;
+  bodyweight: boolean;
   weightHint: string;
   repsHint: string;
   onChange: (p: Partial<Row>) => void;
@@ -358,19 +379,21 @@ function SetRow({
   return (
     <>
       <span className="text-sm text-muted">{r.setNo}</span>
-      <input
-        type="number"
-        inputMode="decimal"
-        step="0.5"
-        min={0}
-        value={r.weight}
-        placeholder={weightHint}
-        onChange={(e) => onChange({ weight: e.target.value })}
-        onBlur={onCommit}
-        onKeyDown={blurOnEnter}
-        aria-label={`Set ${r.setNo} weight`}
-        className={`${inputCls} ${r.status === "error" ? "border-danger" : ""}`}
-      />
+      {bodyweight ? null : (
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.5"
+          min={0}
+          value={r.weight}
+          placeholder={weightHint}
+          onChange={(e) => onChange({ weight: e.target.value })}
+          onBlur={onCommit}
+          onKeyDown={blurOnEnter}
+          aria-label={`Set ${r.setNo} weight`}
+          className={`${inputCls} ${r.status === "error" ? "border-danger" : ""}`}
+        />
+      )}
       <input
         type="number"
         inputMode="numeric"
@@ -395,25 +418,38 @@ function SetRow({
 
 /* -------------------------------- + exercise ------------------------------- */
 
+/** Exercises a home user can do with what they have (household items count as none). */
+export function fitsEquipment(e: Pick<ExerciseLite, "equipment">, userEquipment: string[]): boolean {
+  const allowed = new Set(["none", ...userEquipment]);
+  return e.equipment.length > 0 && e.equipment.every((x) => allowed.has(x));
+}
+
+const newLite = (id: number, name: string, muscleGroup: MuscleGroup): ExerciseLite => ({ id, name, muscleGroup, equipment: [], measure: "reps", pattern: null, ladder: null, ladderLevel: null });
+
 function AddExercise({
   allExercises,
   inSession,
   typeName,
+  userEquipment,
   onAdd,
 }: {
   allExercises: ExerciseLite[];
   inSession: Set<number>;
   /** The session's workout type; null for custom sessions (no "also add" toggle). */
   typeName: string | null;
+  /** Home users: filter by their gear unless "Show all"; null = gym, no filter. */
+  userEquipment: string[] | null;
   onAdd: (input: { exerciseId: number } | { name: string; muscleGroup: MuscleGroup }, display: ExerciseLite, alsoAddToType: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [also, setAlso] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [q, setQ] = useState("");
   const [mg, setMg] = useState<MuscleGroup>("back");
   const query = q.trim();
   const lower = query.toLowerCase();
-  const matches = allExercises.filter((e) => !inSession.has(e.id) && (lower === "" || e.name.toLowerCase().includes(lower))).slice(0, 12);
+  const pool = userEquipment && !showAll ? allExercises.filter((e) => fitsEquipment(e, userEquipment)) : allExercises;
+  const matches = pool.filter((e) => !inSession.has(e.id) && (lower === "" || e.name.toLowerCase().includes(lower))).slice(0, 16);
   const exact = allExercises.some((e) => e.name.toLowerCase() === lower);
 
   function pick(e: ExerciseLite) {
@@ -423,7 +459,7 @@ function AddExercise({
   }
   function create() {
     if (!query) return;
-    onAdd({ name: query, muscleGroup: mg }, { id: tempId--, name: query, muscleGroup: mg }, also);
+    onAdd({ name: query, muscleGroup: mg }, newLite(tempId--, query, mg), also);
     setQ("");
     setOpen(false);
   }
@@ -457,12 +493,18 @@ function AddExercise({
           Also add to {typeName}
         </label>
       ) : null}
+      {userEquipment ? (
+        <label className="flex h-10 items-center gap-2 px-1 text-sm text-muted">
+          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} className="size-5 accent-[var(--accent)]" />
+          Show all, not only what fits my equipment
+        </label>
+      ) : null}
       <ul className="mt-2 max-h-64 divide-y divide-border overflow-y-auto">
         {matches.map((e) => (
           <li key={e.id}>
-            <button type="button" onClick={() => pick(e)} className="flex h-12 w-full items-center justify-between px-2 text-left active:bg-bg">
-              <span className="flex items-center gap-2 font-medium"><MuscleIcon group={e.muscleGroup} className="text-muted" /> {e.name}</span>
-              <span className="text-xs text-muted">{e.muscleGroup}</span>
+            <button type="button" onClick={() => pick(e)} className="flex h-12 w-full items-center justify-between gap-2 px-2 text-left active:bg-bg">
+              <span className="flex min-w-0 items-center gap-2 font-medium"><MuscleIcon group={e.muscleGroup} className="shrink-0 text-muted" /> <span className="truncate">{e.name}</span></span>
+              <span className="shrink-0 text-xs text-muted">{e.ladder ? `${e.ladder.replace(/_/g, " ")} rung ${e.ladderLevel}` : e.muscleGroup}</span>
             </button>
           </li>
         ))}
@@ -480,7 +522,7 @@ function AddExercise({
             </button>
           </li>
         ) : null}
-        {matches.length === 0 && !query ? <li className="p-3 text-sm text-muted">Every exercise is already in this session. Type a name to create a new one.</li> : null}
+        {matches.length === 0 && !query ? <li className="p-3 text-sm text-muted">{userEquipment && !showAll ? "Nothing else fits your equipment. Tick Show all, or type a name to create one." : "Every exercise is already in this session. Type a name to create a new one."}</li> : null}
       </ul>
     </div>
   );

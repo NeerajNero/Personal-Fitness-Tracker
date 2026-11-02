@@ -18,7 +18,7 @@ export function SpendSection({ spend }: { spend: MonthSpend }) {
         <span className="text-muted">of {inr(budget)}, {pct}%</span>
       </div>
       <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-border">
-        <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
+        <div className={`h-full rounded-full motion-safe:transition-[width] motion-safe:duration-150 ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
       <p className={`mt-2 text-xs ${spend.projectedMonthEnd > budget ? "text-danger" : "text-muted"}`}>
         Projected month end {inr(spend.projectedMonthEnd)} at the current rate

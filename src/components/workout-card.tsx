@@ -3,16 +3,19 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { chooseDay } from "@/app/(app)/day-actions";
+import { chooseDay, createHomePlanAction } from "@/app/(app)/day-actions";
 import { n0 } from "@/lib/format";
+import { PUSHUP_ANSWERS, PUSHUP_LABEL, type PushupAnswer } from "@/lib/routine";
 import type { DayPlan } from "@/lib/rules/dayState";
 import type { PickerType } from "@/lib/routine";
 import type { WorkoutCardData } from "@/lib/workout-card";
 import { DayPicker } from "./day-picker";
 import { CheckIcon, LiftIcon, MuscleIcon, RestIcon, StepsIcon } from "./icons";
-import { big, ErrorLine, hero, label, link, primary } from "./ui";
+import { big, chip, ErrorLine, hero, label, link, primary } from "./ui";
 
 const fmtW = (w: number) => (w <= 0 ? "Bodyweight" : `${Number.isInteger(w) ? w : w.toFixed(1).replace(/\.0$/, "")} kg`);
+const topSetText = (t: { weightKg: number; reps: number; bodyweight: boolean; measure: "reps" | "seconds" }) =>
+  t.bodyweight ? `${t.reps}${t.measure === "seconds" ? " s" : " reps"}` : `${fmtW(t.weightKg)} × ${t.reps}`;
 
 type Props = { date: string; data: WorkoutCardData; plan: DayPlan; nextUpId: number | null; types: PickerType[]; trainHref: string; onTrain: boolean };
 
@@ -24,7 +27,17 @@ export function WorkoutCard({ date, data, plan, nextUpId, types, trainHref, onTr
   const router = useRouter();
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pushups, setPushups] = useState<PushupAnswer | null>(null);
   const [pending, start] = useTransition();
+
+  function createPlan() {
+    if (!pushups) return;
+    setError(null);
+    start(async () => {
+      const r = await createHomePlanAction(pushups);
+      if (!r.ok) setError(`${r.error}. The plan wasn't created; try again.`);
+    });
+  }
 
   function startWorkout(typeId: number) {
     setError(null);
@@ -42,15 +55,33 @@ export function WorkoutCard({ date, data, plan, nextUpId, types, trainHref, onTr
   );
   const picker = picking ? <DayPicker date={date} plan={plan} nextUpId={nextUpId} types={types} onDone={() => setPicking(false)} /> : null;
 
+  if (data.kind === "setup" && data.home) {
+    return (
+      <section className="rounded-2xl border border-border bg-surface p-4">
+        <p className="flex items-center gap-2 font-semibold"><LiftIcon className="text-muted" /> Set up your home plan</p>
+        <p className="mt-1 text-sm text-muted">Three days in rotation, no equipment needed: push and squat, pull and hinge, shoulders, legs and conditioning. One question first.</p>
+        <p className={`mt-3 ${label}`}>How many push-ups can you do in a row?</p>
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          {PUSHUP_ANSWERS.map((a) => (
+            <button key={a} type="button" aria-pressed={pushups === a} onClick={() => setPushups(a)} className={`${chip} px-1 text-xs ${pushups === a ? "border-accent bg-accent text-accent-fg" : ""}`}>
+              {PUSHUP_LABEL[a]}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center gap-4">
+          <button type="button" disabled={!pushups || pending} onClick={createPlan} className={`${primary} flex-1`}>{pending ? "Creating" : "Create my plan"}</button>
+          {somethingElse}
+        </div>
+        <div className="mt-2"><ErrorLine>{error}</ErrorLine></div>
+        {picker}
+      </section>
+    );
+  }
   if (data.kind === "setup") {
     return (
       <section className="rounded-2xl border border-border bg-surface p-4">
-        <p className="flex items-center gap-2 font-semibold"><LiftIcon className="text-muted" /> {data.home ? "Set up your home plan" : "Add a workout type"}</p>
-        <p className="mt-1 text-sm text-muted">
-          {data.home
-            ? "Your workout types live in Settings. Bodyweight plans from your equipment arrive in the next release; until then, add a type by hand."
-            : "You have no active workout types, so there is nothing to rotate. Add one in Settings, or restore an archived one."}
-        </p>
+        <p className="flex items-center gap-2 font-semibold"><LiftIcon className="text-muted" /> Add a workout type</p>
+        <p className="mt-1 text-sm text-muted">You have no active workout types, so there is nothing to rotate. Add one in Settings, or restore an archived one.</p>
         <div className="mt-3 flex items-center gap-4">
           <Link href="/settings#workout-types" className={primary}>Open Settings</Link>
           {somethingElse}
@@ -86,6 +117,7 @@ export function WorkoutCard({ date, data, plan, nextUpId, types, trainHref, onTr
           {data.group ? <MuscleIcon group={data.group} size={28} className={done ? "text-done" : "text-muted"} /> : <LiftIcon size={28} className="text-muted" />}
           <div className="min-w-0 flex-1">
             <h2 className={`${big} truncate`}>{data.typeName}</h2>
+            {data.subtitle ? <p className={label}>{data.subtitle}</p> : null}
             <p className={`mt-1 text-sm ${done ? "font-medium text-done" : "text-muted"}`}>
               {done ? `Done, all ${data.total} logged` : `${data.logged} of ${data.total} done`}
             </p>
@@ -104,7 +136,10 @@ export function WorkoutCard({ date, data, plan, nextUpId, types, trainHref, onTr
       <p className={label}>Next up</p>
       <div className="mt-1 flex items-center gap-3">
         <MuscleIcon group={data.group} size={30} className="text-accent" />
-        <h2 className={`${big} truncate`}>{data.typeName}</h2>
+        <div className="min-w-0">
+          <h2 className={`${big} truncate`}>{data.typeName}</h2>
+          {data.subtitle ? <p className={label}>{data.subtitle}</p> : null}
+        </div>
       </div>
       <p className="mt-2 text-sm text-muted">
         {data.exerciseCount} {data.exerciseCount === 1 ? "exercise" : "exercises"}, about {data.estMinutes} min. {ago}
@@ -114,7 +149,7 @@ export function WorkoutCard({ date, data, plan, nextUpId, types, trainHref, onTr
           {data.topSets.map((t) => (
             <div key={t.name} className="min-w-0">
               <dt className={`truncate ${label}`}>{t.name}</dt>
-              <dd className="text-xl font-bold leading-tight">{fmtW(t.weightKg)} × {t.reps}</dd>
+              <dd className="text-xl font-bold leading-tight">{topSetText(t)}</dd>
             </div>
           ))}
         </dl>

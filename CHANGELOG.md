@@ -7,6 +7,16 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 ## Unreleased
 
 ### Added
+- **Home program.** Home users build Day A / B / C from the workout card after one question (push-ups in a row). Eleven
+  bodyweight ladders with a cue per rung (wall push-up to archer push-up, table rows, squats to a doorframe pistol,
+  hinges, lunges, planks, side planks, core holds, wall sits, calves) and seven finishers. Progression by reps: all sets
+  at the top of 8–15 (20–45 s for holds) moves the exercise up a rung on the next Start; two sessions under the bottom
+  suggest the rung below; three flat sessions suggest a slower lowering or an extra set. Train shows reps or seconds
+  only for bodyweight rows, a 10-minute 30 s on / 30 s off finisher timer (vibration, no audio) that logs a cardio entry,
+  and "rung n of m" with up / down in Settings → Workout types. "Add an exercise" filters by your equipment. Rotation
+  follows days per week (3 → A B C, 4 → A B C A). Trends → Lifts lists bodyweight rungs and best sets. The bot accepts
+  `day a` / `day b` / `day c` and the morning brief prints the bodyweight hints. Run `pnpm seed` after deploying
+  migration 0010.
 - **Today's workout card** at the top of Today and Train: the next type in rotation with its icon, exercise count,
   estimated minutes (your session length, or sets × 2.5 min), when it was last done and the last top set of its first
   two lifts, one Start button, and "Something else" for the full picker. Once started it shows "Pull, 3 of 6 done".
@@ -64,6 +74,8 @@ Skip pure refactors and internal-only changes unless they change behaviour.
   (Settings → People shows it); reminders pause until they write to the bot again.
 
 ### Changed
+- Transitions are back on things that answer a tap (switches, chevrons, bar fills, card collapse), 150 ms, honouring
+  reduced motion; the completion tick stays the only unprompted animation.
 - **Look and feel.** One typeface (Manrope) with tabular figures; a light, high-contrast palette with one accent (blue)
   for today's next action and progress and a separate muted green for anything done; dark mode follows the system.
   Numbers lead every screen: kcal left and protein to go on Today, "3 of 6 logged" on Train, the 7-day average on

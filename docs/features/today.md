@@ -6,7 +6,8 @@ The food + body-metrics screen. It should take under 10 seconds to use, one-hand
 1. **Date header**: ‹ › arrows; `?d=YYYY-MM-DD` for past days (never the future).
 2. **Today's workout** (`WorkoutCard`, shared with Train; [../design.md](../design.md#todays-workout-card)): the next type
    in rotation as the hero with Start and "Something else" (the picker: other types, Rest, Custom), "Pull, 3 of 6 done"
-   with Continue once started, the step target with a cardio suggestion on rest days, or "Set up your home plan".
+   with Continue once started, the step target with a cardio suggestion on rest days, or "Set up your home plan" (one
+   question, then Day A/B/C: [../home-program.md](../home-program.md)).
 3. **Two hero numbers** (`totals.tsx`): kcal left (or over, in red) and protein to go (or done, in green with the tick that
    animates the moment it completes), each with a thin bar; steps on rest and unset days; the smoke-free streak when set.
 4. **Weight / steps**: two inputs with their icons that save on blur/Enter; the number is the big thing in each.

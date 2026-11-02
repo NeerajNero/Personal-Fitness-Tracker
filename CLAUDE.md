@@ -17,10 +17,10 @@ then open the files in its Files table. Don't explore the whole repo, and don't 
 | layout, shared modules, client/server boundary | `docs/architecture.md` |
 | tables, views, migrations | `docs/data-model.md` |
 | accounts, sign-in, scoping rule, onboarding, verdicts per goal, owner-only values | `docs/users.md` |
-| Today / Train / Cardio / Trends / Settings + onboarding / Telegram bot | `docs/features/<today|train|cardio|trends|settings-onboarding|telegram-bot>.md` |
+| Today / Train / Cardio / Trends / Settings + onboarding / Telegram bot | `docs/features/<today|train|cardio|trends|settings-onboarding|telegram-bot>.md` · ladders, Day A/B/C, the finisher: `docs/home-program.md` |
 | reminders, `/api/tick`, `getDayState` | `docs/rules-engine.md` |
 | env, deploy order for migrations, webhook, tick, adding/removing a person, backups | `docs/operations.md` |
-| `pnpm test`, PGlite | `docs/testing.md` · broken things: `docs/troubleshooting.md` · Diagnostics, `diag`, diag_events: `docs/diagnostics.md` · tokens, type, icons, the one motion, copy, the workout card: `docs/design.md` |
+| `pnpm test`, PGlite | `docs/testing.md` · broken things: `docs/troubleshooting.md` · Diagnostics, `diag`, diag_events: `docs/diagnostics.md` · tokens, type, icons, motion, copy, the workout card: `docs/design.md` |
 
 **Every step, before its commit:** update the docs it touches (Files tables included), `README.md` when setup, scripts,
 operations or troubleshooting changed, and `CHANGELOG.md` under `## Unreleased` for anything user-visible. Code and docs land
@@ -50,7 +50,8 @@ degrade gracefully) · Vercel Hobby · all rules in `Asia/Kolkata` (store UTC, c
   Client components never import anything that reaches `@/db`.
 - Mobile-first, large tap targets, one-handed. Tailwind only, no UI kits; lucide icons via `components/icons.tsx`; SVG `line-chart.tsx`, no chart library.
 - **Design** (`docs/design.md`): numbers are the hero; one accent for the next action and progress, `done` for anything completed; a card
-  only where it groups; sentence case, plain verbs, no middle-dot meta, no arrows; motion only in `.celebrate`. Match the surrounding idiom.
+  only where it groups; sentence case, plain verbs, no middle-dot meta, no arrows; 150 ms `motion-safe:` transitions on things that
+  answer a tap, `.celebrate` the only unprompted motion. Match the surrounding idiom.
 
 ## Hard rules
 - **Secrets:** they live in `.env` (not `.env.local`). Never print, cat, echo, log or quote `.env` or any env var value
@@ -73,8 +74,7 @@ pnpm test         # migrations + two-user isolation on PGlite; no DATABASE_URL n
 Screens sit behind Google login, so say so when a UI change wasn't seen running.
 
 ## Build order
-10. **Multi-user** — done (accounts, scoping, onboarding per goal, one bot for all, per-user export, People).
-11. **Home program** — workout types for home users from their equipment (`settings.equipment`), same editor and rotation.
+10–11. **Multi-user**, **Home program** — done (accounts, scoping, one bot, per-user export, People; ladders, Day A/B/C, the finisher, weekly rotation).
 12. **Exercise suggestions** — suggest swaps/additions per muscle group from the library (stalls, missing groups).
 
 ## Context hygiene (save tokens)

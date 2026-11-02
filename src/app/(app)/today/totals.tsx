@@ -19,7 +19,7 @@ function Bar({ value, target, tone }: { value: number; target: number; tone: "ac
   const fill = { accent: "bg-accent", done: "bg-done", danger: "bg-danger" }[tone];
   return (
     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
-      <div className={`h-full rounded-full ${fill}`} style={{ width: `${pct}%` }} />
+      <div className={`h-full rounded-full motion-safe:transition-[width] motion-safe:duration-150 ${fill}`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
