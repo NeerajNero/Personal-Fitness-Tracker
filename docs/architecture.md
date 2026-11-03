@@ -41,7 +41,7 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
 | `src/lib/home-program.ts`, `src/lib/library-seed.ts` | Day A/B/C creation and the weekly-rotation count; the idempotent library upsert shared by `pnpm seed` and the tests. See [home-program.md](home-program.md) |
 | `scripts/` | `seed.ts` (shared exercise library only), `remove-user.ts` (delete a person, `:dry`), `backup.ts` (JSON dump of every table, `--full` keeps chat ids), `choose-your-day.ts` (one-off data step), `bot-webhook.ts`, `tick.ts`, `gen-icons.ts` (PWA icons, one-off) |
 | `drizzle/` | SQL migrations (0001 = views, 0007 = multi-user; both hand-written; 0008–0009 generated then made re-runnable) |
-| `tests/` | `multi-user.test.ts`: migrations + two-user isolation on PGlite (`pnpm test`) |
+| `tests/` | `multi-user.test.ts` (migrations + two-user isolation), `onboarding.test.ts` (the real onboarding action, the `"use server"` export rule, the action error boundary) on PGlite; `stubs/` doubles for `@/lib/session` and `next/navigation` (`pnpm test`) |
 
 ## Rules that keep it coherent
 - **Every query is scoped to a user.** App code imports `forUser(userId)` from `src/lib/db/scope.ts` and filters with
@@ -58,8 +58,13 @@ A few users, each fully isolated by `user_id`. Everything is computed in IST (`A
 - **Client/server boundary:** client components must not import anything that imports `@/db`. Client-safe modules:
   `lib/format.ts` (incl. `MEAL_SERVING`), `lib/cardio.ts` (cardio config, validation, summaries), `lib/metrics/phase.ts`, `lib/routine.ts`, `lib/nudges.ts`, `lib/export-tables.ts`, `lib/targets.ts`, `lib/library.ts`, `lib/diag/text.ts`, `lib/diag/client-log.ts`.
   (A db import that leaked into the client bundle was fixed in `f731e7d`, so keep it that way.)
-- **Mutations:** Server Actions return `ActionResult` (`src/lib/action-result.ts`). Each one calls `requireUser()`,
-  validates its input with zod, and calls `revalidatePath` on the screens it affects. A foreign id is simply "not found". Route handlers exist only for telegram, tick and export.
+- **Mutations:** Server Actions return `ActionResult` (`src/lib/action-result.ts`). Each one is
+  `export const name = action("name", async (…) => { … })`: the wrapper writes any thrown error (not a redirect) to
+  `diag_events` with the action's name before Next's error page, and `fail(e)` inside reports the same way before the
+  result returns. Each calls `requireUser()`, validates its input with zod, and calls `revalidatePath` on the screens it
+  affects. A foreign id is simply "not found". Inline form actions in pages wrap their body in `run("name", …)`.
+  **A `"use server"` file may export only async functions**: a schema or constant exported next to an action makes
+  Next refuse the whole module at request time (the build doesn't catch it; `pnpm test` does). Route handlers exist only for telegram, tick and export.
 - **Optimistic UI:** lists use `useOptimistic` with negative temp ids, and rows with an id < 0 render as pending.
 - **Dates in URLs:** Today and Train take `?d=YYYY-MM-DD` (past days only) for back-filling.
 

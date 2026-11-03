@@ -15,6 +15,11 @@ targets (`src/lib/targets.ts`: Mifflin-St Jeor × activity factor → kcal ± 25
 `settings` row (single protein range; owner-only columns stay null), creates Push/Pull/Legs for gym users (home users get an
 empty workout-type list; the Today card builds Day A/B/C after one question), marks `users.onboarded_at` and shows the confirm page: targets + `/start <code>` for the
 bot. Already-onboarded users are redirected to Today, so targets are never recomputed behind someone's back.
+The form's schema and state types are in `src/lib/onboarding.ts`, not the action file: a `"use server"` module may export
+only async functions, and Next refuses the whole module otherwise (the bug that broke the second account's onboarding;
+`pnpm test` checks every such file). **Resumable:** a settings row left by a failed attempt (users.onboarded_at still null)
+is updated in place, link code and date kept, and gym starter types are not duplicated, so submitting again just works.
+Like every action, it runs under `action("completeOnboarding", …)`: a throw becomes an `action` diag event before Next's error page.
 
 ## Settings layout
 **Everyday**
@@ -53,6 +58,8 @@ All mutations are in `src/app/(app)/settings/actions.ts` (each scoped with `forU
 | `auth.ts`, `src/lib/session.ts`, `src/lib/users.ts` | Allowlist, `requireUser`, users rows (details in [../users.md](../users.md)) |
 | `src/app/login/page.tsx`, `src/app/(app)/layout.tsx` | Sign-in page; the gate |
 | `src/app/onboarding/{page,onboarding-form,actions}.tsx`, `onboarding/confirm/page.tsx` | Onboarding flow |
+| `src/lib/onboarding.ts` | The form's zod schema and state types (client-safe; kept out of the `"use server"` file) |
+| `src/lib/action-result.ts` | `action()` / `run()` wrapper around every action (failures → diag events), `fail()`, `ActionResult` |
 | `src/app/(app)/settings/page.tsx`, `actions.ts`, `ui.tsx` | Settings screen, every mutation, `Field` / `Status` (the classes come from `src/components/ui.tsx`) |
 | `settings/targets-form.tsx`, `phase-section.tsx`, `telegram-card.tsx`, `nudge-settings.tsx` | Everyday cards |
 | `settings/foods-editor.tsx`, `workout-types-editor.tsx`, `body-stats-form.tsx`, `people.tsx` | Setup cards; admin People |

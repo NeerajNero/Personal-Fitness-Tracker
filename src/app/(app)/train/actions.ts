@@ -6,7 +6,7 @@ import { z } from "zod";
 import { sessionExercises, sessions, sets } from "@/db/schema";
 import { deleteCardio, insertCardio, repeatLastCardio, updateCardio } from "@/lib/activities";
 import type { CardioInput } from "@/lib/cardio";
-import { fail, type ActionResult } from "@/lib/action-result";
+import { action, fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
 import { forUser } from "@/lib/db/scope";
 import { MUSCLE_GROUPS } from "@/lib/routine";
@@ -24,7 +24,7 @@ function revalidate() {
 /* --------------------------------- session --------------------------------- */
 
 /** ✓ Same as last time — one exercise, or every unlogged exercise when `exerciseId` is omitted. */
-export async function sameAsLast(sessionId: number, exerciseId?: number): Promise<ActionResult<{ filled: number }>> {
+export const sameAsLast = action("sameAsLast", async (sessionId: number, exerciseId?: number): Promise<ActionResult<{ filled: number }>> => {
   const userId = await requireUser();
   try {
     const filled = await copyLastSets(userId, id.parse(sessionId), exerciseId === undefined ? undefined : [id.parse(exerciseId)]);
@@ -33,9 +33,9 @@ export async function sameAsLast(sessionId: number, exerciseId?: number): Promis
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function discardSession(sessionId: number): Promise<ActionResult> {
+export const discardSession = action("discardSession", async (sessionId: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const u = forUser(userId);
@@ -45,9 +45,9 @@ export async function discardSession(sessionId: number): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function saveSessionNotes(sessionId: number, notes: string): Promise<ActionResult> {
+export const saveSessionNotes = action("saveSessionNotes", async (sessionId: number, notes: string): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const n = z.string().trim().max(500, "Notes too long").parse(notes);
@@ -58,7 +58,7 @@ export async function saveSessionNotes(sessionId: number, notes: string): Promis
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* ---------------------------------- sets ----------------------------------- */
 
@@ -71,13 +71,13 @@ const setSchema = z.object({
   reps: z.coerce.number().int("Whole numbers only").min(1, "At least 1").max(600, "Up to 600 seconds"),
 });
 
-export async function upsertSet(input: {
+export const upsertSet = action("upsertSet", async (input: {
   sessionId: number;
   exerciseId: number;
   setNo: number;
   weightKg: string;
   reps: string;
-}): Promise<ActionResult> {
+}): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const v = setSchema.parse(input);
@@ -100,9 +100,9 @@ export async function upsertSet(input: {
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function deleteSet(sessionId: number, exerciseId: number, setNo: number): Promise<ActionResult> {
+export const deleteSet = action("deleteSet", async (sessionId: number, exerciseId: number, setNo: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const u = forUser(userId);
@@ -114,10 +114,10 @@ export async function deleteSet(sessionId: number, exerciseId: number, setNo: nu
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** The finisher timer ran its 10 minutes (or the user marked it done): one set row + a cardio entry. */
-export async function logFinisher(sessionId: number, exerciseId: number): Promise<ActionResult> {
+export const logFinisher = action("logFinisher", async (sessionId: number, exerciseId: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const ok = await finishFinisher(userId, id.parse(sessionId), id.parse(exerciseId));
@@ -127,7 +127,7 @@ export async function logFinisher(sessionId: number, exerciseId: number): Promis
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* ------------------------------- + exercise -------------------------------- */
 
@@ -137,11 +137,11 @@ const addExerciseSchema = z.union([
 ]);
 
 /** Add an existing exercise (full library) or create a new one, attach it to this session, and optionally to its workout type. */
-export async function addExerciseToSession(
+export const addExerciseToSession = action("addExerciseToSession", async (
   sessionId: number,
   input: { exerciseId: number } | { name: string; muscleGroup: string },
   alsoAddToType = false,
-): Promise<ActionResult<{ exerciseId: number }>> {
+): Promise<ActionResult<{ exerciseId: number }>> => {
   const userId = await requireUser();
   try {
     const sid = id.parse(sessionId);
@@ -172,12 +172,12 @@ export async function addExerciseToSession(
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* --------------------------------- cardio ---------------------------------- */
 
 /** Add a cardio entry (validation + speed ⇄ distance derivation in normalizeCardio). */
-export async function addCardio(date: string, input: CardioInput): Promise<ActionResult<{ id: number }>> {
+export const addCardio = action("addCardio", async (date: string, input: CardioInput): Promise<ActionResult<{ id: number }>> => {
   const userId = await requireUser();
   try {
     const e = await insertCardio(userId, dateSchema.parse(date), input);
@@ -186,9 +186,9 @@ export async function addCardio(date: string, input: CardioInput): Promise<Actio
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function editCardio(entryId: number, input: CardioInput): Promise<ActionResult> {
+export const editCardio = action("editCardio", async (entryId: number, input: CardioInput): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const e = await updateCardio(userId, id.parse(entryId), input);
@@ -198,9 +198,9 @@ export async function editCardio(entryId: number, input: CardioInput): Promise<A
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function removeCardio(entryId: number): Promise<ActionResult> {
+export const removeCardio = action("removeCardio", async (entryId: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     await deleteCardio(userId, id.parse(entryId));
@@ -209,10 +209,10 @@ export async function removeCardio(entryId: number): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** "Same as last time": copy the most recent entry onto `date` with the current time. */
-export async function repeatCardio(date: string): Promise<ActionResult> {
+export const repeatCardio = action("repeatCardio", async (date: string): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const e = await repeatLastCardio(userId, dateSchema.parse(date));
@@ -222,4 +222,4 @@ export async function repeatCardio(date: string): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});

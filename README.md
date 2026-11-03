@@ -63,7 +63,7 @@ redirect URI is in step 2.
 | `pnpm dev` | Next.js dev server (Turbopack) on :3000 |
 | `pnpm build` / `pnpm start` | Production build / serve it |
 | `pnpm lint` | ESLint, including the rule that only `src/lib/db/scope.ts` and `src/lib/users.ts` may import `@/db` |
-| `pnpm test` | Migrations + two-user isolation test on PGlite (in-memory Postgres); needs no database |
+| `pnpm test` | Migrations, two-user isolation, the real onboarding action and the action error boundary on PGlite (in-memory Postgres); needs no database |
 | `pnpm db:generate` | drizzle-kit: diff `src/db/schema.ts` into a new `drizzle/*.sql` + snapshot (then hand-edit if data must move) |
 | `pnpm db:migrate` | Apply pending migrations to `DATABASE_URL` |
 | `pnpm db:studio` | drizzle-kit studio against `DATABASE_URL` |

@@ -54,7 +54,9 @@ Their bot access lasts until `remove-user` deletes them (or the chat is unlinked
 The action writes the settings row (body stats, goal, location, equipment, days, minutes, `weekly_session_target` = days,
 kcal + single protein range, a link code, `settings.onboarded_at`), creates Push/Pull/Legs for gym users
 (`createWorkoutType`, from `src/lib/library.ts`; home users get none yet), marks `users.onboarded_at`, and shows
-`/onboarding/confirm`. An onboarded user who opens `/onboarding` is sent to Today: **targets are computed once and never
+`/onboarding/confirm`. A settings row from an earlier failed attempt is updated, not inserted again (link code and
+`onboarded_at` kept), so a retry works. The schema is `onboardingSchema` in `src/lib/onboarding.ts` (a `"use server"` file
+may export only async functions). `tests/onboarding.test.ts` runs the real action for a home and a gym user. An onboarded user who opens `/onboarding` is sent to Today: **targets are computed once and never
 recomputed for an existing user** (the owner's stored numbers predate this code and must stay).
 
 ## Verdicts and maintenance per goal (`src/lib/metrics/trends.ts`)
@@ -83,7 +85,7 @@ and `budget_80` reminders. Everyone else has one protein range (`protein_min/max
 | `src/lib/session.ts` | `requireSession`, `requireUser` |
 | `src/lib/settings.ts` | `getSettings`, `findSettings`, `hasPhases`, `hasBudgets`, `hasNavelGoal` |
 | `src/lib/targets.ts`, `src/lib/library.ts` | Targets per goal; shared exercise library + gym starter types |
-| `src/app/onboarding/*` | Form, `completeOnboarding`, confirm page |
+| `src/app/onboarding/*`, `src/lib/onboarding.ts` | Form, `completeOnboarding`, confirm page; the form's schema |
 | `src/app/(app)/layout.tsx` | The gate |
 | `src/app/(app)/settings/people.tsx` | Admin list |
 | `eslint.config.mjs` | The `@/db` import rule |

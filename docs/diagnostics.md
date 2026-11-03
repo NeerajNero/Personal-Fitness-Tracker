@@ -68,7 +68,7 @@ Last 20 for me; admins see the last 50 across users with the email. Written by:
 | `tick · due` / `sent` / `failed` | per user, only when something was due or the run threw | `dry`, `rules`, `error`, `code` |
 | `send · <ErrorClass>` (error) | a failed proactive send | `code`, `blocked` |
 | `gemini · parsed` / `nothing edible` / `bad output` / `rate limited` / `timeout` / `failed` / `no key` | `parseFreeText` | `ms`, `items`, `status`, `error` |
-| `action · <Error>: <message>` (error) | `fail()` in server actions, after the response (`after()`); validation errors are not events | |
+| `action · <Error>: <first message line>` (error) | every server action runs under `action(name, …)` / `run(name, …)` (`src/lib/action-result.ts`): a thrown error (not a redirect) is written before Next renders its error page, and an error handed to `fail()` before the result returns; zod validation errors are not events | `action`: the action's name |
 Real (non-dry) ticks delete rows older than 7 days. `remove-user` and the cascade delete a person's rows.
 
 ## The bot's `diag`
@@ -86,7 +86,7 @@ Env values, tokens, the webhook secret, full chat ids, link codes, other people'
 | `src/lib/diag/me.ts` | `collectMe`, `collectDayState`, `meSection`, `dayStateSection`, `dayStateLine`, `dayStateJson` |
 | `src/lib/diag/bot.ts` | `diagReply` (the `diag` command) |
 | `src/lib/diag/text.ts`, `src/lib/diag/client-log.ts` | Client-safe: report shape + `renderDiagText` (incl. `## Errors`), `errorLine`, `maskChatId`; the in-memory client error log |
-| `src/lib/diag/report.ts`, `src/lib/action-result.ts` | Server-action error boundary (`reportActionError` via `fail`) |
+| `src/lib/diag/report.ts`, `src/lib/action-result.ts` | Server-action error boundary: `action()` / `run()` / `fail()` → `reportActionError` (user from `currentUserId`, never a redirect) |
 | `src/lib/diag/load.ts` | `buildDiagnostics(userId, …)` (one collector per section, each caught), `runTickDryAs(userId)`, `isAdmin`: the server-side gate |
 | `src/app/(app)/settings/diagnostics.tsx`, `diag-actions.ts` | The card (client sections, copy, fallback textarea, Run tick) and the thin `loadDiagnostics` / `runTickDry` actions |
 | `src/components/client-log.tsx`, `public/sw.js` | Installs the client log; `SW_VERSION` + the version message |

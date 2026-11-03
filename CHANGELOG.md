@@ -7,6 +7,9 @@ Skip pure refactors and internal-only changes unless they change behaviour.
 ## Unreleased
 
 ### Added
+- **Diagnostics sees every action failure.** A server action that throws (onboarding included) writes an `action`
+  event with the user, the action's name, the error class and the first line of its message before Next shows its
+  error page, so Settings → Diagnostics explains a "This page couldn't load". `pnpm test` covers it.
 - **Home program.** Home users build Day A / B / C from the workout card after one question (push-ups in a row). Eleven
   bodyweight ladders with a cue per rung (wall push-up to archer push-up, table rows, squats to a doorframe pistol,
   hinges, lunges, planks, side planks, core holds, wall sits, calves) and seven finishers. Progression by reps: all sets
@@ -71,6 +74,11 @@ Skip pure refactors and internal-only changes unless they change behaviour.
   an RCE in `use cache` functions returning typed arrays, and a Server Actions denial of service.
 
 ### Fixed
+- **Onboarding for a second account.** Submitting the set-up form gave Next's "This page couldn't load" and left the
+  person not onboarded. The action file exported its zod schema next to the action, and a `"use server"` module may
+  export only async functions, so the whole module failed to load (before sign-in, the database or any event). The
+  schema now lives in `src/lib/onboarding.ts`; a test imports every `"use server"` file and checks its exports. A retry
+  after a failed attempt updates the settings row that was left behind instead of inserting a second one.
 - One failed Telegram send (429, or a 403 from someone who blocked the bot) no longer aborts `/api/tick` for the users
   after them: each user's run is isolated and reported as `ok` or the error class. A 403 marks that chat blocked
   (Settings → People shows it); reminders pause until they write to the bot again.

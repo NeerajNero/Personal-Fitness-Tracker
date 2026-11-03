@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
 import { primary } from "@/components/ui";
+import { run } from "@/lib/action-result";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const session = await auth();
@@ -16,7 +17,9 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       <form
         action={async () => {
           "use server";
-          await signIn("google", { redirectTo: "/today" });
+          await run("signIn", async () => {
+            await signIn("google", { redirectTo: "/today" });
+          });
         }}
       >
         <button type="submit" className={`${primary} h-14 w-full text-lg`}>

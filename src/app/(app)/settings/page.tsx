@@ -21,6 +21,7 @@ import { PhaseSection } from "./phase-section";
 import { WorkoutTypesEditor, type WorkoutTypeView } from "./workout-types-editor";
 import { TargetsForm } from "./targets-form";
 import { TelegramCard } from "./telegram-card";
+import { run } from "@/lib/action-result";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -95,7 +96,9 @@ export default async function SettingsPage() {
       <form
         action={async () => {
           "use server";
-          await signOut({ redirectTo: "/login" });
+          await run("signOut", async () => {
+            await signOut({ redirectTo: "/login" });
+          });
         }}
       >
         <button type="submit" className={`${btn} h-12 w-full text-base text-danger`}>

@@ -21,7 +21,7 @@
     "bot:delete-webhook": "node --env-file=.env --import=tsx scripts/bot-webhook.ts delete",
     "tick": "node --env-file=.env --import=tsx scripts/tick.ts",
     "tick:dry": "node --env-file=.env --import=tsx scripts/tick.ts dry",
-    "test": "node --conditions=react-server --import=tsx --test tests/multi-user.test.ts"
+    "test": "node --conditions=react-server --import=tsx --test tests/multi-user.test.ts tests/onboarding.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { foodLog } from "@/db/schema";
-import { fail, type ActionResult } from "@/lib/action-result";
+import { action, fail, type ActionResult } from "@/lib/action-result";
 import { upsertDailyMetrics } from "@/lib/daily";
 import { addDays, ISO_DATE, nowTimeIST } from "@/lib/dates";
 import { forUser } from "@/lib/db/scope";
@@ -27,7 +27,7 @@ const stepsSchema = z.union([
   z.coerce.number().int("Whole number").min(0, "0–100,000").max(100_000, "0–100,000"),
 ]);
 
-export async function saveWeight(date: string, raw: string): Promise<ActionResult> {
+export const saveWeight = action("saveWeight", async (date: string, raw: string): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
@@ -38,9 +38,9 @@ export async function saveWeight(date: string, raw: string): Promise<ActionResul
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function saveSteps(date: string, raw: string): Promise<ActionResult> {
+export const saveSteps = action("saveSteps", async (date: string, raw: string): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
@@ -51,12 +51,12 @@ export async function saveSteps(date: string, raw: string): Promise<ActionResult
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* --------------------------------- food log -------------------------------- */
 
 /** Add `qty` servings of a catalogue food. */
-export async function addFoodLog(date: string, foodId: number, qty: number): Promise<ActionResult<{ id: number }>> {
+export const addFoodLog = action("addFoodLog", async (date: string, foodId: number, qty: number): Promise<ActionResult<{ id: number }>> => {
   const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
@@ -69,7 +69,7 @@ export async function addFoodLog(date: string, foodId: number, qty: number): Pro
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 const quickAddSchema = z.object({
   label: z.string().trim().min(1, "Name required").max(80, "Name too long"),
@@ -82,10 +82,10 @@ const quickAddSchema = z.object({
  * Manual entry (name + kcal + protein). With `saveAsMeal` the entry is also saved to My meals
  * and logged against it, so next time it's one tap.
  */
-export async function quickAddFoodLog(
+export const quickAddFoodLog = action("quickAddFoodLog", async (
   date: string,
   input: { label: string; kcal: string; proteinG: string; saveAsMeal: boolean },
-): Promise<ActionResult<{ id: number }>> {
+): Promise<ActionResult<{ id: number }>> => {
   const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
@@ -106,10 +106,10 @@ export async function quickAddFoodLog(
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** Copy the previous day's food log onto `date`. Only allowed while `date` is empty, so a double tap can't duplicate. */
-export async function copyPreviousDay(date: string): Promise<ActionResult<{ count: number }>> {
+export const copyPreviousDay = action("copyPreviousDay", async (date: string): Promise<ActionResult<{ count: number }>> => {
   const userId = await requireUser();
   try {
     const d = dateSchema.parse(date);
@@ -121,10 +121,10 @@ export async function copyPreviousDay(date: string): Promise<ActionResult<{ coun
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** Change servings. Catalogue rows recompute from the food; quick-adds scale proportionally. */
-export async function updateFoodLogQty(id: number, qty: number): Promise<ActionResult> {
+export const updateFoodLogQty = action("updateFoodLogQty", async (id: number, qty: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const q = qtySchema.parse(qty);
@@ -146,9 +146,9 @@ export async function updateFoodLogQty(id: number, qty: number): Promise<ActionR
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function deleteFoodLog(id: number): Promise<ActionResult> {
+export const deleteFoodLog = action("deleteFoodLog", async (id: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const u = forUser(userId);
@@ -158,4 +158,4 @@ export async function deleteFoodLog(id: number): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});

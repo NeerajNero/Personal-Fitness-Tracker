@@ -39,6 +39,15 @@ is in the [README](../README.md#troubleshooting).
 exists), `markOnboarded` didn't run; set `onboarded_at = now()` on their users row in the Neon SQL editor. A user without a
 settings row who lands on `/onboarding/confirm` is redirected back to the form.
 
+## "This page couldn't load" on onboarding (or any form)
+Next's error page after a submit means the server action threw. Open Settings → Diagnostics (or the bot's `diag` for the
+admin): every action failure is an `action · <Error>: <first line>` event with the action's name in its meta, written
+before the error page, so the newest event names the cause. No event at all means the action module itself failed to
+load: `A "use server" file can only export async functions` is the one that broke the second user's onboarding
+(the form's schema was exported next to the action; `pnpm test` now refuses any non-function export). Vercel's function
+log shows the same error with a stack. Onboarding can simply be submitted again: a settings row from the failed attempt
+is updated, not inserted twice, and `users.onboarded_at` is set on the attempt that completes.
+
 ## "That Google account isn't allowed"
 - The app's message: the email isn't in `ALLOWED_EMAILS` (watch spelling, spaces and an un-redeployed env change). An
   existing users row doesn't help: the list is the authority. Someone signed in when they were removed is dropped on their
@@ -99,3 +108,4 @@ After a Neon password reset, update `DATABASE_URL` in Vercel and `.env`.
 | `src/lib/rules/engine.ts`, `src/app/api/tick/route.ts` | Skip reasons; per-user try/catch and the blocked mark |
 | `src/lib/users.ts` | `isAllowedEmail`, `ensureUser` claim logic, blocked flag |
 | `auth.ts`, `src/app/login/page.tsx` | Allowlist and the sign-in error text |
+| `src/lib/action-result.ts`, `src/lib/diag/report.ts`, `src/app/onboarding/actions.ts` | `action()` / `run()` error boundary around every server action; the onboarding action |

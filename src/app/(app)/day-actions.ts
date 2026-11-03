@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { fail, type ActionResult } from "@/lib/action-result";
+import { action, fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE } from "@/lib/dates";
 import { createHomePlan, PUSHUP_ANSWERS } from "@/lib/home-program";
 import { requireUser } from "@/lib/session";
@@ -15,7 +15,7 @@ const choiceSchema = z.union([
 ]);
 
 /** "Set up your home plan": Day A/B/C from the ladders, after the push-up question. Idempotent. */
-export async function createHomePlanAction(pushups: string): Promise<ActionResult<{ created: boolean }>> {
+export const createHomePlanAction = action("createHomePlanAction", async (pushups: string): Promise<ActionResult<{ created: boolean }>> => {
   const userId = await requireUser();
   try {
     const r = await createHomePlan(userId, z.enum(PUSHUP_ANSWERS).parse(pushups));
@@ -26,14 +26,14 @@ export async function createHomePlanAction(pushups: string): Promise<ActionResul
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** The day picker on Today and Train. `needsConfirm` → the current session has sets; call again with confirm to switch and keep them. */
-export async function chooseDay(
+export const chooseDay = action("chooseDay", async (
   date: string,
   choice: { kind: "rest" } | { kind: "custom" } | { kind: "workout"; typeId: number },
   confirm = false,
-): Promise<ActionResult<{ needsConfirm: false } | { needsConfirm: true; setCount: number }>> {
+): Promise<ActionResult<{ needsConfirm: false } | { needsConfirm: true; setCount: number }>> => {
   const userId = await requireUser();
   try {
     const r = await setDayPlan(userId, z.string().regex(ISO_DATE, "Bad date").parse(date), choiceSchema.parse(choice), { confirm: z.boolean().parse(confirm) });
@@ -44,4 +44,4 @@ export async function chooseDay(
   } catch (e) {
     return fail(e);
   }
-}
+});

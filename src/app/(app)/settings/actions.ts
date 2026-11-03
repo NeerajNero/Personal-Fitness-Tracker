@@ -13,7 +13,7 @@ import { BOT_COMMAND_WORDS, MUSCLE_GROUPS } from "@/lib/routine";
 import { hasBudgets, hasPhases, getSettings } from "@/lib/settings";
 import { matchFood } from "@/lib/telegram/parse";
 import { findOrCreateExercise, listWorkoutTypes, setRoutineRung as moveRung } from "@/lib/training";
-import { fail, type ActionResult } from "@/lib/action-result";
+import { action, fail, type ActionResult } from "@/lib/action-result";
 import { requireUser } from "@/lib/session";
 
 import { NUDGE_TOGGLES, type NudgeToggle } from "@/lib/nudges";
@@ -27,7 +27,7 @@ function patchSettings(userId: UserId, values: Partial<typeof settings.$inferIns
 const toggleSchema = z.enum(NUDGE_TOGGLES);
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
 
-export async function setNudgeToggle(key: NudgeToggle, value: boolean): Promise<ActionResult> {
+export const setNudgeToggle = action("setNudgeToggle", async (key: NudgeToggle, value: boolean): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const k = toggleSchema.parse(key);
@@ -37,9 +37,9 @@ export async function setNudgeToggle(key: NudgeToggle, value: boolean): Promise<
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function saveQuietHours(start: string, end: string): Promise<ActionResult> {
+export const saveQuietHours = action("saveQuietHours", async (start: string, end: string): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const s = hhmm.parse(start);
@@ -50,9 +50,9 @@ export async function saveQuietHours(start: string, end: string): Promise<Action
   } catch (err) {
     return fail(err);
   }
-}
+});
 
-export async function saveDailyCap(cap: number): Promise<ActionResult> {
+export const saveDailyCap = action("saveDailyCap", async (cap: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const c = z.coerce.number().int("Whole number").min(1, "1–20").max(20, "1–20").parse(cap);
@@ -62,7 +62,7 @@ export async function saveDailyCap(cap: number): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* ============================== targets & phase ============================== */
 
@@ -104,7 +104,7 @@ function formFail(err: unknown): FormState {
   return { ok: false, error: err instanceof Error ? err.message : "Something went wrong" };
 }
 
-export async function saveTargets(_prev: FormState, formData: FormData): Promise<FormState> {
+export const saveTargets = action("saveTargets", async (_prev: FormState, formData: FormData): Promise<FormState> => {
   const userId = await requireUser();
   try {
     const raw = Object.fromEntries(formData);
@@ -120,11 +120,11 @@ export async function saveTargets(_prev: FormState, formData: FormData): Promise
   } catch (e) {
     return formFail(e);
   }
-}
+});
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Bad date");
 
-export async function savePhase(input: { override: "auto" | "veg" | "nonveg"; switchDate: string }): Promise<ActionResult> {
+export const savePhase = action("savePhase", async (input: { override: "auto" | "veg" | "nonveg"; switchDate: string }): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const override = z.enum(["auto", "veg", "nonveg"]).parse(input.override);
@@ -135,9 +135,9 @@ export async function savePhase(input: { override: "auto" | "veg" | "nonveg"; sw
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function saveBodyStats(_prev: FormState, formData: FormData): Promise<FormState> {
+export const saveBodyStats = action("saveBodyStats", async (_prev: FormState, formData: FormData): Promise<FormState> => {
   const userId = await requireUser();
   try {
     const v = bodyStatsSchema.parse(Object.fromEntries(formData));
@@ -147,9 +147,9 @@ export async function saveBodyStats(_prev: FormState, formData: FormData): Promi
   } catch (e) {
     return formFail(e);
   }
-}
+});
 
-export async function saveSmokeFreeSince(date: string): Promise<ActionResult> {
+export const saveSmokeFreeSince = action("saveSmokeFreeSince", async (date: string): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const d = date === "" ? null : isoDate.refine((x) => x <= todayIST(), "Date is in the future").parse(date);
@@ -159,7 +159,7 @@ export async function saveSmokeFreeSince(date: string): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* =================================== foods =================================== */
 
@@ -177,7 +177,7 @@ const foodSchema = z.object({
 });
 
 /** Insert when `id` is empty, else update. Archive is separate. */
-export async function saveFood(_prev: FormState, formData: FormData): Promise<FormState> {
+export const saveFood = action("saveFood", async (_prev: FormState, formData: FormData): Promise<FormState> => {
   const userId = await requireUser();
   try {
     const raw = Object.fromEntries(formData);
@@ -192,9 +192,9 @@ export async function saveFood(_prev: FormState, formData: FormData): Promise<Fo
     if (e instanceof Error && /foods_user_name_uq/.test(e.message)) return { ok: false, error: "A food with that name already exists.", fieldErrors: { name: "Duplicate" } };
     return formFail(e);
   }
-}
+});
 
-export async function setFoodArchived(id: number, archived: boolean): Promise<ActionResult> {
+export const setFoodArchived = action("setFoodArchived", async (id: number, archived: boolean): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const u = forUser(userId);
@@ -204,9 +204,9 @@ export async function setFoodArchived(id: number, archived: boolean): Promise<Ac
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function setFoodFavourite(id: number, isFavourite: boolean): Promise<ActionResult> {
+export const setFoodFavourite = action("setFoodFavourite", async (id: number, isFavourite: boolean): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const u = forUser(userId);
@@ -216,7 +216,7 @@ export async function setFoodFavourite(id: number, isFavourite: boolean): Promis
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* ================================== routine ================================== */
 
@@ -236,7 +236,7 @@ const routineRow = (userId: UserId, dayId: number, exerciseId: number) => {
   return u.own(routineExercises, eq(routineExercises.routineDayId, dayId), eq(routineExercises.exerciseId, exerciseId));
 };
 
-export async function moveRoutineExercise(dayId: number, exerciseId: number, dir: "up" | "down"): Promise<ActionResult> {
+export const moveRoutineExercise = action("moveRoutineExercise", async (dayId: number, exerciseId: number, dir: "up" | "down"): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const d = id.parse(dayId);
@@ -256,9 +256,9 @@ export async function moveRoutineExercise(dayId: number, exerciseId: number, dir
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function setRoutineTargets(dayId: number, exerciseId: number, sets: number, reps: number): Promise<ActionResult> {
+export const setRoutineTargets = action("setRoutineTargets", async (dayId: number, exerciseId: number, sets: number, reps: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const v = { targetSets: int(1, 10, "1–10").parse(sets), targetReps: int(1, 50, "1–50").parse(reps) };
@@ -268,10 +268,10 @@ export async function setRoutineTargets(dayId: number, exerciseId: number, sets:
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** Ladder exercises: one rung up or down in this type (Settings shows "rung n of m"). */
-export async function setRoutineRung(dayId: number, exerciseId: number, dir: "up" | "down"): Promise<ActionResult> {
+export const setRoutineRung = action("setRoutineRung", async (dayId: number, exerciseId: number, dir: "up" | "down"): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const r = await moveRung(userId, id.parse(dayId), id.parse(exerciseId), z.enum(["up", "down"]).parse(dir));
@@ -281,9 +281,9 @@ export async function setRoutineRung(dayId: number, exerciseId: number, dir: "up
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function removeRoutineExercise(dayId: number, exerciseId: number): Promise<ActionResult> {
+export const removeRoutineExercise = action("removeRoutineExercise", async (dayId: number, exerciseId: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     await forUser(userId).db.delete(routineExercises).where(routineRow(userId, id.parse(dayId), id.parse(exerciseId)));
@@ -292,11 +292,11 @@ export async function removeRoutineExercise(dayId: number, exerciseId: number): 
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 const addSchema = z.union([z.object({ exerciseId: id }), z.object({ name: z.string().trim().min(1, "Name required").max(60, "Too long"), muscleGroup: z.enum(MUSCLE_GROUPS) })]);
 
-export async function addRoutineExercise(dayId: number, input: { exerciseId: number } | { name: string; muscleGroup: string }): Promise<ActionResult> {
+export const addRoutineExercise = action("addRoutineExercise", async (dayId: number, input: { exerciseId: number } | { name: string; muscleGroup: string }): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const d = id.parse(dayId);
@@ -313,7 +313,7 @@ export async function addRoutineExercise(dayId: number, input: { exerciseId: num
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* =============================== workout types =============================== */
 
@@ -342,7 +342,7 @@ async function renumberTypes(userId: UserId, activeOrder: number[]) {
   }
 }
 
-export async function addWorkoutType(name: string): Promise<ActionResult<{ warning: string | null }>> {
+export const addWorkoutType = action("addWorkoutType", async (name: string): Promise<ActionResult<{ warning: string | null }>> => {
   const userId = await requireUser();
   try {
     const n = typeName.parse(name);
@@ -357,9 +357,9 @@ export async function addWorkoutType(name: string): Promise<ActionResult<{ warni
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function renameWorkoutType(typeId: number, name: string): Promise<ActionResult<{ warning: string | null }>> {
+export const renameWorkoutType = action("renameWorkoutType", async (typeId: number, name: string): Promise<ActionResult<{ warning: string | null }>> => {
   const userId = await requireUser();
   try {
     const t = id.parse(typeId);
@@ -373,10 +373,10 @@ export async function renameWorkoutType(typeId: number, name: string): Promise<A
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** Move within the rotation (active types only). */
-export async function moveWorkoutType(typeId: number, dir: "up" | "down"): Promise<ActionResult> {
+export const moveWorkoutType = action("moveWorkoutType", async (typeId: number, dir: "up" | "down"): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const order = (await listWorkoutTypes(userId)).map((t) => t.id);
@@ -390,10 +390,10 @@ export async function moveWorkoutType(typeId: number, dir: "up" | "down"): Promi
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** Archive hides a type from the picker and rotation (history stays); restore puts it at the end of the rotation. */
-export async function setWorkoutTypeArchived(typeId: number, archived: boolean): Promise<ActionResult> {
+export const setWorkoutTypeArchived = action("setWorkoutTypeArchived", async (typeId: number, archived: boolean): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const t = id.parse(typeId);
@@ -406,9 +406,9 @@ export async function setWorkoutTypeArchived(typeId: number, archived: boolean):
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function saveWeeklySessionTarget(n: number): Promise<ActionResult> {
+export const saveWeeklySessionTarget = action("saveWeeklySessionTarget", async (n: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     await patchSettings(userId, { weeklySessionTarget: int(1, 14, "1–14").parse(n) });
@@ -417,9 +417,9 @@ export async function saveWeeklySessionTarget(n: number): Promise<ActionResult> 
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function saveExerciseCues(exerciseId: number, cues: string): Promise<ActionResult> {
+export const saveExerciseCues = action("saveExerciseCues", async (exerciseId: number, cues: string): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const c = z.string().trim().max(1000, "Too long").parse(cues);
@@ -432,11 +432,11 @@ export async function saveExerciseCues(exerciseId: number, cues: string): Promis
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /* ================================== telegram ================================= */
 
-export async function regenerateLinkCode(): Promise<ActionResult<{ code: string }>> {
+export const regenerateLinkCode = action("regenerateLinkCode", async (): Promise<ActionResult<{ code: string }>> => {
   const userId = await requireUser();
   try {
     const code = randomBytes(4).toString("hex").toUpperCase();
@@ -446,9 +446,9 @@ export async function regenerateLinkCode(): Promise<ActionResult<{ code: string 
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function unlinkTelegram(): Promise<ActionResult> {
+export const unlinkTelegram = action("unlinkTelegram", async (): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     await patchSettings(userId, { telegramChatId: null });
@@ -457,4 +457,4 @@ export async function unlinkTelegram(): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});

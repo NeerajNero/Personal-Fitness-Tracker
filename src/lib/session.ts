@@ -14,3 +14,9 @@ export async function requireUser(): Promise<UserId> {
   const session = await requireSession();
   return asUserId(session.user!.id!);
 }
+
+/** The signed-in user's id or null. Never redirects and never throws: for error reporting. */
+export async function currentUserId(): Promise<UserId | null> {
+  const session = await auth().catch(() => null);
+  return session?.user?.id ? asUserId(session.user.id) : null;
+}

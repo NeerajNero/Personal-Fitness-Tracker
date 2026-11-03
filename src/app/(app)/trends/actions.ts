@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { settings } from "@/db/schema";
-import { fail, type ActionResult } from "@/lib/action-result";
+import { action, fail, type ActionResult } from "@/lib/action-result";
 import { ISO_DATE, todayIST } from "@/lib/dates";
 import { forUser } from "@/lib/db/scope";
 import { deleteMeasurement as deleteMeasurementRow, upsertMeasurementByDate } from "@/lib/measurements";
@@ -21,7 +21,7 @@ const measurementSchema = z
   .refine((v) => v.navelCm !== null || v.waistCm !== null, { message: "Enter navel or waist", path: ["navelCm"] });
 
 /** One measurement per date: update if that date exists, else insert. */
-export async function upsertMeasurement(input: { date: string; navelCm: string; waistCm: string; notes: string }): Promise<ActionResult<{ id: number }>> {
+export const upsertMeasurement = action("upsertMeasurement", async (input: { date: string; navelCm: string; waistCm: string; notes: string }): Promise<ActionResult<{ id: number }>> => {
   const userId = await requireUser();
   try {
     const v = measurementSchema.parse(input);
@@ -31,9 +31,9 @@ export async function upsertMeasurement(input: { date: string; navelCm: string; 
   } catch (e) {
     return fail(e);
   }
-}
+});
 
-export async function deleteMeasurement(id: number): Promise<ActionResult> {
+export const deleteMeasurement = action("deleteMeasurement", async (id: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     await deleteMeasurementRow(userId, z.number().int().positive().parse(id));
@@ -42,10 +42,10 @@ export async function deleteMeasurement(id: number): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});
 
 /** Apply a suggested calorie target (±25 range). Only ever called from an explicit confirm. */
-export async function applyKcalTarget(target: number): Promise<ActionResult> {
+export const applyKcalTarget = action("applyKcalTarget", async (target: number): Promise<ActionResult> => {
   const userId = await requireUser();
   try {
     const t = z.number().int().min(1200, "Too low to be safe").max(4000, "Too high").parse(target);
@@ -57,4 +57,4 @@ export async function applyKcalTarget(target: number): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
-}
+});
